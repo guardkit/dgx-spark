@@ -225,6 +225,8 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 # line satisfies the first grep's `fallbacks: []` substring even when `fallbacks:` is POPULATED (false-pass).
 ```
 
+**Install + run it (agent steps — not a pre-install):** the agent runs `pip install 'litellm[proxy]' --break-system-packages`, writes the config above to `/opt/litellm/config.yaml` (heredoc), then starts it: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0` (or a `systemctl --user` unit per Phase 4.1).
+
 ---
 
 ## Phase 8: Memory-budget gate + TP Proposer bring-up &nbsp;·&nbsp; **▶ GATE: pool XOR proposer**
@@ -232,13 +234,17 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 The ~158 GB Proposer shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict/tear down the swap pool before launching the Proposer.**
 
 ```bash
+# 0. One-time: install the pinned vLLM (agent step — heavy build, edit out the wait). GB10-validated
+#    commit jasl/vllm dda4668b + torch 2.9.1 (2.10 breaks CUDA graphs). Use the recipe's installer
+#    (eugr/spark-vllm-docker) OR a venv:  python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install -U pip torch==2.9.1
+#    && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
 # 1. Pause keepalive + drain the Node A pool so it can't revive on top of the proposer:
 sudo systemctl stop llama-swap-keepalive.timer        # (system unit, per the single-Spark runbook)
 # 2. Launch vLLM --tp 2 across both nodes (mp backend; no Ray at 2 nodes):
 #    TP-layer env (distinct from the Phase-4 fabric vars): add the RoCE HCAs explicitly.
 export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
        GLOO_SOCKET_IFNAME=enp1s0f1np1 TP_SOCKET_IFNAME=enp1s0f1np1
-vllm serve deepseek-ai/DeepSeek-V4-Flash \
+~/vllm-tp/bin/vllm serve deepseek-ai/DeepSeek-V4-Flash \
   --tensor-parallel-size 2 --distributed-executor-backend mp --nnodes 2 \
   --kv-cache-dtype fp8 --enable-expert-parallel --no-ray \
   --speculative-config '{"method":"deepseek_mtp","num_speculative_tokens":2}' \

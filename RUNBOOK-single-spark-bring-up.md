@@ -151,7 +151,19 @@ for pat in "qwen3.6*35*a3b" "gemma*4*26b*a4b*it" "gpt-oss-20b" "qwen3*embedding*
   echo "${pat}: ${f:-NOT FOUND}"
 done
 ```
-**Pass:** all four resolve. If any are missing, download the GGUFs named in the PINS block (use `HF_HUB_ENABLE_HF_TRANSFER=1`; use the Blackwell-tuned / Unsloth GGUF repos) into `/opt/llama-swap/models/<dir>/`. The two public-only models (`gpt-oss-20b` chat + `Qwen3-Embedding-0.6B` embed) stage in one shot with [`scripts/stage-public-models.sh`](./scripts/stage-public-models.sh) — it downloads them and makes the on-disk filenames match the config (Unsloth ships uppercase `MXFP4`). **Note the case-sensitivity gate:** glob with `-iname`, not `-name` (registry row, conventions §8). The served path is `/opt/llama-swap/models/` — staging only into the HF cache will pass this glob but the config `--model` paths must point at what you actually serve.
+**Pass (read-only check):** the find lists which of the four are already present — this phase has no side effects. Any missing model is staged by **Phase 1.5** (the agent's next step); there is no manual download. Glob with `-iname`, not `-name` (registry row, conventions §8); the served path is `/opt/llama-swap/models/` (the config `--model` paths point there).
+
+---
+
+## Phase 1.5: Stage the model GGUFs (first downloads — long; edit out the wait) &nbsp;·&nbsp; **▶ the agent runs this step**
+
+A **step the agent executes**, not a manual prerequisite. Idempotent — models already on disk are skipped.
+
+```bash
+./scripts/stage-public-models.sh
+```
+
+Downloads the four public models — workhorse (Qwen3.6-35B-A3B), coach (stock Gemma-4-26B-A4B-it), chat (gpt-oss-20b), embed (Qwen3-Embedding-0.6B) — into `/opt/llama-swap/models/`, and makes each on-disk filename match the `--model` paths in [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) (Unsloth ships uppercase `MXFP4`, so the script symlinks to the expected name). ~35 GB on a fresh box — this is the long pull you edit out of the recording; a re-run skips what's present.
 
 ---
 
