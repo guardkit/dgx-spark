@@ -67,7 +67,7 @@ Degrades gracefully (DF-001): network down → `recon: skipped`, proceed on PINS
 ```bash
 echo "=== Phase 0.1: two-spark deterministic checks ==="
 # CX-7 firmware on THIS node vs the all_gather-halving-fix floor
-flint -d $(ibdev2netdev | awk '{print $1; exit}') q 2>/dev/null | grep -i 'FW Version' || echo "[recon] flint unavailable — check FW via DGX Dashboard"
+mstflint -d $(ibdev2netdev | awk '{print $1; exit}') q 2>/dev/null | grep -i 'FW Version' || echo "[recon] mstflint unavailable — check FW via DGX Dashboard"   # DGX OS ships mstflint, not legacy flint
 # torch + vLLM commit pins (on the node that will host vLLM)
 python3 -c "import torch; print('[info] torch', torch.__version__)" 2>/dev/null || echo "[info] torch not yet installed"
 echo "[pin] vLLM commit dda4668b (jasl/vllm); torch 2.9.1; nccl-tests v2.28.9-1"
@@ -96,7 +96,7 @@ curl -sf http://localhost:9000/v1/models >/dev/null && echo "PASS: Node A llama-
 uname -m   # aarch64 on both
 ```
 - Both Sparks powered; the **single** 200 G QSFP56 CX-7 cable in hand.
-- **Record known-good NIC firmware per node BEFORE cabling** (the brick guard, Phase 2). `flint -d <dev> q | grep -i 'FW Version'` on each; save it.
+- **Record known-good NIC firmware per node BEFORE cabling** (the brick guard, Phase 2). `mstflint -d <dev> q | grep -i 'FW Version'` on each (DGX OS ships `mstflint`, not the legacy Mellanox-OFED `flint`); save it.
 **Pass:** Node A green; both nodes on a matched DGX OS / driver.
 
 ---
@@ -139,8 +139,11 @@ ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan
 ### 4.1 Build nccl-tests + pin the iface (per the NCCL playbook)
 
 ```bash
+sudo apt install -y libopenmpi-dev openmpi-bin build-essential   # OpenMPI is NOT preinstalled; `make MPI=1` needs it (both nodes)
 git clone https://github.com/NVIDIA/nccl-tests ~/nccl-tests && cd ~/nccl-tests
-make MPI=1 MPI_HOME=/usr/lib/aarch64-linux-gnu/openmpi NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
+# Resolve the real MPI prefix per-box — do NOT hardcode (the path varies by install):
+MPI_HOME=$(dirname "$(mpicc --showme:incdirs 2>/dev/null | awk '{print $1}')"); : "${MPI_HOME:=/usr/lib/aarch64-linux-gnu/openmpi}"
+make MPI=1 MPI_HOME="$MPI_HOME" NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
 # Pin the FABRIC vars to the link iface (resolve the real name per-box via ibdev2netdev):
 export NCCL_SOCKET_IFNAME=enp1s0f1np1 UCX_NET_DEVICES=enp1s0f1np1 OMPI_MCA_btl_tcp_if_include=enp1s0f1np1
 ```
@@ -152,7 +155,7 @@ N1=169.254.x.a; N2=169.254.x.b   # the two link-local IPs
 mpirun -np 2 -H ${N1}:1,${N2}:1 --mca plm_rsh_agent 'ssh -o StrictHostKeyChecking=no' \
   -x NCCL_SOCKET_IFNAME -x UCX_NET_DEVICES -x OMPI_MCA_btl_tcp_if_include -x LD_LIBRARY_PATH \
   ~/nccl-tests/build/all_gather_perf -b 16G -e 16G -f 2 | tee /tmp/ag.txt
-BUSBW=$(grep -Eo '[0-9]+\.[0-9]+' /tmp/ag.txt | tail -1)
+BUSBW=$(awk '/Avg bus bandwidth/{print $NF}' /tmp/ag.txt)   # parse the named line (robust to integer values + column drift)
 awk -v b="$BUSBW" 'BEGIN{exit !(b>=20)}' && echo "GATE PASS(a): busbw ${BUSBW} GB/s ≥ 20" || echo "GATE FAIL(a): busbw ${BUSBW} GB/s < 20 — firmware-degraded (~15.5) or miswired (~10.25). STOP."
 # Signal (b): transport must be RoCE/IB, not socket/TCP
 mpirun -np 2 -H ${N1}:1,${N2}:1 --mca plm_rsh_agent 'ssh -o StrictHostKeyChecking=no' \
@@ -215,9 +218,11 @@ router_settings:
 **▶ GATE:**
 ```bash
 CFG=/opt/litellm/config.yaml
-grep -qE 'fallbacks:\s*\[\]' "$CFG" && grep -qE 'context_window_fallbacks:\s*\[\]' "$CFG" \
+grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallbacks:\s*\[\]' "$CFG" \
   && echo "GATE PASS: no cloud fallback (both fallbacks empty)" \
   || echo "GATE FAIL: a cloud fallback path exists — DF-001 violation. STOP."
+# NOTE: the leading `^\s*` anchor is load-bearing — without it, an empty `context_window_fallbacks: []`
+# line satisfies the first grep's `fallbacks: []` substring even when `fallbacks:` is POPULATED (false-pass).
 ```
 
 ---
@@ -241,7 +246,7 @@ vllm serve deepseek-ai/DeepSeek-V4-Flash \
 #    (pin jasl/vllm dda4668b + torch 2.9.1; choose a cudagraph mode that AVOIDS vLLM #40969
 #     — FULL_AND_PIECEWISE + chunked prefill silently hangs after ~6–7 requests on GB10.)
 ```
-**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the proposer.
+**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the proposer. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
 **Treat the seat as single-stream:** concurrency=2 collapses decode to ~1 tok/s at 65 K. `--max-num-seqs 2` is a KV-budget cap, not a throughput target.
 **Tear down** the Proposer (and `sudo systemctl start llama-swap-keepalive.timer`) to return to daily/pool mode.
 

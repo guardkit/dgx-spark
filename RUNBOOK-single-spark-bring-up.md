@@ -128,7 +128,7 @@ Write `DRIFT-single-spark-bring-up-<timestamp>.md` in the format of conventions 
 ### 1.1 Confirm hardware, DGX OS, CUDA
 
 ```bash
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader   # expect GB10 / ~128 GiB
+nvidia-smi --query-gpu=name --format=csv,noheader   # expect GB10 (memory.total reports [N/A] on unified-memory GB10 — confirm capacity via free -g in 1.2)
 /usr/local/cuda/bin/nvcc --version | grep release                # build (Phase 2) needs this exact path
 uname -m                                                          # expect aarch64
 ```
@@ -138,7 +138,7 @@ uname -m                                                          # expect aarch
 
 ```bash
 df -h /opt 2>/dev/null || df -h /          # need ~80 GB free for model staging
-free -g                                    # confirm 128 GB unified visible
+free -g                                    # confirm ~121 GB usable unified visible (128 physical / ~121 usable, per PINS)
 ```
 **Pass:** ≥ 80 GB free on the model volume.
 
@@ -224,8 +224,10 @@ It ships the four always-on open models (`workhorse` · `coach` · `chat` · `em
 CFG=/opt/llama-swap/config/config.yaml
 grep -q 'matrix:' "$CFG"            && echo "GATE PASS: matrix coexistence block present" || echo "GATE FAIL: no matrix block — eviction thrash. STOP."
 grep -q 'healthCheckTimeout: 600' "$CFG" && echo "GATE PASS: cold-load timeout" || echo "GATE FAIL: raise healthCheckTimeout to ≥600."
-! grep -q -- '--cache-type-k f16\|--cache-type-v f16' "$CFG" && echo "GATE PASS: no explicit f16 KV" || echo "GATE FAIL: f16 KV present."
+! grep -qE -- '--cache-type-[kv][ =]f16' "$CFG" && echo "GATE PASS: no explicit f16 KV" || echo "GATE FAIL: f16 KV present."
 grep -cq -- '--no-mmap' "$CFG" && echo "GATE PASS: --no-mmap present" || echo "GATE FAIL: add --no-mmap."
+# The config cmds invoke /usr/local/bin/llama-server — confirm it exists (Phase 2.1 copied it there) or every model fails healthcheck at start:
+test -x /usr/local/bin/llama-server && echo "GATE PASS: server binary present" || echo "GATE FAIL: /usr/local/bin/llama-server missing — run Phase 2.1's copy step (or point the config cmds at the build tree). STOP."
 ```
 Any FAIL → fix the config, re-assert, then start. **`--config` will be rejected** by v208+ — the start command uses single-dash flags (next phase).
 
