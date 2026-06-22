@@ -20,6 +20,35 @@ The contribution is the method and the gates, not the stack. See [`RUNBOOK-CONVE
 
 ---
 
+## Running a runbook
+
+Clone the repo, point an agent (Claude Code / Codex / OpenCode) at a runbook, and tell it to execute:
+
+```bash
+git clone https://github.com/guardkit/dgx-spark.git && cd dgx-spark
+claude "execute RUNBOOK-single-spark-bring-up.md"      # or: codex exec … / opencode run …
+```
+
+The agent runs **every** step itself — `apt`/`pip` installs, the ~35 GB model pull (Phase 1.5), the llama.cpp build + binary install, llama-swap install, config deploy, start, and the validation gates. Long downloads/builds run **inline** — edit the wait out of any recording. There are **no manual prerequisites** beyond the one-time box setup below.
+
+### One-time box setup: passwordless sudo
+
+The runbooks use `sudo` (apt, `install` to `/usr/local/bin`, `mkdir`/`chown` `/opt`, `systemctl`, `fwupdmgr`, …). For the agent to run **unattended**, the operator user needs **passwordless sudo** — otherwise the first `sudo` blocks on a password the agent can't type. The agent can't enable this itself (enabling sudo needs sudo), so run it **once per box** (you enter your password this one time):
+
+```bash
+echo "$USER ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/90-spark-agent >/dev/null
+sudo chmod 0440 /etc/sudoers.d/90-spark-agent
+sudo visudo -cf /etc/sudoers.d/90-spark-agent      # must print "parsed OK"
+```
+
+- **Run the agent as that user, not root** — the runbooks supervise llama-swap as a *user* systemd unit (`systemctl --user` + `loginctl enable-linger`); running as root breaks that supervision model.
+- **Revoke** when you're done filming: `sudo rm /etc/sudoers.d/90-spark-agent`.
+- `NOPASSWD:ALL` is fine for a **dedicated** Spark. On a shared box, scope it to just the commands the runbooks invoke (`apt-get, apt, apt-mark, install, cp, mkdir, chown, systemctl, tee, fwupdmgr, nvidia-smi, visudo`) — tighter, at the cost of brittleness if one is missed.
+
+The only other non-agent inputs are **physical** and **two-Spark-only**: plugging in the ConnectX-7 cable, and any firmware reboot. Everything else is a step the agent runs.
+
+---
+
 ## Current stack (steady state)
 
 Honest snapshot of what actually runs in production today:
