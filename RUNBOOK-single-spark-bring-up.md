@@ -151,7 +151,7 @@ for pat in "qwen3.6*35*a3b" "gemma*4*26b*a4b*it" "gpt-oss-20b" "qwen3*embedding*
   echo "${pat}: ${f:-NOT FOUND}"
 done
 ```
-**Pass:** all four resolve. If any are missing, download the GGUFs named in the PINS block (use `HF_HUB_ENABLE_HF_TRANSFER=1`; use the Blackwell-tuned / Unsloth GGUF repos) into `/opt/llama-swap/models/<dir>/`. **Note the case-sensitivity gate:** glob with `-iname`, not `-name` (registry row, conventions §8). The served path is `/opt/llama-swap/models/` — staging only into the HF cache will pass this glob but the config `--model` paths must point at what you actually serve.
+**Pass:** all four resolve. If any are missing, download the GGUFs named in the PINS block (use `HF_HUB_ENABLE_HF_TRANSFER=1`; use the Blackwell-tuned / Unsloth GGUF repos) into `/opt/llama-swap/models/<dir>/`. The two public-only models (`gpt-oss-20b` chat + `Qwen3-Embedding-0.6B` embed) stage in one shot with [`scripts/stage-public-models.sh`](./scripts/stage-public-models.sh) — it downloads them and makes the on-disk filenames match the config (Unsloth ships uppercase `MXFP4`). **Note the case-sensitivity gate:** glob with `-iname`, not `-name` (registry row, conventions §8). The served path is `/opt/llama-swap/models/` — staging only into the HF cache will pass this glob but the config `--model` paths must point at what you actually serve.
 
 ---
 
