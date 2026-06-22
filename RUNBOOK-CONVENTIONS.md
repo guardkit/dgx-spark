@@ -150,7 +150,7 @@ The reusable core: GB10 traps we've hit (ours + the community's), each with the 
 | `mmap` on unified memory | Severe slowdown on GB10 | every `llama-server` cmd contains `--no-mmap` | setup §5 |
 | f16 KV cache | Quality degradation on Qwen3.x / SM121 | KV type is `q8_0` (`--cache-type-k/v q8_0`) | setup §5 |
 | `-np` splits ctx across slots | per-slot ctx = ctx/np; large chunks 400 | `ctx_size / np ≥ expected_max_chunk_tokens` | findings §9.1, v3 §5.2 |
-| 121 GB memory ceiling | Freeze observed at 114 GB / 7 GB free | projected `resident + KV < MEM_CEILING_GB (115)` before load | README §9.4 |
+| 121 GB memory ceiling | Freeze observed at 114 GB / 7 GB free | projected `resident + KV < MEM_CEILING_GB (115)` before load; gate on **total** unified mem (`free`), not just compute-apps | findings §9.4 |
 | `pkill -f llama-server` | Matches the running script → self-kill | use `pkill -x llama-server` | v3 §4.2 |
 | `find -name "*Q8*"` | Misses lowercase files on disk | use `-iname` | v3 §0.1 |
 | llama-swap `--config` | GNU double-dash silently rejected (v208) | flags are single-dash `-config` / `-listen` | v3 §5.3 |
