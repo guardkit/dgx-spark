@@ -18,7 +18,7 @@ llama-swap :9000          ← the front door (all-llama.cpp; one process tree un
 **Machine:** `promaxgb10-41b1` (the Dell ProMax GB10 reference box) or a fresh DGX Spark / GB10, DGX OS, Blackwell **SM121**, 128 GB unified memory (**121 GB usable**, safe ceiling **115 GB**).
 **Conventions:** [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) — recon → drift report → gates; promotion by PR.
 **Prior art it stands on:** [NVIDIA dgx-spark-playbooks](https://github.com/NVIDIA/dgx-spark-playbooks) (official) · [DGX Spark / GB10 forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-spark-gb10/719) · [martinB78 full-stack guide](https://forums.developer.nvidia.com/t/running-a-full-llm-stack-on-dgx-spark-gb10-your-application-litellm-llama-swap-vllm-llama-cpp-ollama/367580) · [Dre Dyson](https://dredyson.com/) · [Spark Arena leaderboard](https://spark-arena.com/leaderboard) · [mostlygeek/llama-swap](https://github.com/mostlygeek/llama-swap). The Phase 0 recon re-checks these at run time.
-**Source material:** the proven procedure + steady-state lineup live in `guardkit/docs/research/dgx-spark/` until the MIGRATION cutover — `RUNBOOK-v3-production-deployment.md` (procedure), `llama-swap-setup.md` (SM121 build flags + dynamic-VRAM launcher; **§12–§15 carry unresolved merge conflicts** pending MIGRATION step 4), `README.md` (steady-state lineup, to be renamed `ARCHITECTURE-current.md`). The committed [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) in **this** repo is the runbook's canonical config target.
+**Source material (now in this repo):** [`RUNBOOK-v3-production-deployment.md`](./RUNBOOK-v3-production-deployment.md) (the proven procedure), [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) (SM121 build flags + dynamic-VRAM launcher + LiteLLM Phase-4 appendix; the §12–§15 merge conflicts are resolved), [`ARCHITECTURE-current.md`](./ARCHITECTURE-current.md) (steady-state lineup). The committed [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) is the runbook's canonical config target.
 **Expected wall-clock:** fresh box **~60–90 min** (the llama.cpp build + model staging dominate); a re-run on a built box **~15 min**.
 **On-stage target:** the demo is the **recon → execute → gate-catch arc** on a box with llama.cpp already built — **~8–10 min** (see Talk Track).
 **Outputs:** `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`, the committed `DRIFT-single-spark-bring-up-<YYYY-MM-DD>.md`, and the live `/opt/llama-swap/config/config.yaml`.
@@ -394,8 +394,8 @@ Leave running for subsequent work: `llama-swap` (it *is* the endpoint). Nothing 
 
 - [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) — the method (recon → drift → gates) and the full gotcha→gate registry.
 - [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) — the canonical config this runbook deploys.
-- `RUNBOOK-v3-production-deployment.md` — the proven end-to-end procedure this exemplar distils (in `guardkit/docs/research/dgx-spark/` until cutover).
-- `llama-swap-setup.md` — SM121 build flags, model downloads, the dynamic-VRAM launcher, the LiteLLM Phase-4 appendix (same location; §12–§15 carry merge conflicts pending MIGRATION step 4).
+- [`RUNBOOK-v3-production-deployment.md`](./RUNBOOK-v3-production-deployment.md) — the proven end-to-end procedure this exemplar distils.
+- [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) — SM121 build flags, model downloads, the dynamic-VRAM launcher, the LiteLLM Phase-4 appendix (merge conflicts resolved).
 - `TALK-ddd-southwest-got-a-spark-now-what.md` — the talk this runbook is the live demo for.
 
 ---

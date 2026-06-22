@@ -77,9 +77,10 @@ So: copy → update internal cross-references to the new repo → prove the new 
 
 ## Execution status
 
-Nothing has been copied yet — this file is the plan. Next steps, in order:
-1. Build `RUNBOOK-single-spark-bring-up.md` (exemplar-before-template).
-2. Copy the **current** docs above, updating internal cross-refs to this repo.
-3. Mirror the operational scripts (live installs keep pointing at `guardkit` until cutover).
-4. Resolve `llama-swap-setup.md` conflicts into a clean `RUNBOOK-llama-swap-setup.md`.
-5. Coordinated cutover: repoint systemd `ExecStart`/install commands, then retire the `guardkit` copies.
+**Migrated 2026-06-22 — trimmed clean public set.** `dgx-spark` is now the canonical home for the public DGX Spark work.
+
+1. ✅ `RUNBOOK-single-spark-bring-up.md` + `RUNBOOK-two-spark-bring-up.md` authored; `examples/llama-swap-config.public.yaml` added.
+2. ✅ Copied the **operational / architecture / record** docs to root; `README.md` → `ARCHITECTURE-current.md`; `llama-swap-config.yaml` → `examples/llama-swap-config.example.yaml`; diagrams 1–2 + grammars; scripts mirrored to `scripts/`. Runbook cross-refs repointed to in-repo paths.
+3. ✅ `RUNBOOK-llama-swap-setup.md` — the §12–§15 merge conflicts resolved (kept the completed side); collaborator names genericised for the public artifact.
+4. **Intentionally NOT copied** (kept in `guardkit` — internal strategy / not Spark-setup): `dark-factory-economics-and-model-serving.md`, `dark-factory-dataset-factory-conversation-starter.md`, `TASK-graphiti-yaml-endpoint-migration.md`, the Braun NVFP4 PDF, and `diagrams/fleet-memory-write-path.*` (a fleet-memory subsystem asset). `DECISION-DF-004` stays in `guardkit/docs/decisions/` (the DF-00x decision series) and is referenced cross-repo.
+5. **Not retired (deliberate).** The `guardkit` copies are KEPT (copy-not-retire). Live systemd units already run from `/usr/local/bin/` (not `guardkit/scripts/`), so retiring the guardkit copies is safe for services — deferred as a later step after eyeballing `dgx-spark`. Re-export the diagram SVGs from their `.excalidraw` sources for clean box layout when convenient.

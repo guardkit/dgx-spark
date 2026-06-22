@@ -1,6 +1,6 @@
 # Runbook: Two-Spark Bring-Up — Add Node B → a Networked GB10 Pair (capacity, not speed)
 
-**Status:** Draft (executable companion to the capture spine; conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md)). Execute once to verify before the second video; the [capture spine](../../guardkit/docs/research/dgx-spark/RUNBOOK-two-spark-video-capture.md) *films* this arc.
+**Status:** Draft (executable companion to the capture spine; conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md)). Execute once to verify before the second video; the [capture spine](./RUNBOOK-two-spark-video-capture.md) *films* this arc.
 
 **Purpose:** Take an **already-working single Spark** (Node A, stood up by [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md)) and **add a second GB10 (Node B)** over a 200 G ConnectX-7 link, to serve a model **too large for one node** behind a unified front door — *without* disturbing the single-node fleet. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon reports upstream drift first. **This is purely additive: Node A is unchanged.**
 
@@ -21,7 +21,7 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 **Machines:** Node A = `promaxgb10-41b1` (proven baseline); Node B = the new DGX Spark. Both Blackwell SM121, 128 GB unified (~121 usable, ceiling 115). 200 G QSFP56 ConnectX-7 single cable.
 **Prereq (hard):** Node A is **GREEN** on `RUNBOOK-single-spark-bring-up.md` (llama-swap on `:9000`, gates passed). This runbook does nothing to the Node A config.
 **Prior art (re-checked in Phase 0):** [NVIDIA connect-two-sparks playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/README.md) · [NVIDIA NCCL playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/nccl/README.md) · the [DeepSeek-V4-Flash 2× Spark recipe thread](https://forums.developer.nvidia.com/t/deepseek-v4-flash-official-fp8-running-across-2x-dgx-spark-tp-2-mtp-200k-ctx-recipe-numbers/370309) · [corti "Two Sparks, One Cluster"](https://corti.com/two-sparks-one-cluster-why-stacking-nvidia-dgx-spark-units-unlocks-local-frontier-scale-inference/) · eugr/spark-vllm-docker.
-**Source material:** `DECISION-DF-004-...md`, `RUNBOOK-two-spark-video-capture.md`, `two-spark-serving-research-and-references.md` (all in `guardkit/docs/research/dgx-spark/` + `docs/decisions/` until the MIGRATION cutover).
+**Source material:** [`RUNBOOK-two-spark-video-capture.md`](./RUNBOOK-two-spark-video-capture.md) + [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
 **Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the Proposer cold-start alone is ~6 min.
 **Outputs:** `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md`, committed `DRIFT-two-spark-bring-up-<YYYY-MM-DD>.md`, the live `/opt/litellm/config.yaml` + the vLLM launch command.
 
@@ -298,5 +298,5 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 ## Appendix: relationship to the other artifacts
 
 - **`RUNBOOK-single-spark-bring-up.md`** — Node A baseline. This runbook is additive on top; it never edits the Node A config.
-- **`RUNBOOK-two-spark-video-capture.md`** (capture spine, in `guardkit/docs/research/dgx-spark/`) — the filming notes; it *films* this executable arc (P2 bring-up war-story = Phases 2–6; P3 number = Phase 9).
-- **`DECISION-DF-004-...md`** — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
+- **[`RUNBOOK-two-spark-video-capture.md`](./RUNBOOK-two-spark-video-capture.md)** (capture spine, in this repo) — the filming notes; it *films* this executable arc (P2 bring-up war-story = Phases 2–6; P3 number = Phase 9).
+- **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
