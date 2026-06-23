@@ -1,7 +1,7 @@
 # llama-swap Setup Guide for GB10 Dark Factory
 
 **Status:** Ready to implement
-**Companion doc:** [`dark-factory-economics-and-model-serving.md`](./dark-factory-economics-and-model-serving.md) — read that first for context and rationale.
+**Companion doc:** [`dark-factory-economics-and-model-serving.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/dark-factory-economics-and-model-serving.md) (guardkit repo) — read that first for context and rationale.
 **Target hardware:** Dell Pro Max GB10 (Blackwell SM121, 128 GB unified memory)
 
 This guide documents how to stand up `mostlygeek/llama-swap` as the unified inference front door for the GuardKit dark factory, with the full fleet config for Jarvis + Forge + architect-agent + Graphiti + embeddings + AutoBuild.

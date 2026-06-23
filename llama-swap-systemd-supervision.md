@@ -2,8 +2,8 @@
 
 **Date deployed:** 2026-04-29
 **Host:** `promaxgb10-41b1` (Dell DGX Spark GB10)
-**Companion to:** [`llama-swap-setup.md`](./llama-swap-setup.md) §6
-**Trigger:** the [Gemma 4 tutor template-leak runbook](../../../../agentic-dataset-factory/domains/architect-agent-probe/RUNBOOK-fix-tutor-template-leak.md) revealed two operational gaps while applying a config change. This doc captures the fix.
+**Companion to:** [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) §6
+**Trigger:** the Gemma 4 tutor template-leak runbook (`RUNBOOK-fix-tutor-template-leak.md`, in the private `agentic-dataset-factory` repo) revealed two operational gaps while applying a config change. This doc captures the fix.
 
 ---
 
@@ -111,7 +111,7 @@ systemctl is-enabled llama-swap.service              # expect: not-found
 
 ## Operational notes
 
-- **Stop / restart for maintenance:** `systemctl --user stop llama-swap.service` and `systemctl --user start llama-swap.service`. Killing children is *not* equivalent — see Phase 3 of the [tutor template-leak runbook](../../../../agentic-dataset-factory/domains/architect-agent-probe/RUNBOOK-fix-tutor-template-leak.md#phase-3-reload-llama-swap) for why.
+- **Stop / restart for maintenance:** `systemctl --user stop llama-swap.service` and `systemctl --user start llama-swap.service`. Killing children is *not* equivalent — see Phase 3 of the tutor template-leak runbook (`RUNBOOK-fix-tutor-template-leak.md`, private `agentic-dataset-factory` repo) for why.
 - **Config edits no longer need a manual signal.** Edit `/opt/llama-swap/config/config.yaml`, save. llama-swap re-reads within ~1–3 s. Affected children are restarted; unaffected children are left running. Confirm via `tail -f /opt/llama-swap/logs/llama-swap.log` for `Configuration Changed`.
 - **Logs:** `/opt/llama-swap/logs/llama-swap.log` (appended by the unit's `StandardOutput`/`StandardError`). The user unit does not also log to `journalctl --user -u llama-swap` because of `StandardOutput=append:`.
 - **Relationship to TASK-OPS-7CB1's keep-alive timer:** the keep-alive timer revives crashed *children* (individual `llama-server` processes). This unit supervises the *parent* (`llama-swap` itself). Both are needed; neither makes the other redundant.

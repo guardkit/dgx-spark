@@ -42,7 +42,7 @@ Rendered SVGs live in `diagrams/` (clean-line renderings of the architecture; an
 
 **fleet-memory write path** — zero-LLM structured ingest: structured payloads go straight to the deterministic writer (no model in the loop), and only markdown/text touches nomic for embedding before landing in Postgres.
 
-![fleet-memory write path - zero-LLM structured ingest](diagrams/fleet-memory-write-path.svg)
+*(The fleet-memory write-path diagram is a fleet-memory subsystem asset — kept with fleet-memory in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/diagrams/fleet-memory-write-path.svg), not duplicated in this public Spark repo.)*
 
 ## NVIDIA official
 

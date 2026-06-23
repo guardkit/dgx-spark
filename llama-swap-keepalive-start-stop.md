@@ -12,9 +12,9 @@ configured-but-crashed model child (one observed overnight four-way crash
 left workhorse + tutor down until manually re-requested — TASK-OPS-7CB1).
 
 - Units live in `/etc/systemd/system/` → **commands need `sudo`**.
-- Repo source of truth: [`scripts/llama-swap-keepalive.sh`](../../../scripts/llama-swap-keepalive.sh),
-  [`.service`](../../../scripts/llama-swap-keepalive.service),
-  [`.timer`](../../../scripts/llama-swap-keepalive.timer).
+- Repo source of truth: [`scripts/llama-swap-keepalive.sh`](./scripts/llama-swap-keepalive.sh),
+  [`.service`](./scripts/llama-swap-keepalive.service),
+  [`.timer`](./scripts/llama-swap-keepalive.timer).
 
 ## Quick reference
 
