@@ -110,7 +110,7 @@ Loading `autobuild-coder` evicts every other llama.cpp model in `all`
 (qg, ne, qw, aa, dl) — coder-30b runs alone at ~22 GB. The 5-min revive
 probe for `qwen-graphiti` would otherwise swap the coder out mid-build
 (the ~111 GB workhorse↔coder ping-pong documented in
-[`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md)
+[`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md)
 §9.2 / §9.4).
 
 ```bash
@@ -145,7 +145,7 @@ sudo systemctl start llama-swap-keepalive.timer
 If the tutor gets evicted mid-session, the next user message reloads it
 in ~8 s (warm cache cold start). Recoverable, but disruptive.
 
-See [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md)
+See [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md)
 §9.9 for the tutor matrix-set design.
 
 ### `lpa` / `lpa_v3` — LPA POC page→markdown extraction
@@ -188,7 +188,7 @@ without changing the set, force a container restart:
 `docker stop vllm-granite-vision-3-3-2b` (3.3-2b). `--rm` cleans up;
 the next POST triggers a fresh container with empty caches.
 
-See [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md)
+See [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md)
 §9.10 / §9.11 (4.1-4b setup history) and §9.12 (3.3-2b fallback + memory
 math) for the full setup details, vLLM image rationale, and matrix-set
 design.

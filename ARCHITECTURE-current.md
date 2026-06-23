@@ -2,7 +2,7 @@
 
 Research, decisions, and deployment docs for the GuardKit inference fleet on the Dell DGX Spark GB10 (Blackwell SM121, 128 GB unified memory).
 
-> **For history**: this directory's primary record is [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md) §1–§11 (chronological, from 2026-05-14 through 2026-05-31). **For current operational state**: the sections immediately below are the source of truth. Update them when the live config changes; don't expect to reconstruct today's reality from the findings doc alone.
+> **For history**: this directory's primary record is [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md) §1–§11 (chronological, from 2026-05-14 through 2026-05-31). **For current operational state**: the sections immediately below are the source of truth. Update them when the live config changes; don't expect to reconstruct today's reality from the findings doc alone.
 
 ---
 
@@ -77,9 +77,9 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 |---|---|
 | `README.md` (this file) | **Current operational state.** Architecture table, matrix sets, per-workload recipes, pointers to operational docs. Update when the live config changes. |
 | [`llama-swap-keepalive-start-stop.md`](./llama-swap-keepalive-start-stop.md) | Keep-alive timer control: pause / resume / inspect; per-workload "when to pause" recipes. |
-| [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md) | Chronological findings log §1–§11: AutoBuild + llama-swap setup; the `-np` ctx-split trap; memory-ceiling freeze postmortem (§9.4); workhorse-as-Graphiti failed experiments (§9.5–§9.7); Gemma-4-as-Graphiti failed experiment (§9.8); coder-next drop + tutor↔architect rotation (§9.9); granite-vision-4-1-4b registration + fix (§9.10–§9.11). |
+| [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md) | Chronological findings log §1–§11: AutoBuild + llama-swap setup; the `-np` ctx-split trap; memory-ceiling freeze postmortem (§9.4); workhorse-as-Graphiti failed experiments (§9.5–§9.7); Gemma-4-as-Graphiti failed experiment (§9.8); coder-next drop + tutor↔architect rotation (§9.9); granite-vision-4-1-4b registration + fix (§9.10–§9.11). |
 | [`gb10-memory-budget-and-macbook-offload.md`](./gb10-memory-budget-and-macbook-offload.md) | Memory-budget analysis: where the 121 GB goes, what could offload to the MacBook Pro M2 Max. |
-| [`RUNBOOK-v3-production-deployment.md`](./RUNBOOK-v3-production-deployment.md) | Original production deployment runbook (2026-04-28). Six gaps found and fixed via TASK-RUN-D6F4. Architectural sections are still current; model lineup table is historical (superseded by this README). |
+| [`RUNBOOK-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RUNBOOK-v3-production-deployment.md) | Original production deployment runbook (2026-04-28). Six gaps found and fixed via TASK-RUN-D6F4. Architectural sections are still current; model lineup table is historical (superseded by this README). |
 | [`llama-swap-systemd-supervision.md`](./llama-swap-systemd-supervision.md) | User-space systemd unit with `-watch-config` for auto-reload. |
 | [`gb10-model-requirements-matrix.md`](./gb10-model-requirements-matrix.md) | Fleet-wide model consolidation analysis: 16 roles → 6 models → 4 deployed. Role mapping still valid; speed expectations superseded. |
 | [`qwen3.6-27b-gb10-community-research.md`](./qwen3.6-27b-gb10-community-research.md) | NVIDIA DGX Spark forum research on Qwen3.6-27B. |
@@ -98,7 +98,7 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 
 | Document | What it proved |
 |---|---|
-| [`RESULTS-v3-production-deployment.md`](./RESULTS-v3-production-deployment.md) | Production deployment results: 65 GB VRAM, 41.32 tok/s workhorse, all four models coexisting. |
+| [`RESULTS-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RESULTS-v3-production-deployment.md) | Production deployment results: 65 GB VRAM, 41.32 tok/s workhorse, all four models coexisting. |
 
 ### Background reading
 

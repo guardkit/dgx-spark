@@ -145,6 +145,8 @@ Recon tells you a value *might* need changing *before* you hit the gate. The gat
 
 The reusable core: GB10 traps we've hit (ours + the community's), each with the assertion that catches it. New runbooks pull the relevant rows in as gates. This table is the talk's "receipts."
 
+> **Source key:** `setup` = [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) (this repo). `v3` / `findings` = the originating engineering record in the **guardkit** repo — [`RUNBOOK-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RUNBOOK-v3-production-deployment.md) and [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md) — kept there (their internal links resolve in that tree), referenced here rather than duplicated.
+
 | Gotcha | Why it bites | Gate (assertion) | Source |
 |---|---|---|---|
 | `mmap` on unified memory | Severe slowdown on GB10 | every `llama-server` cmd contains `--no-mmap` | setup §5 |
