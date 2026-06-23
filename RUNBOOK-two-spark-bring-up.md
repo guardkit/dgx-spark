@@ -50,6 +50,18 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 
 ---
 
+## Node roles & prerequisites — no factory reset, ever
+
+This runbook is **purely additive** — it assumes one box already works and layers the second node + the CX-7 interconnect + LiteLLM + the on-demand TP proposer on top. **Nothing here wipes or conflicts with a single-Spark setup;** the engines coexist on distinct ports (llama-swap `:9000`, vLLM `:8080`, LiteLLM `:4000`). **No factory reset is ever required.**
+
+- **Both nodes may be single-Spark boxes.** Running `RUNBOOK-single-spark-bring-up.md` on a box first is fine and recommended — you validate it and get an independently-useful node. It is *not* something to undo.
+- **Node A** = the llama-swap pool host (the always-on fleet, fronted by LiteLLM `:4000`). A single-Spark box *is* Node A as-is — zero change.
+- **Node B** = cross-node TP compute. If Node B also ran single-Spark, its fleet just sits **dormant** during a TP run — you **stop** it, you don't uninstall it (`systemctl --user stop llama-swap`; `start` to revive after). A single GB10 can't hold both its ~65 GB fleet *and* a ~75–80 GB proposer shard, so the fleet and the proposer **time-share** the box (the DF-004 memory rule).
+- **What each node needs:** *both* need firmware (Phase 2), the CX-7 fabric (Phases 3–5), and vLLM + the proposer weights (Phase 8). Node B does **not** need its own always-on fleet for TP — but having one (from single-Spark) is harmless.
+- **The only first-run risks are hardware/fabric** (cable link-up, NCCL `NET/IB`, firmware, the TP launch) — never the single-Spark software underneath.
+
+---
+
 ## What this runbook does NOT cover
 
 - **The single-node fleet.** That is `RUNBOOK-single-spark-bring-up.md` (Node A baseline) — already done; not re-run here.
@@ -232,15 +244,20 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 
 ## Phase 8: Memory-budget gate + TP Proposer bring-up &nbsp;·&nbsp; **▶ GATE: pool XOR proposer**
 
-The ~158 GB Proposer shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict/tear down the swap pool before launching the Proposer.**
+The ~158 GB Proposer shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict the swap pool on EVERY participating node before launching the Proposer** (Node A always; Node B too if it ran single-Spark — stop, don't uninstall).
 
 ```bash
-# 0. One-time: install the pinned vLLM (agent step — heavy build, edit out the wait). GB10-validated
-#    commit jasl/vllm dda4668b + torch 2.9.1 (2.10 breaks CUDA graphs). Use the recipe's installer
-#    (eugr/spark-vllm-docker) OR a venv:  python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install -U pip torch==2.9.1
-#    && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
-# 1. Pause keepalive + drain the Node A pool so it can't revive on top of the proposer:
+# 0. One-time, ON BOTH NODES: install the pinned vLLM (agent step — heavy build, edit out the wait).
+#    GB10-validated commit jasl/vllm dda4668b + torch 2.9.1 (2.10 breaks CUDA graphs). Use the recipe's
+#    installer (eugr/spark-vllm-docker) OR a venv:  python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install
+#    -U pip torch==2.9.1 && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
+# 0b. The proposer weights (~158 GB) load LOCALLY PER NODE for mp/no-ray TP — vLLM pulls them to EACH
+#     node's HF cache on first launch (so it downloads on BOTH A and B). Pre-stage to avoid inline waits:
+#     hf download deepseek-ai/DeepSeek-V4-Flash   (run on each node)  — or point --model at a shared NFS dir.
+# 1. Drain the fleet on EVERY participating node so it can't revive on top of the proposer.
+#    On Node A always (and Node B too, if it ran single-Spark): stop the keepalive timer + the fleet.
 sudo systemctl stop llama-swap-keepalive.timer        # (system unit, per the single-Spark runbook)
+systemctl --user stop llama-swap                      # fleet goes dormant during TP; `start` to revive after
 # 2. Launch vLLM --tp 2 across both nodes (mp backend; no Ray at 2 nodes):
 #    TP-layer env (distinct from the Phase-4 fabric vars): add the RoCE HCAs explicitly.
 export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
@@ -255,7 +272,7 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 ```
 **▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the proposer. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
 **Treat the seat as single-stream:** concurrency=2 collapses decode to ~1 tok/s at 65 K. `--max-num-seqs 2` is a KV-budget cap, not a throughput target.
-**Tear down** the Proposer (and `sudo systemctl start llama-swap-keepalive.timer`) to return to daily/pool mode.
+**Tear down** the Proposer, then revive each node you drained: `systemctl --user start llama-swap` + `sudo systemctl start llama-swap-keepalive.timer` — back to daily/pool mode.
 
 ---
 
