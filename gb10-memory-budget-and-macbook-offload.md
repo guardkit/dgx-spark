@@ -19,13 +19,12 @@ The memory is the *LLM models* behind them. Offloading the right **models**
 | forge-prod | 25 MiB |
 | graphiti-mcp | 23 MiB |
 | open-webui | 48 MiB |
-| ships-computer-nats | 38 MiB |
 | specialist-agent-architect-agent-1 | 5 MiB |
 | specialist-agent-product-owner-agent-1 | 5 MiB |
 | study-tutor-gcse-tutor-1 | 10 MiB |
-| **Total app layer** | **~0.15 GB** |
+| **Total app layer** | **~0.12 GB** |
 
-These are thin orchestration shells (Python apps, NATS, the OpenWebUI front
+These are thin orchestration shells (Python apps, the OpenWebUI front
 end). They *call* the LLM endpoints; they hold no model weights.
 
 ### LLM models — this is the memory (`nvidia-smi` per-process GPU memory)

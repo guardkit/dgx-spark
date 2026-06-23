@@ -323,7 +323,7 @@ curl -sf http://localhost:9000/v1/models | jq -r '.data[].id' | sort
 
 ```bash
 curl -s http://localhost:9000/v1/messages -H "Content-Type: application/json" -H "x-api-key: not-needed" \
-  -d '{"model":"workhorse","max_tokens":256,"messages":[{"role":"user","content":"Write an async Python function to publish to NATS subject fleet.register."}]}' \
+  -d '{"model":"workhorse","max_tokens":256,"messages":[{"role":"user","content":"Write an async Python function that fetches a URL with aiohttp and returns the parsed JSON body."}]}' \
   > /tmp/spark-smoke.json
 ```
 **What the reply should look like (load-bearing lines):** a `content` array with assistant text (and, for the tool variant, a `tool_use` block); `stop_reason` present. ~256 tokens should return in ~5–6 s (≈ 40+ tok/s warm). If you get plain text where a tool was expected, `--jinja` isn't active. (Throughput is not gated here — it's a read-only smoke; record the number in RESULTS.)

@@ -5,8 +5,6 @@
 #   1. llama-swap   — endpoint reachable + models listed; last keepalive run.
 #   2. graphiti-mcp — container state + Docker healthcheck status.
 #   3. FalkorDB     — TCP reachable on whitestocks:6379 (NAS via Tailscale).
-#   4. NATS tier    — sourced hook output (no-op until future task).
-#   5. agents tier  — sourced hook output (no-op until future task).
 #
 # Preconditions: none.
 # Postconditions: prints a multi-line summary; exits 0 regardless of state.
@@ -19,9 +17,6 @@
 #   ./scripts/infra-status.sh
 
 set -uo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOKS_DIR="$SCRIPT_DIR/infra"
 
 LLAMA_SWAP_URL="${LLAMA_SWAP_URL:-http://localhost:9000}"
 
@@ -76,18 +71,6 @@ if (echo -e "PING\r"; sleep 0.3) | timeout 3 nc -w 2 whitestocks 6379 2>/dev/nul
 else
   echo "  reachable:   NO — check Tailscale, NAS power, FalkorDB compose"
 fi
-
-# --- 4. NATS tier (hook) ---
-echo ""
-echo "── NATS tier ──"
-# shellcheck source=scripts/infra/nats-status.sh
-source "$HOOKS_DIR/nats-status.sh"
-
-# --- 5. Agents tier (hook) ---
-echo ""
-echo "── Agents tier ──"
-# shellcheck source=scripts/infra/agents-status.sh
-source "$HOOKS_DIR/agents-status.sh"
 
 echo ""
 echo "════════════════════════════════════════════════════"

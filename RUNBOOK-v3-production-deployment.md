@@ -3,7 +3,6 @@
 **Purpose:** Deploy the validated all-llama.cpp architecture into production. Four models permanently loaded behind llama-swap on :9000. Zero vLLM dependency. Zero model swapping.
 
 **Machine:** Dell DGX Spark GB10 (`promaxgb10-41b1`), 128 GB unified memory
-**Predecessors:** `RESULTS-v2-all-llamacpp-validation.md` (all tests passed), `POST-VALIDATION-model-strategy-revision.md`
 **Execution results:** [`RESULTS-v3-production-deployment.md`](RESULTS-v3-production-deployment.md) — see "Runbook gaps discovered while executing" for the live-execution gap analysis that was folded back into this revision (TASK-RUN-D6F4).
 **Expected duration:** ~1 hour
 
@@ -841,7 +840,7 @@ START=$(date +%s%N)
 curl -s http://localhost:9000/v1/messages \
     -H "Content-Type: application/json" \
     -H "x-api-key: not-needed" \
-    -d '{"model":"qwen36-workhorse","max_tokens":256,"messages":[{"role":"user","content":"Write a Python async function to subscribe to NATS subject fleet.register."}]}' > /tmp/prod-speed-test.json
+    -d '{"model":"qwen36-workhorse","max_tokens":256,"messages":[{"role":"user","content":"Write a Python async function that fetches a URL with aiohttp and returns the parsed JSON body."}]}' > /tmp/prod-speed-test.json
 END=$(date +%s%N)
 ELAPSED_MS=$(( (END - START) / 1000000 ))
 echo "Wall time: ${ELAPSED_MS}ms (expect ~5-6s for 256 tokens at 45+ tok/s)"

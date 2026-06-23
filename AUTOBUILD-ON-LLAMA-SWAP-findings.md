@@ -6,8 +6,7 @@ end-to-end against the GB10's llama-swap stack (post-vLLM migration) using local
 models as the autobuild backend.
 **Companion docs:**
 [`RUNBOOK-v3-production-deployment.md`](./RUNBOOK-v3-production-deployment.md),
-[`llama-swap-systemd-supervision.md`](./llama-swap-systemd-supervision.md),
-[`POST-VALIDATION-model-strategy-revision.md`](./POST-VALIDATION-model-strategy-revision.md).
+[`llama-swap-systemd-supervision.md`](./llama-swap-systemd-supervision.md).
 
 ---
 
@@ -1012,9 +1011,7 @@ preserved as fallback) and llama-swap **v219** (`v208` backed up at
 
 ### 9.8 2026-05-30 — Gemma 4 as Graphiti backend (failed; revert)
 
-**Trigger.** §9.7 (c) candidate. Runbook
-[`gemma4-as-graphiti-experiment-runbook.md`](gemma4-as-graphiti-experiment-runbook.md)
-authored on the same day to formalise the experiment. Hypothesis: reuse
+**Trigger.** §9.7 (c) candidate. Hypothesis: reuse
 the `gemma4-tutor` GGUF (Gemma 4 26B-A4B Q4_K_M, already on disk and
 proven under llama-swap at `-np 1`) as a new `gemma4-graphiti` model
 entry, with Graphiti-tuned args (`-np 4`, ctx 65 K, temp 0, no Socratic

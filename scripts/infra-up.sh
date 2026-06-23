@@ -7,10 +7,6 @@
 #                         by this script — see AC-10 of TASK-INFRA-001).
 #   2. Graphiti tier   — graphiti-mcp + FalkorDB precondition checks
 #                         (graphiti-stack-up.sh).
-#   3. NATS tier       — sourced from scripts/infra/nats-up.sh (no-op stub
-#                         until a future task fills it in).
-#   4. Agents tier     — sourced from scripts/infra/agents-up.sh (no-op stub
-#                         until a future task fills it in).
 #
 # Preconditions:
 #   - llama-swap-keepalive.timer is enabled and running (it is by default;
@@ -40,7 +36,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOKS_DIR="$SCRIPT_DIR/infra"
 
 LLAMA_SWAP_URL="${LLAMA_SWAP_URL:-http://localhost:9000}"
 WAIT_LLAMA_SECONDS="${WAIT_LLAMA_SECONDS:-30}"
@@ -105,18 +100,6 @@ if [ "$SKIP_GRAPHITI" = "1" ]; then
 else
   bash "$SCRIPT_DIR/graphiti-stack-up.sh"
 fi
-
-# --- Tier 3: NATS (extension hook, no-op) ---
-echo ""
-echo "── Tier 3: NATS ──"
-# shellcheck source=scripts/infra/nats-up.sh
-source "$HOOKS_DIR/nats-up.sh"
-
-# --- Tier 4: agents (extension hook, no-op) ---
-echo ""
-echo "── Tier 4: agents ──"
-# shellcheck source=scripts/infra/agents-up.sh
-source "$HOOKS_DIR/agents-up.sh"
 
 echo ""
 echo "════════════════════════════════════════════════════"

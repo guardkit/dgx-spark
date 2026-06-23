@@ -27,16 +27,8 @@ So: copy → update internal cross-references to the new repo → prove the new 
 | `README.md` (current operational state) | `ARCHITECTURE-current.md` | current | The live model lineup / matrix sets / routing recipes. This repo's `README.md` is the new front page; the old one becomes the steady-state architecture doc. |
 | `AUTOBUILD-ON-LLAMA-SWAP-findings.md` | same name | current | Primary chronological findings log §1–§11. The history of record. |
 | `RUNBOOK-v3-production-deployment.md` | same name | current arch / historical lineup | Architectural sections current; model table superseded by `ARCHITECTURE-current.md`. |
-| `RUNBOOK-v2-all-llamacpp-architecture.md` | same name | validation runbook | Pairs with `RESULTS-v2`. |
-| `RUNBOOK-qwen3.6-27b-validation.md` | same name | validation runbook | Pairs with `RESULTS-qwen3.6-27b`. |
 | `RUNBOOK-two-spark-video-capture.md` | same name | current | Capture spine for the two-Spark talk. |
-| `gemma4-as-graphiti-experiment-runbook.md` | same name | worked example | The §9.8 failed experiment, preserved as a pattern. |
 | `RESULTS-v3-production-deployment.md` | same name | record | 65 GB VRAM, 41.32 tok/s workhorse. |
-| `RESULTS-v2-all-llamacpp-validation.md` | same name | record | The evidence that eliminated vLLM. |
-| `RESULTS-qwen3.6-27b-validation.md` | same name | record | The evidence that pivoted dense→MoE. |
-| `VALIDATION-D6F4-gap-fix-results.md` | same name | record | Six D6F4 gaps PASS. |
-| `VALIDATION-OPS-7CB1-9F2A-results.md` | same name | record | Keep-alive revival + concurrency tuning. |
-| `POST-VALIDATION-model-strategy-revision.md` | same name | decision | Dense-27B → MoE-35B-A3B pivot. |
 | `gb10-memory-budget-and-macbook-offload.md` | same name | current | Where the 121 GB goes. |
 | `gb10-model-requirements-matrix.md` | same name | current-ish | Role mapping valid; speed expectations superseded. |
 | `two-spark-serving-research-and-references.md` | same name | current | Two-Spark research + the diagrams section. |

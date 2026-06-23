@@ -2,10 +2,8 @@
 # infra-down.sh — Tear down the local infrastructure tiers on the GB10.
 #
 # Tiers (top-down, intentionally torn down in reverse-startup order):
-#   1. Agents tier     — sourced from scripts/infra/agents-down.sh (no-op stub).
-#   2. NATS tier       — sourced from scripts/infra/nats-down.sh (no-op stub).
-#   3. Graphiti tier   — graphiti-stack-down.sh (stops graphiti-mcp).
-#   4. LLM tier        — llama-swap is INTENTIONALLY NOT TOUCHED. It is shared
+#   1. Graphiti tier   — graphiti-stack-down.sh (stops graphiti-mcp).
+#   2. LLM tier        — llama-swap is INTENTIONALLY NOT TOUCHED. It is shared
 #                         with autobuild and other consumers and is managed by
 #                         systemd timers. The only legitimate reason to stop
 #                         llama-swap is a kernel reboot (DGX OS update); see
@@ -31,7 +29,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOKS_DIR="$SCRIPT_DIR/infra"
 
 STOP_LLAMA_SWAP=0
 for arg in "$@"; do
@@ -47,26 +44,14 @@ echo "════════════════════════�
 echo "  GB10 infrastructure — bringing down"
 echo "════════════════════════════════════════════════════"
 
-# --- Tier 1: agents (extension hook, no-op) ---
+# --- Tier 1: Graphiti ---
 echo ""
-echo "── Tier 1: agents ──"
-# shellcheck source=scripts/infra/agents-down.sh
-source "$HOOKS_DIR/agents-down.sh"
-
-# --- Tier 2: NATS (extension hook, no-op) ---
-echo ""
-echo "── Tier 2: NATS ──"
-# shellcheck source=scripts/infra/nats-down.sh
-source "$HOOKS_DIR/nats-down.sh"
-
-# --- Tier 3: Graphiti ---
-echo ""
-echo "── Tier 3: Graphiti (graphiti-mcp) ──"
+echo "── Tier 1: Graphiti (graphiti-mcp) ──"
 bash "$SCRIPT_DIR/graphiti-stack-down.sh"
 
-# --- Tier 4: LLM (llama-swap) — opt-in only ---
+# --- Tier 2: LLM (llama-swap) — opt-in only ---
 echo ""
-echo "── Tier 4: llama-swap ──"
+echo "── Tier 2: llama-swap ──"
 if [ "$STOP_LLAMA_SWAP" = "1" ]; then
   echo "  --stop-llama-swap was passed; stopping llama-swap-keepalive..."
   if sudo systemctl stop llama-swap-keepalive.timer llama-swap-keepalive.service 2>/dev/null; then

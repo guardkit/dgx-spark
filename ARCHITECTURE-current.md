@@ -78,11 +78,9 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 | `README.md` (this file) | **Current operational state.** Architecture table, matrix sets, per-workload recipes, pointers to operational docs. Update when the live config changes. |
 | [`llama-swap-keepalive-start-stop.md`](./llama-swap-keepalive-start-stop.md) | Keep-alive timer control: pause / resume / inspect; per-workload "when to pause" recipes. |
 | [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](./AUTOBUILD-ON-LLAMA-SWAP-findings.md) | Chronological findings log §1–§11: AutoBuild + llama-swap setup; the `-np` ctx-split trap; memory-ceiling freeze postmortem (§9.4); workhorse-as-Graphiti failed experiments (§9.5–§9.7); Gemma-4-as-Graphiti failed experiment (§9.8); coder-next drop + tutor↔architect rotation (§9.9); granite-vision-4-1-4b registration + fix (§9.10–§9.11). |
-| [`gemma4-as-graphiti-experiment-runbook.md`](./gemma4-as-graphiti-experiment-runbook.md) | The runbook executed for §9.8 (Gemma 4 as Graphiti backend; failed). Preserved as a worked example of the experiment pattern. |
 | [`gb10-memory-budget-and-macbook-offload.md`](./gb10-memory-budget-and-macbook-offload.md) | Memory-budget analysis: where the 121 GB goes, what could offload to the MacBook Pro M2 Max. |
 | [`RUNBOOK-v3-production-deployment.md`](./RUNBOOK-v3-production-deployment.md) | Original production deployment runbook (2026-04-28). Six gaps found and fixed via TASK-RUN-D6F4. Architectural sections are still current; model lineup table is historical (superseded by this README). |
 | [`llama-swap-systemd-supervision.md`](./llama-swap-systemd-supervision.md) | User-space systemd unit with `-watch-config` for auto-reload. |
-| [`POST-VALIDATION-model-strategy-revision.md`](./POST-VALIDATION-model-strategy-revision.md) | The dense-27B → MoE-35B-A3B strategy pivot. Physics + decision. |
 | [`gb10-model-requirements-matrix.md`](./gb10-model-requirements-matrix.md) | Fleet-wide model consolidation analysis: 16 roles → 6 models → 4 deployed. Role mapping still valid; speed expectations superseded. |
 | [`qwen3.6-27b-gb10-community-research.md`](./qwen3.6-27b-gb10-community-research.md) | NVIDIA DGX Spark forum research on Qwen3.6-27B. |
 
@@ -101,12 +99,6 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 | Document | What it proved |
 |---|---|
 | [`RESULTS-v3-production-deployment.md`](./RESULTS-v3-production-deployment.md) | Production deployment results: 65 GB VRAM, 41.32 tok/s workhorse, all four models coexisting. |
-| [`VALIDATION-D6F4-gap-fix-results.md`](./VALIDATION-D6F4-gap-fix-results.md) | All six D6F4 gaps verified PASS. |
-| [`VALIDATION-OPS-7CB1-9F2A-results.md`](./VALIDATION-OPS-7CB1-9F2A-results.md) | Keep-alive timer revives crashed children in 30s; concurrency tuning eliminated 429 throttling. |
-| [`RESULTS-v2-all-llamacpp-validation.md`](./RESULTS-v2-all-llamacpp-validation.md) | All-llama.cpp works: Graphiti JSON via llama.cpp (no xgrammar needed); embeddings at 768 dims; MoE workhorse at 45 tok/s. **The key evidence that eliminated vLLM.** |
-| [`RESULTS-qwen3.6-27b-validation.md`](./RESULTS-qwen3.6-27b-validation.md) | Dense Qwen3.6-27B quality excellent, 8.35 tok/s bandwidth wall. **The key evidence that pivoted to MoE.** |
-| [`RUNBOOK-v2-all-llamacpp-architecture.md`](./RUNBOOK-v2-all-llamacpp-architecture.md) | Validation runbook for RESULTS-v2. |
-| [`RUNBOOK-qwen3.6-27b-validation.md`](./RUNBOOK-qwen3.6-27b-validation.md) | Validation runbook for RESULTS-v1. |
 
 ### Background reading
 
