@@ -1,6 +1,8 @@
 # llama-swap Setup Guide for GB10 Dark Factory
 
-**Status:** Ready to implement
+> ⚠️ **HISTORICAL / SUPERSEDED.** This describes the *old* vLLM-proxy dark-factory architecture (Graphiti on `:8000`, embedder on `:8001`, llama-swap proxying them) from before **fleet-memory** retired the always-on Graphiti model and before **DECISION-DF-005** promoted **LiteLLM `:4000`** to the front door. The current, gated bring-up is [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) (+ `DECISION-DF-005`). **Kept for reference only:** the SM121 llama.cpp build flags, the dynamic-VRAM launcher pattern, and the resolved LiteLLM appendix. Don't follow this as the current plan.
+
+**Status:** HISTORICAL — superseded; see banner above.
 **Companion doc:** [`dark-factory-economics-and-model-serving.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/dark-factory-economics-and-model-serving.md) (guardkit repo) — read that first for context and rationale.
 **Target hardware:** Dell Pro Max GB10 (Blackwell SM121, 128 GB unified memory)
 
