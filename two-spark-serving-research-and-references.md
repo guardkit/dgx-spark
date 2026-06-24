@@ -32,11 +32,11 @@
 
 Rendered SVGs live in `diagrams/` (clean-line renderings of the architecture; an editable `.excalidraw` source sits beside each one).
 
-**Two-Spark fleet serving architecture** — the layered topology: clients hit one LiteLLM front door, which fans out to the llama-swap pool (plus always-on nomic) on Node A and a vLLM TP=2 proposer spanning both nodes; Postgres + pgvector lives on the NAS.
+**Two-Spark fleet serving architecture** — the layered topology: clients hit one LiteLLM front door, which fans out to the llama-swap pool (plus always-on nomic) on Node A and a vLLM TP=2 strategist spanning both nodes; Postgres + pgvector lives on the NAS.
 
 ![Two-Spark fleet serving architecture](diagrams/two-spark-fleet-serving-architecture.svg)
 
-**Request routing — two paths, one front door** — Path A swaps a fleet model in on a single node; Path B brings up the cross-node TP proposer. Same proxy instance, different backend.
+**Request routing — two paths, one front door** — Path A swaps a fleet model in on a single node; Path B brings up the cross-node TP strategist. Same proxy instance, different backend.
 
 ![Request routing - two paths, one front door](diagrams/two-spark-request-routing.svg)
 

@@ -28,9 +28,9 @@
 <path d="M 920,270 L 50,270" fill="none" stroke="#1971c2" stroke-width="2" stroke-dasharray="9 6" marker-end="url(#ah_1971c2)"/>
 <rect x="397" y="261" width="175" height="18" fill="#ffffff" fill-opacity="0.82"/>
 <text x="485" y="270" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#1971c2">4 . tokens stream back</text>
-<text x="60" y="360" font-size="18" text-anchor="start" dominant-baseline="hanging" fill="#b45309">Path B   -   big proposer across both nodes</text>
+<text x="60" y="360" font-size="18" text-anchor="start" dominant-baseline="hanging" fill="#b45309">Path B   -   big strategist across both nodes</text>
 <rect x="50" y="400" width="180" height="66" rx="12" fill="#a5d8ff" fill-opacity="1.00" stroke="#1971c2" stroke-width="2" stroke-opacity="1.00"/>
-<text x="140" y="433" font-size="16" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">Forge (proposer)</text>
+<text x="140" y="433" font-size="16" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">Forge (strategist)</text>
 <rect x="320" y="400" width="200" height="66" rx="12" fill="#d0bfff" fill-opacity="1.00" stroke="#6741d9" stroke-width="2" stroke-opacity="1.00"/>
 <text x="420" y="433" font-size="18" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">LiteLLM :4000</text>
 <rect x="600" y="400" width="240" height="66" rx="12" fill="#ffd8a8" fill-opacity="1.00" stroke="#e8860c" stroke-width="2" stroke-opacity="1.00"/>
@@ -39,7 +39,7 @@
 <text x="1040" y="433" font-size="15" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">Node A + Node B  (TP=2)</text>
 <path d="M 230,433 L 320,433" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah_1e1e1e)"/>
 <rect x="226" y="424" width="98" height="18" fill="#ffffff" fill-opacity="0.82"/>
-<text x="275" y="433" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">1 . proposer</text>
+<text x="275" y="433" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">1 . strategist</text>
 <path d="M 520,433 L 600,433" fill="none" stroke="#1e1e1e" stroke-width="2" marker-end="url(#ah_1e1e1e)"/>
 <rect x="522" y="424" width="75" height="18" fill="#ffffff" fill-opacity="0.82"/>
 <text x="560" y="433" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#1e1e1e">2 . route</text>

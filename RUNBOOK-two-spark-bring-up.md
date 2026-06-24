@@ -4,7 +4,7 @@
 
 **Purpose:** Take an **already-working single Spark** (Node A, stood up by [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md)) and **add a second GB10 (Node B)** over a 200 G ConnectX-7 link, to serve a model **too large for one node** behind a unified front door — *without* disturbing the single-node fleet. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon reports upstream drift first. **This is purely additive: Node A is unchanged.**
 
-> **The one idea (DECISION-DF-004):** *a second node buys **capacity and parallelism, not single-stream speed**.* The 200 G link (~22 GB/s healthy) is the ceiling; a model that fits one node is **faster** on one node. The second node earns its place by running models that **don't fit** (the cross-node TP Proposer), time-shared with the swap pool.
+> **The one idea (DECISION-DF-004):** *a second node buys **capacity and parallelism, not single-stream speed**.* The 200 G link (~22 GB/s healthy) is the ceiling; a model that fits one node is **faster** on one node. The second node earns its place by running models that **don't fit** (the cross-node TP Strategist), time-shared with the swap pool.
 
 ```
 clients (agents, Claude Code — OpenAI / Anthropic-compatible)
@@ -13,7 +13,7 @@ clients (agents, Claude Code — OpenAI / Anthropic-compatible)
 LiteLLM :4000  ← NEW unified front door (router only; NO cloud fallback, DF-001)
    ├── fleet   → llama-swap :9000 on Node A   (the single-Spark baseline, UNCHANGED; becomes a backend)
    ├── embed   → Qwen3-Embedding-0.6B (1024-dim, always-on for fleet-memory)
-   └── proposer→ vLLM --tp 2 across Node A <==> Node B   (200 G CX-7; on-demand only; ~158 GB)
+   └── strategist→ vLLM --tp 2 across Node A <==> Node B   (200 G CX-7; on-demand only; ~158 GB)
                  DeepSeek-V4-Flash class — brought up XOR the full swap pool (memory budget)
 Synology NAS — Postgres + pgvector (fleet-memory)                          (LAN / Tailscale)
 ```
@@ -23,7 +23,7 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 **One-time box setup:** passwordless sudo on **both** nodes (run the agent as that user, not root) — see [README → Running a runbook](./README.md#one-time-box-setup-passwordless-sudo). The only physically-manual inputs are the CX-7 cable + any firmware reboot.
 **Prior art (re-checked in Phase 0):** [NVIDIA connect-two-sparks playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/README.md) · [NVIDIA NCCL playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/nccl/README.md) · the [DeepSeek-V4-Flash 2× Spark recipe thread](https://forums.developer.nvidia.com/t/deepseek-v4-flash-official-fp8-running-across-2x-dgx-spark-tp-2-mtp-200k-ctx-recipe-numbers/370309) · [corti "Two Sparks, One Cluster"](https://corti.com/two-sparks-one-cluster-why-stacking-nvidia-dgx-spark-units-unlocks-local-frontier-scale-inference/) · eugr/spark-vllm-docker.
 **Source material:** [`RUNBOOK-two-spark-video-capture.md`](./RUNBOOK-two-spark-video-capture.md) + [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
-**Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the Proposer cold-start alone is ~6 min.
+**Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the Strategist cold-start alone is ~6 min.
 **Outputs:** `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md`, committed `DRIFT-two-spark-bring-up-<YYYY-MM-DD>.md`, the live `/opt/litellm/config.yaml` + the vLLM launch command.
 
 ---
@@ -38,10 +38,10 @@ PINS (set 2026-06-22)
   BUSBW_PASS_GBPS   20          healthy single-cable ~22.1; 25 = theoretical ceiling, NOT the bar; ~15.5 = fw-degraded; ~10.25 = both-ports-miswired
   vLLM              jasl/vllm commit dda4668b   (GB10 validation is commit-specific)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
-  proposer          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
+  strategist          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
   litellm           front door :4000   NO cloud fallback (fallbacks: [] AND context_window_fallbacks: [])
   embed             Qwen3-Embedding-0.6B  (1024-dim, always-on; matches the single-Spark public config — pin ONE dim end-to-end)
-  MEM_RULE          swap pool XOR TP proposer  (the ~158 GB proposer + a full pool cannot co-reside across 2x128 GB)
+  MEM_RULE          swap pool XOR TP strategist  (the ~158 GB strategist + a full pool cannot co-reside across 2x128 GB)
   ENDPOINT          LiteLLM :4000  (clients);  llama-swap :9000 + vLLM :8080 remain direct-port fallbacks (DF-001 §3.3)
   PREREQ            Node A GREEN on RUNBOOK-single-spark-bring-up.md
 ```
@@ -52,12 +52,12 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 
 ## Node roles & prerequisites — no factory reset, ever
 
-This runbook is **purely additive** — it assumes one box already works and layers the second node + the CX-7 interconnect + LiteLLM + the on-demand TP proposer on top. **Nothing here wipes or conflicts with a single-Spark setup;** the engines coexist on distinct ports (llama-swap `:9000`, vLLM `:8080`, LiteLLM `:4000`). **No factory reset is ever required.**
+This runbook is **purely additive** — it assumes one box already works and layers the second node + the CX-7 interconnect + LiteLLM + the on-demand TP strategist on top. **Nothing here wipes or conflicts with a single-Spark setup;** the engines coexist on distinct ports (llama-swap `:9000`, vLLM `:8080`, LiteLLM `:4000`). **No factory reset is ever required.**
 
 - **Both nodes may be single-Spark boxes.** Running `RUNBOOK-single-spark-bring-up.md` on a box first is fine and recommended — you validate it and get an independently-useful node. It is *not* something to undo.
 - **Node A** = the llama-swap pool host (the always-on fleet, fronted by LiteLLM `:4000`). A single-Spark box *is* Node A as-is — zero change.
-- **Node B** = cross-node TP compute. If Node B also ran single-Spark, its fleet just sits **dormant** during a TP run — you **stop** it, you don't uninstall it (`systemctl --user stop llama-swap`; `start` to revive after). A single GB10 can't hold both its ~65 GB fleet *and* a ~75–80 GB proposer shard, so the fleet and the proposer **time-share** the box (the DF-004 memory rule).
-- **What each node needs:** *both* need firmware (Phase 2), the CX-7 fabric (Phases 3–5), and vLLM + the proposer weights (Phase 8). Node B does **not** need its own always-on fleet for TP — but having one (from single-Spark) is harmless.
+- **Node B** = cross-node TP compute. If Node B also ran single-Spark, its fleet just sits **dormant** during a TP run — you **stop** it, you don't uninstall it (`systemctl --user stop llama-swap`; `start` to revive after). A single GB10 can't hold both its ~65 GB fleet *and* a ~75–80 GB strategist shard, so the fleet and the strategist **time-share** the box (the DF-004 memory rule).
+- **What each node needs:** *both* need firmware (Phase 2), the CX-7 fabric (Phases 3–5), and vLLM + the strategist weights (Phase 8). Node B does **not** need its own always-on fleet for TP — but having one (from single-Spark) is harmless.
 - **The only first-run risks are hardware/fabric** (cable link-up, NCCL `NET/IB`, firmware, the TP launch) — never the single-Spark software underneath.
 
 ---
@@ -66,8 +66,8 @@ This runbook is **purely additive** — it assumes one box already works and lay
 
 - **The single-node fleet.** That is `RUNBOOK-single-spark-bring-up.md` (Node A baseline) — already done; not re-run here.
 - **3+ nodes / switch fabric.** Direct-cable link-local only; a third Spark needs a QSFP switch + `--tp 4`/Ray (DF-004 §4.4).
-- **Choosing the Proposer engine** (vLLM vs SGLang vs TensorRT-LLM) — decided by the Phase 9 benchmark, not here.
-- **The single-node big-brain Player (`gpt-oss-120b`, ~63 GB).** It fits ONE node and stays on-demand on Node A — it is **not** the cross-node TP Proposer.
+- **Choosing the Strategist engine** (vLLM vs SGLang vs TensorRT-LLM) — decided by the Phase 9 benchmark, not here.
+- **The single-node big-brain Player (`gpt-oss-120b`, ~63 GB).** It fits ONE node and stays on-demand on Node A — it is **not** the cross-node TP Strategist.
 
 ---
 
@@ -220,7 +220,7 @@ model_list:
     litellm_params: { model: openai/workhorse, api_base: http://localhost:9000/v1, api_key: "none" }
   - model_name: embed            # Qwen3-Embedding-0.6B, 1024-dim (matches the single-Spark public config)
     litellm_params: { model: openai/embed, api_base: http://localhost:9000/v1, api_key: "none" }
-  - model_name: proposer         # cross-node TP=2, brought up on demand (Phase 8)
+  - model_name: strategist         # cross-node TP=2, brought up on demand (Phase 8)
     litellm_params: { model: openai/deepseek-v4-flash, api_base: http://localhost:8080/v1, api_key: "none" }
   - model_name: claude-opus      # DF-003 ATTENDED path only — never a fallback target
     litellm_params: { model: anthropic/claude-opus-4-7 }
@@ -242,19 +242,19 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 
 ---
 
-## Phase 8: Memory-budget gate + TP Proposer bring-up &nbsp;·&nbsp; **▶ GATE: pool XOR proposer**
+## Phase 8: Memory-budget gate + TP Strategist bring-up &nbsp;·&nbsp; **▶ GATE: pool XOR strategist**
 
-The ~158 GB Proposer shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict the swap pool on EVERY participating node before launching the Proposer** (Node A always; Node B too if it ran single-Spark — stop, don't uninstall).
+The ~158 GB Strategist shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict the swap pool on EVERY participating node before launching the Strategist** (Node A always; Node B too if it ran single-Spark — stop, don't uninstall).
 
 ```bash
 # 0. One-time, ON BOTH NODES: install the pinned vLLM (agent step — heavy build, edit out the wait).
 #    GB10-validated commit jasl/vllm dda4668b + torch 2.9.1 (2.10 breaks CUDA graphs). Use the recipe's
 #    installer (eugr/spark-vllm-docker) OR a venv:  python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install
 #    -U pip torch==2.9.1 && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
-# 0b. The proposer weights (~158 GB) load LOCALLY PER NODE for mp/no-ray TP — vLLM pulls them to EACH
+# 0b. The strategist weights (~158 GB) load LOCALLY PER NODE for mp/no-ray TP — vLLM pulls them to EACH
 #     node's HF cache on first launch (so it downloads on BOTH A and B). Pre-stage to avoid inline waits:
 #     hf download deepseek-ai/DeepSeek-V4-Flash   (run on each node)  — or point --model at a shared NFS dir.
-# 1. Drain the fleet on EVERY participating node so it can't revive on top of the proposer.
+# 1. Drain the fleet on EVERY participating node so it can't revive on top of the strategist.
 #    On Node A always (and Node B too, if it ran single-Spark): stop the keepalive timer + the fleet.
 sudo systemctl stop llama-swap-keepalive.timer        # (system unit, per the single-Spark runbook)
 systemctl --user stop llama-swap                      # fleet goes dormant during TP; `start` to revive after
@@ -270,9 +270,9 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 #    (pin jasl/vllm dda4668b + torch 2.9.1; choose a cudagraph mode that AVOIDS vLLM #40969
 #     — FULL_AND_PIECEWISE + chunked prefill silently hangs after ~6–7 requests on GB10.)
 ```
-**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the proposer. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
+**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the strategist. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
 **Treat the seat as single-stream:** concurrency=2 collapses decode to ~1 tok/s at 65 K. `--max-num-seqs 2` is a KV-budget cap, not a throughput target.
-**Tear down** the Proposer, then revive each node you drained: `systemctl --user start llama-swap` + `sudo systemctl start llama-swap-keepalive.timer` — back to daily/pool mode.
+**Tear down** the Strategist, then revive each node you drained: `systemctl --user start llama-swap` + `sudo systemctl start llama-swap-keepalive.timer` — back to daily/pool mode.
 
 ---
 
@@ -280,10 +280,10 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 
 ```bash
 # Same model, both ways — the numbers, not the README, decide whether TP earns its place.
-#  (a) Proposer TP=2 decode tok/s + cold-start time (expect ~44 tok/s warm WITH MTP; ~5 without)
+#  (a) Strategist TP=2 decode tok/s + cold-start time (expect ~44 tok/s warm WITH MTP; ~5 without)
 #  (b) a fleet model single-node on Node A for contrast
-#  (c) PP=2 vs TP=2 for the Proposer — PP wins under concurrency (~555 vs ~252 @batch128),
-#      TP wins at batch=1 single-stream (the Proposer's actual regime). Record both.
+#  (c) PP=2 vs TP=2 for the Strategist — PP wins under concurrency (~555 vs ~252 @batch128),
+#      TP wins at batch=1 single-stream (the Strategist's actual regime). Record both.
 ```
 Record decode tok/s (TP=2 / single-node / PP=2), cold-start (~6 min), and TTFT@32K/128K.
 
@@ -299,7 +299,7 @@ Record decode tok/s (TP=2 / single-node / PP=2), cold-start (~6 min), and TTFT@3
 | P5 passwordless SSH both ways | | |
 | P6 power-off mitigation on both | | `-lgc` (unverified) + thermal |
 | P7 LiteLLM no-cloud guard (both fallbacks empty) | | |
-| P8 pool evicted before Proposer (memory XOR) | | |
+| P8 pool evicted before Strategist (memory XOR) | | |
 | P9 TP=2 / single-node / PP=2 numbers | | **record tok/s + cold-start** |
 
 ## Phase 11: Evidence → RESULTS
@@ -317,8 +317,8 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 | busbw fine but `NET/Socket` in logs | silent TCP fallback (lost RoCE) | pin `NCCL_IB_HCA`; Phase 4.3 `ib_write_bw` to isolate |
 | Node hard powers-off ~60 s into TP | the open GB10 power-off bug | Phase 6: `-lgc` (unverified) + **thermal** (repaste/airflow) |
 | One node drops, other GPU 100 % forever | torch 2.10.0 broke CUDA graphs | pin **torch 2.9.1** |
-| Proposer hangs after ~6–7 requests, 0 decode | vLLM #40969 (FULL_AND_PIECEWISE + chunked prefill) | cudagraph mode change / `--enforce-eager` (slower) |
-| Proposer decode ~5 tok/s not ~44 | MTP speculative decode off | `--speculative-config deepseek_mtp num_speculative_tokens=2` |
+| Strategist hangs after ~6–7 requests, 0 decode | vLLM #40969 (FULL_AND_PIECEWISE + chunked prefill) | cudagraph mode change / `--enforce-eager` (slower) |
+| Strategist decode ~5 tok/s not ~44 | MTP speculative decode off | `--speculative-config deepseek_mtp num_speculative_tokens=2` |
 | NIC bricked (pre-init, error -110) | unsolicited `mlnx-fw-updater` flash | Phase 2 hold; `fwupdmgr` downgrade to known-good |
 | Unattended run escalated to claude-opus + spend | LiteLLM `context_window_fallbacks` | Phase 7: set it `[]` too |
 

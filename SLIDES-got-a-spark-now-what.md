@@ -228,8 +228,8 @@ clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
 - **The intuition:** "two boxes, twice the tokens, right?"
 - **The reality:** stacking buys **capacity and parallelism, not single-stream speed.** A model that already fits on one node is *faster* on one node — the interconnect is a ceiling, not an accelerator. (Any throughput figures are community numbers, to be re-confirmed on our own hardware — DF-004. Lead with the shape, not a tok/s claim.)
 - **The reframe:** you stack to **run a model too big for one 128 GB node**, and to **run different models in parallel** — then **time-share** the boxes. Never for single-stream speed.
-- **The example:** a heavyweight local **Player** seat — DeepSeek-V4-Flash class (~149 GB FP8) — runs across both nodes via vLLM `--tp 2`, and *only* while deliberately launched. It can't co-reside with the swap pool; memory is budgeted per session, not per pipeline.
-- **The architecture:** one LiteLLM `:4000` front door → llama-swap pool (Node A) **XOR** the cross-node TP Player (memory budget per session). [diagram: `diagrams/two-spark-fleet-serving-architecture.svg`]
+- **The example:** a heavyweight local **Strategist** seat — DeepSeek-V4-Flash class (~149 GB FP8) — runs across both nodes via vLLM `--tp 2`, and *only* while deliberately launched. It can't co-reside with the swap pool; memory is budgeted per session, not per pipeline.
+- **The architecture:** one LiteLLM `:4000` front door → llama-swap pool (Node A) **XOR** the cross-node TP Strategist (memory budget per session). [diagram: `diagrams/two-spark-fleet-serving-architecture.svg`]
 - **The honest gotchas** (the bring-up war story): any QSFP port (the "same port" myth), prove RoCE not TCP (`NET/IB`), the firmware hard-power-off, MTP-or-decode-collapses.
 - **Close:** capacity not speed — *share the boxes by time, not at once.*
 

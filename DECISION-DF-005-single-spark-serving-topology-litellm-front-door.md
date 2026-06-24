@@ -51,7 +51,7 @@ This box serves *many* models from *more than one engine* (llama.cpp fleet via l
 
 1. **LiteLLM `:4000` is the single front door** for the single-Spark setup. Every agent points at `:4000`. It routes by model name to llama-swap `:9000` (the llama.cpp fleet) and to vLLM backends as applicable.
 2. **llama-swap is unchanged** as the unified-memory/lifecycle layer beneath it. LiteLLM does not load or evict models.
-3. **No cloud fallback on local models (DF-001), enforced by a gate.** Auto cloud-fallback is LiteLLM's headline feature and the exact mechanism behind the April Gemini-spend incident. The config ships `fallbacks: []` **and** `context_window_fallbacks: []`. Cloud models (`claude-*`) may be *named* only for the attended DF-003 path — never as an automatic fallback target. Local→local fallback (e.g. proposer → workhorse) is permitted; local→cloud is not.
+3. **No cloud fallback on local models (DF-001), enforced by a gate.** Auto cloud-fallback is LiteLLM's headline feature and the exact mechanism behind the April Gemini-spend incident. The config ships `fallbacks: []` **and** `context_window_fallbacks: []`. Cloud models (`claude-*`) may be *named* only for the attended DF-003 path — never as an automatic fallback target. Local→local fallback (e.g. strategist → workhorse) is permitted; local→cloud is not.
 4. **Direct `:9000` remains a documented fallback** if LiteLLM is unavailable (DF-004 §chokepoint mitigation) — additive, never on the critical path.
 
 ---
