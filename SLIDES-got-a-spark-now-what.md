@@ -123,16 +123,19 @@
 
 **On screen — single-Spark topology (diagram):**
 ```
-clients (Claude Code / agents — OpenAI & Anthropic compatible)
+clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
         │
-   llama-swap :9000   ← the front door (all-llama.cpp, one process tree)
+   LiteLLM :4000      ← the front door  (routing · per-agent keys · spend · no-cloud-fallback gate)
+        │
+   llama-swap :9000   ← unified-memory lifecycle  (load · swap · evict, all-llama.cpp)
    always-on (~65 GB): workhorse · coach · chat · embed
 ```
 - **workhorse** Qwen3.6-35B-A3B · **coach** Gemma-4-26B-A4B · **chat** gpt-oss-20b · **embed** Qwen3-Embedding-0.6B
 - 100% **open, downloadable** models — a viewer can reproduce the whole box.
-- *Honest:* the live front door is **llama-swap on :9000**. **LiteLLM is the Phase-4 layer** — documented, not yet production.
+- *Two layers, one job each:* **LiteLLM** routes & accounts; **llama-swap** owns GPU memory. This is the **community stack** (martinB78/Dre), built on — not a subset of it.
+- *The one community feature I deliberately **disable**:* auto cloud-fallback — a **gate** enforces no-cloud-on-local (DF-001).
 
-**Notes:** New visual (single-Spark). Mention the leaderboard-topping Qwen3.6-35B + the 17/17-on-tool-calling Gemma-4 coach so the model picks feel earned, not arbitrary.
+**Notes:** New visual (single-Spark, two-layer front door — see `DECISION-DF-005`). LiteLLM is the front door (not a deferred "Phase 4") so the box is a genuine superset of the community stack and continuous with the two-node DF-004 story. Mention the leaderboard-topping Qwen3.6-35B + the 17/17-on-tool-calling Gemma-4 coach so the model picks feel earned. The "feature I disable" line is the honest gotcha→gate beat for this slide.
 
 ---
 
@@ -223,10 +226,10 @@ clients (Claude Code / agents — OpenAI & Anthropic compatible)
 *Spine: `RUNBOOK-two-spark-video-capture.md` + `DECISION-DF-004`. Build this deck after the foundation one.*
 
 - **The intuition:** "two boxes, twice the tokens, right?"
-- **The reality:** the **200 G ConnectX-7 link (~22 GB/s, wired as 2× PCIe Gen5 x4)** is the ceiling. A model that fits one node is **faster** on one node.
-- **The reframe:** you stack for **capacity** (run a model too big for 128 GB) and **parallelism**, then **time-share** the boxes — never for single-stream speed.
-- **The proof:** DeepSeek-V4-Flash (284B-A13B, ~158 GB) across two nodes via vLLM `--tp 2`, ~44 tok/s warm — vs the same-class model running faster single-node.
-- **The architecture:** one LiteLLM `:4000` front door → llama-swap pool (Node A) **XOR** the cross-node TP proposer (memory budget per session). [diagram: `diagrams/two-spark-fleet-serving-architecture.svg`]
+- **The reality:** stacking buys **capacity and parallelism, not single-stream speed.** A model that already fits on one node is *faster* on one node — the interconnect is a ceiling, not an accelerator. (Any throughput figures are community numbers, to be re-confirmed on our own hardware — DF-004. Lead with the shape, not a tok/s claim.)
+- **The reframe:** you stack to **run a model too big for one 128 GB node**, and to **run different models in parallel** — then **time-share** the boxes. Never for single-stream speed.
+- **The example:** a heavyweight local **Player** seat — DeepSeek-V4-Flash class (~149 GB FP8) — runs across both nodes via vLLM `--tp 2`, and *only* while deliberately launched. It can't co-reside with the swap pool; memory is budgeted per session, not per pipeline.
+- **The architecture:** one LiteLLM `:4000` front door → llama-swap pool (Node A) **XOR** the cross-node TP Player (memory budget per session). [diagram: `diagrams/two-spark-fleet-serving-architecture.svg`]
 - **The honest gotchas** (the bring-up war story): any QSFP port (the "same port" myth), prove RoCE not TCP (`NET/IB`), the firmware hard-power-off, MTP-or-decode-collapses.
 - **Close:** capacity not speed — *share the boxes by time, not at once.*
 
@@ -235,5 +238,5 @@ clients (Claude Code / agents — OpenAI & Anthropic compatible)
 ## Production notes
 
 - **Video vs talk:** the YouTube single-Spark video = slides 1–4, 9–13, 16 (framing) wrapped around the live recording. The talk = the full deck. Same narrative, different density.
-- **Diagrams:** slide 9 needs a *new* single-Spark topology graphic (simple — the ASCII above, drawn). The two-Spark appendix reuses `diagrams/two-spark-fleet-serving-architecture.svg` (re-export from `.excalidraw` for clean layout first).
+- **Diagrams:** slide 9 needs a *new* single-Spark topology graphic — the **two-layer** front door (LiteLLM `:4000` → llama-swap `:9000` → the four always-on models), drawn from the ASCII above. The two-Spark appendix reuses `diagrams/two-spark-fleet-serving-architecture.svg` (re-export from `.excalidraw` for clean layout first).
 - **Live demo safety:** record on a box where llama.cpp is already built (so the demo is ~8–10 min, not 90); the drift-report + gate-catch is the part that must land on camera.
