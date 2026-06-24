@@ -51,20 +51,23 @@ The only other non-agent inputs are **physical** and **two-Spark-only**: pluggin
 
 ## Current stack (steady state)
 
-Honest snapshot of what actually runs in production today:
+The architecture the public single-Spark runbook stands up — LiteLLM `:4000` in front of the llama-swap `:9000` fleet ([`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)):
 
 ```
 clients (agents, Claude Code, OpenAI/Anthropic-compatible) 
    │
    ▼
-llama-swap :9000        ← THE deployed front door (all-llama.cpp; one process tree)
-   ├── always-on preload (~80 GB): qwen-graphiti, nomic-embed, qwen36-workhorse, architect-agent
-   └── on-demand + matrix sets: tutor, coder, vision (vLLM-in-Docker for a few vision models)
+LiteLLM :4000           ← the front door (control plane: claude-* wildcard · per-agent keys · spend; NO cloud fallback, DF-001)
+   │   (LiteLLM-down fallback: clients may hit llama-swap :9000 directly)
+   ▼
+llama-swap :9000        ← the unified-memory model layer (all-llama.cpp; one process tree under a user systemd unit)
+   └── always-on fleet (~65 GB): workhorse (Qwen3.6-35B-A3B) · coach (Gemma-4-26B-A4B) · chat (gpt-oss-20b) · embed (Qwen3-Embedding-0.6B, 1024-dim)
+   └── on-demand: gpt-oss-120b (evicts the fleet)
 ```
 
-- **LiteLLM** is the **Phase 4 routing layer** (the martinB78/community pattern: LiteLLM → llama-swap → vLLM/llama.cpp). It is documented and validated but is **not yet the live front door** — today, agents point at llama-swap on `:9000` directly. Talks/docs should present it that way.
-- Hardware: `promaxgb10-41b1`, 121 GB usable of 128 GB unified. Safe ceiling ~115 GB.
-- Constraint **DECISION-DF-001**: no cloud API on the dark-factory critical path. Recon/search is *additive*, never on the critical path (see conventions).
+- **LiteLLM `:4000` is the front door** — the *full* community stack (martinB78 → Dre Dyson → dasroot: `client → LiteLLM → llama-swap → engines`), not a llama-swap-only subset. It is a router / control plane only (per-agent keys, `claude-*` wildcard, spend, fallback policy); llama-swap underneath owns model lifecycle / unified memory. [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) Phase 5.4 stands it up on one node; [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) extends it across two ([`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md), PROPOSED).
+- Constraint **DECISION-DF-001**: no cloud API on the dark-factory critical path — enforced as a LiteLLM config gate (`fallbacks: []` + `context_window_fallbacks: []`, and no cloud model named as a fallback target). Recon/search is *additive*, never on the critical path (see conventions).
+- Hardware: `promaxgb10-41b1`, 121 GB usable of 128 GB unified, safe ceiling ~115 GB. (`:9000` is *this box's* llama-swap port — the upstream community default is `:8080`; the universal part is the single-proxy-port principle.)
 
 ---
 

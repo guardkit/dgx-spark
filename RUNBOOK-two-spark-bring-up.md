@@ -228,7 +228,7 @@ router_settings:
   fallbacks: []                  # NO local->cloud fallback (DF-001)
   context_window_fallbacks: []   # also empty — LiteLLM's documented example escalates to claude-opus on overflow (the exact unattended-spend footgun)
 ```
-**▶ GATE:**
+**▶ GATE — no cloud fallback (DF-001):** the robust invariant is *no cloud model is reachable as a fallback target*. `claude-opus` is *named* (DF-003 attended path) but must never appear in a fallback chain.
 ```bash
 CFG=/opt/litellm/config.yaml
 grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallbacks:\s*\[\]' "$CFG" \
@@ -236,9 +236,43 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
   || echo "GATE FAIL: a cloud fallback path exists — DF-001 violation. STOP."
 # NOTE: the leading `^\s*` anchor is load-bearing — without it, an empty `context_window_fallbacks: []`
 # line satisfies the first grep's `fallbacks: []` substring even when `fallbacks:` is POPULATED (false-pass).
+! sed 's/#.*//' "$CFG" | grep -qiE 'fallback.*(claude|gemini|anthropic|vertex|bedrock|openai/gpt)' \
+  && echo "GATE PASS: no cloud model named as a fallback target (claude-opus is attended-only, not a fallback)" \
+  || echo "GATE FAIL: a cloud model appears in a fallback chain — DF-001 violation. STOP."
+# `sed 's/#.*//'` strips comments first so the in-file "…escalates to claude-opus on overflow" note
+# (and the attended-only claude-opus model line) can't false-FAIL the gate — it asserts YAML values only.
 ```
 
-**Install + run it (agent steps — not a pre-install):** the agent runs `pip install 'litellm[proxy]' --break-system-packages`, writes the config above to `/opt/litellm/config.yaml` (heredoc), then starts it: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0` (or a `systemctl --user` unit per Phase 4.1).
+**▶ GATE — CPU-pin LiteLLM disjoint from llama-swap on Node A (WARN, not STOP):** Node A runs *both* the LiteLLM front door and the llama-swap pool, so under concurrent multi-model load they must not share a core (symptom: LiteLLM 504s + flaky llama-swap health). Set non-overlapping `CPUAffinity=` on the two user units; the GB10 CPU is **20 cores** (10× Cortex-X925 + 10× Cortex-A725) — e.g. litellm `0-3`, llama-swap `4-19`. WARN on overlap (the disjointness check is sound; the 504s rationale is community-sourced — see DF-005's verification note). Identical mechanism + gate as `RUNBOOK-single-spark-bring-up.md` §5.4.4:
+```bash
+LSW=$(systemctl --user show llama-swap.service -p CPUAffinity --value 2>/dev/null)
+LIT=$(systemctl --user show litellm.service   -p CPUAffinity --value 2>/dev/null)
+python3 - "$LSW" "$LIT" <<'PY'
+import sys
+def expand(s):
+    out=set()
+    for t in (s or "").replace(',',' ').split():
+        if '-' in t: a,b=t.split('-'); out|=set(range(int(a),int(b)+1))
+        elif t.isdigit(): out.add(int(t))
+    return out
+a,b=expand(sys.argv[1]),expand(sys.argv[2])
+print("GATE WARN: CPUAffinity not set on both units — pin disjoint (litellm 0-3 / llama-swap 4-19 on 20 cores)." if not a or not b
+      else f"GATE WARN: CPUAffinity overlaps on {sorted(a&b)} — make disjoint." if a&b
+      else "GATE PASS: litellm and llama-swap CPUAffinity disjoint.")
+PY
+```
+
+**▶ GATE — front door answers (route to a local model):** a smoke request to `:4000` for `workhorse` returns a local completion (front door up + routing to llama-swap). The cloud-safety invariant is the no-cloud gate above; this just proves `:4000` is live and demuxing.
+```bash
+curl -sf http://localhost:4000/v1/models | jq -r '.data[].id' | sort
+RESP=$(curl -s http://localhost:4000/v1/chat/completions -H "Content-Type: application/json" \
+  -d '{"model":"workhorse","max_tokens":16,"messages":[{"role":"user","content":"reply: pong"}]}')
+echo "$RESP" | jq -e '.choices[0].message.content' >/dev/null \
+  && echo "GATE PASS: :4000 front door answers from a local model" \
+  || { echo "GATE FAIL: no local completion via :4000 — check LiteLLM + the llama-swap :9000 backend. STOP."; echo "$RESP" | head -c 400; }
+```
+
+**Install + run it (agent steps — not a pre-install):** the agent runs `pip install --user --break-system-packages 'litellm[proxy]'`, writes the config above to `/opt/litellm/config.yaml` (heredoc), then runs it as a **CPU-pinned user systemd unit** — the same unit as `RUNBOOK-single-spark-bring-up.md` §5.4.2 (`CPUAffinity=0-3`, llama-swap drop-in `4-19`), which is also where the single-node LiteLLM front door (DECISION-DF-005, the precursor to this decision) is specified. Direct ad-hoc start for a quick test: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0`.
 
 ---
 
@@ -298,7 +332,9 @@ Record decode tok/s (TP=2 / single-node / PP=2), cold-start (~6 min), and TTFT@3
 | P4(b) transport NET/IB (not Socket) | | no silent TCP fallback |
 | P5 passwordless SSH both ways | | |
 | P6 power-off mitigation on both | | `-lgc` (unverified) + thermal |
-| P7 LiteLLM no-cloud guard (both fallbacks empty) | | |
+| P7 LiteLLM no-cloud guard (both fallbacks empty + no cloud target) | | claude-opus attended-only, not a fallback |
+| P7 LiteLLM ↔ llama-swap CPUAffinity disjoint on Node A | | **WARN** (not hard-gated) |
+| P7 front door `:4000` answers from a local model | | proves routing to llama-swap :9000 |
 | P8 pool evicted before Strategist (memory XOR) | | |
 | P9 TP=2 / single-node / PP=2 numbers | | **record tok/s + cold-start** |
 
@@ -321,6 +357,7 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 | Strategist decode ~5 tok/s not ~44 | MTP speculative decode off | `--speculative-config deepseek_mtp num_speculative_tokens=2` |
 | NIC bricked (pre-init, error -110) | unsolicited `mlnx-fw-updater` flash | Phase 2 hold; `fwupdmgr` downgrade to known-good |
 | Unattended run escalated to claude-opus + spend | LiteLLM `context_window_fallbacks` | Phase 7: set it `[]` too |
+| LiteLLM 504s / flaky health on Node A under load | LiteLLM & llama-swap sharing a CPU core | Phase 7: disjoint `CPUAffinity=` (litellm 0-3 / llama-swap 4-19; 20-core GB10) |
 
 ---
 
@@ -329,3 +366,4 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 - **`RUNBOOK-single-spark-bring-up.md`** — Node A baseline. This runbook is additive on top; it never edits the Node A config.
 - **[`RUNBOOK-two-spark-video-capture.md`](./RUNBOOK-two-spark-video-capture.md)** (capture spine, in this repo) — the filming notes; it *films* this executable arc (P2 bring-up war-story = Phases 2–6; P3 number = Phase 9).
 - **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
+- **[`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)** (this repo) — the **single-node precursor**: the same LiteLLM `:4000` front door + no-cloud-fallback gate + disjoint-`CPUAffinity` gate, on one Spark. This two-node fabric is its **superset**; the LiteLLM Phase here re-uses the single-Spark §5.4 install/unit/gates verbatim.
