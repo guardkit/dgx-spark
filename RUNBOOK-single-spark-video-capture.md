@@ -1,0 +1,80 @@
+# Single-Spark Bring-Up — Video Capture Runbook
+
+**Spine:** *One box runs my whole local-AI loop — build the dataset, fine-tune the model, host it, then point my agents at it to ship features. Here's how I get that box set up so it just works.*
+
+**Channel fit:** @RichWoollcott — a software engineer crossing into AI. This is the **companion video** to the *"2026: The Year of the Software Factory"* talk. The talk is the *system*; this video is the **machine underneath it** — the one box that does the local inference, the dataset building, and the fine-tuning the factory runs on.
+
+**The deliberate non-goal — say this out loud in the hook:** this is **not** a tokens-per-second video. The forums are wall-to-wall speed benchmarks and leaderboard drag-races. The thing almost nobody shows is *what the box is actually for* and *how to make it reliable enough to trust with real work*. That gap **is** the video. Leave the tok/s to the people geeking out in the forums.
+
+**How to use this:** a capture *spine*, not a script. Record the real bring-up with OBS and narrate as you go. Don't write lines, don't re-shoot for polish, don't hide failures — the gotchas are the content. If a phase doesn't land, pick it up in a second session.
+
+Audience: software engineers who have (or are about to get) a local-AI box and want it to *do useful work*, not benchmark well. Target: ~10–15 min build-log + purpose explainer.
+
+---
+
+## The one idea (open on it, close on it)
+
+This box isn't a benchmark rig — it's the **factory floor for one developer**. It does four jobs end to end, with **no cloud on the critical path**:
+
+1. **Build the dataset** — an agent turns my source material (books, docs, PDFs) into validated training data. *(The "Agentic Dataset Factory" from the talk.)*
+2. **Fine-tune** — train an open-weight model on that data, on-box, with Unsloth.
+3. **Host** — serve the fine-tuned model *and* the open-weight models behind **one local front door** (llama-swap), so anything OpenAI/Anthropic-compatible can call them.
+4. **Build** — my **LangGraph DeepAgents** and **guardkit AutoBuild** call that box to do the work. They build features against *my* local models, not someone's cloud.
+
+The rest of the video is the honest part: **how I get this box reliable enough to trust with all four** — by pointing a coding agent at a gated runbook, not by hand-following a blog.
+
+---
+
+## Pre-read (open in tabs before recording)
+
+- **Software Factory deck** — have these slides ready as the framing cutaways: *The Factory / Fleet Architecture* (slide 9, "every model through one endpoint"), *The Player-Coach Loop* (slide 10), *Evidence — 26B fine-tune vs GPT-5.5* (slide 12), *Agentic Dataset Factory* (slide 13), *The Stack — four layers* (slide 14).
+- **`./RUNBOOK-single-spark-bring-up.md`** — the executable, gated runbook this video *films*. Run it once before recording.
+- `RUNBOOK-CONVENTIONS.md` — the recon → drift → gates method (the "how it stays reliable" half).
+- The single-Spark topology diagram *(to draw — see Production notes)*.
+
+---
+
+## Pre-flight — recording setup &nbsp; · &nbsp; **Gate:** scenes ready, framing slides loaded, terminal legible
+
+- OBS scenes: (a) desk/hardware cam, (b) full-screen terminal, (c) slide/diagram cutaway. Terminal font ≥ 18pt.
+- The Spark powered; single clean shell, history cleared; the bring-up dry-run done once so you know it goes green.
+
+---
+
+## Capture phases
+
+| # | On screen | Say (prompts, not lines) | Gate (pass/fail) |
+|---|-----------|--------------------------|------------------|
+| **P1 Hook** *(what it's for)* | The box on the desk | "This one box is my whole AI loop — I build datasets on it, fine-tune models on it, host them, then point my agents at it to ship features. And I'm **not** going to talk to you about tokens per second — that's the forums' game. I'm going to show you what it's *for* and how to make it reliable." | Purpose + anti-benchmark promise stated on camera |
+| **P2 The loop** *(the purpose beat — the differentiator)* | Cut to the Fleet Architecture slide (9) + Dataset Factory slide (13) | Walk the four jobs, one line each: **dataset** (an agent turns my books/PDFs into validated training data) → **fine-tune** (open-weight model, on-box, Unsloth) → **host** (every model behind one local front door) → **build** (DeepAgents + AutoBuild call the box, not the cloud). Land it: "everything from here is making *this* box trustworthy enough to run all four unattended." | The four jobs explained as one loop |
+| **P3 Get it reliable** *(the method)* | Full-screen terminal | `git clone … && claude "execute RUNBOOK-single-spark-bring-up.md"`. The pitch: I don't *hand-follow* a blog — I point a coding agent at a **runbook it executes**: pinned versions, gotchas encoded as **gates that fail loudly**, a Phase-0 recon pass that checks what's drifted the morning I run it. "Clone → point an agent at it → walk away." | "Runbook an agent runs, not a tutorial" landed |
+| **P4 The trap that bites everyone** *(one gotcha, three ways)* | Split: forum post · blog · the gate | Tell the signature story: a generic ARM64 build silently runs on **CPU** — the box *feels broken*, everything crawls, and you lose a day before you realise the GPU never engaged. Three ways it shows up: a forum "watch out", a blog "I lost a day", and **this repo: a gate that STOPS the run until the GPU is proven to be doing the work.** *(Recast as the experience — "the box felt broken" — never lead with a tok/s number.)* | The watch-out → I-lost-a-day → gate-that-STOPS motif lands |
+| **P5 Live demo** *(the proof it's reliable)* | The real run, full-screen | Roll the recording: Phase-0 **recon → drift report** (one flagged regression), agent **executes** the pinned build/serve, a **gate fires** on the flagged trap and **halts loudly**, the fix is **a reviewed PR**, then a green re-run. Talk over it; let it move. | Recon → execute → gate-catch → PR-fix → green captured |
+| **P6 Payoff** *(close the loop on camera)* | Terminal / a DeepAgent or AutoBuild run | The box is now serving my models behind the one front door. Show it being *used*: a **DeepAgent** or **AutoBuild** actually calling the box to do real work (e.g. an architecture review by the fine-tuned model, or a feature task). "Datasets, fine-tune, host, build — all on the one box, no cloud in the loop." | The box shown doing useful work, not a benchmark |
+| **P7 Close** | Back to hardware / channel card | Restate the one idea (factory floor for one developer). Repo + channel. Tease the next video on **what a second box unlocks** (run a model too big for one box; more agents in parallel) — *capacity, not speed.* | One idea restated; next video teed on utility |
+
+---
+
+## Evidence / prompt pack (for the edit + publish)
+
+- **Title options (utility-framed, never speed):**
+  - "One Box, the Whole AI Loop: I Build Datasets, Fine-Tune & Host My Own Models — Then Build With Them"
+  - "How a Software Engineer Runs a Local AI Lab on One Box (Dataset → Fine-Tune → Ship a Feature)"
+  - "The Machine Behind My Software Factory: One DGX Spark, No Cloud"
+- **Thumbnail text (no numbers):** `BUILD → FINE-TUNE → HOST → SHIP` · or `ONE BOX. THE WHOLE LOOP.`
+- **Chapters** = the phases: `00:00` What it's for · The loop · Make it reliable · The trap → the gate · The live run · Using it · Close.
+- **Say-these truths (the spine, safe to repeat):** the box is a *factory floor*, not a benchmark rig · four jobs on one box (dataset · fine-tune · host · build) · no cloud on the critical path · the runbook is an *executable spec*, gotchas are *gates* · I'm pointing my own agents at my own models.
+- **Do NOT:** quote tokens/sec or compare to a leaderboard (that's the forums' game — and the whole point is to *not* play it) · re-shoot for polish · script lines · cut the failures · let the camera slow the build.
+- **Must-haves to make the video** (any gate that failed → a second session is fine): (1) the "what it's for / not a tok/s video" hook on camera, (2) the four-job loop explained, (3) the runbook-as-spec method, (4) the gate catching the trap live, (5) the box shown *doing useful work*, (6) the close.
+
+---
+
+## Production notes
+
+- **Relationship to the talk:** this video is the **machine** under the *Software Factory* talk — reuse the talk's Fleet Architecture (9), Dataset Factory (13), and Stack (14) slides as cutaways so the channel and the talk reinforce each other. Same narrative, more hands-on density.
+- **Diagram:** P2 needs a simple single-Spark "the four jobs on one box" graphic (the loop: dataset → fine-tune → host → build, with llama-swap as the front door). Draw it once; reuse on the slide.
+- **Live-demo safety:** record on a box where llama.cpp is already built so the run is ~8–10 min, not 90. The drift-report + gate-catch is the part that must land on camera; the long download/build is edited out.
+- **Honest framing (say it):** the live front door is **llama-swap** (all-llama.cpp). LiteLLM is the documented routing layer, not yet the production front door — present it that way.
+
+---
+*Companion to `TALK`/`SLIDES-got-a-spark-now-what.md` and the Software Factory deck. The two-Spark payoff has its own spine: `RUNBOOK-two-spark-video-capture.md` — teed at the close as capacity, not speed.*
