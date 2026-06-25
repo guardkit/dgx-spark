@@ -54,6 +54,8 @@ PINS (runbook vN, set 2026-06-19)
 
 When recon flags drift on a pin, the fix is a **PR that edits this block** (see §6) — not an edit the agent makes to itself at runtime.
 
+**Exception — float-with-baseline (for stable-interface, gate-protected, fast-moving deps).** The default is exact pins (above), because the things we pin are hardware-coupled and drift has *bitten* (SM121 build flags, llama-swap flag contracts, GGUF re-quants) — silent breakage a gate can't always catch. A dependency that is the *opposite* of that — a **stable interface**, **already asserted by a runtime gate**, and **released very frequently** — is **floated to latest with a recorded validated-at baseline**, not frozen. The canonical case is the **LiteLLM proxy**: its surface the runbook touches (`model_list`→`openai/<model>`+`api_base`, `--port`, `/v1/*`) is mature, the no-cloud and routes gates prove the installed release works at run time, and it ships multiple releases a week — so an exact pin buys almost no determinism and rots fast (a viewer six months on would install a stale version for no benefit). For such a dep: install latest, **record the version actually run in `RESULTS-*`**, keep recon pointed at its releases, and **pin it reactively (a PR to the PINS block) only if a release actually breaks a run** — exactly how the hardware pins earned their freeze. This is *not* a licence to float the fragile pins; it is a narrow carve-out for deps whose drift the gates already catch.
+
 ---
 
 ## 4. Phase 0 — Recon (read-only, advisory)

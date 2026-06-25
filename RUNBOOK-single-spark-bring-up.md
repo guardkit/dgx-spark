@@ -41,7 +41,7 @@ PINS (set 2026-06-21)
   chat       GGUF       gpt-oss-20b MXFP4                     unsloth/gpt-oss-20b-GGUF         (general chat)
   embed      GGUF       Qwen3-Embedding-0.6B Q8_0            Qwen/Qwen3-Embedding-0.6B-GGUF    (1024 dims)
   big (opt)  GGUF       gpt-oss-120b MXFP4                    ggml-org/gpt-oss-120b-GGUF       (on-demand Player)
-  litellm    PyPI       litellm[proxy]==1.89.4               pip --user --break-system-packages  (front door :4000; wheels-only ~16s, validated on GB10 2026-06-25)
+  litellm    PyPI       litellm[proxy]  (latest)             pip --user --break-system-packages  (front door :4000; floated not frozen — stable interface + gate-protected, see CONVENTIONS §3; validated at 1.89.4 on GB10 2026-06-25, wheels-only ~16s)
   KV_CACHE_TYPE         q8_0                         on large-ctx models (workhorse / coach)
   MEM_CEILING_GB        115                          121 usable; freeze observed at 114 (TOTAL unified, not just compute-apps)
   GB10_CORES            20                           10x Cortex-X925 + 10x Cortex-A725 (NOT 72-core Grace) — for CPUAffinity ranges
@@ -355,12 +355,14 @@ LiteLLM is **additive**: it adds one OpenAI/Anthropic-compatible endpoint (`:400
 #### 5.4.1 Install LiteLLM (agent step — pure-Python, ARM64; not a manual prerequisite)
 
 ```bash
-pip install --user --break-system-packages 'litellm[proxy]==1.89.4'   # PINNED; [proxy] extra is pure-Python, wheels-only on aarch64 (~16s, validated on GB10)
+pip install --user --break-system-packages 'litellm[proxy]'   # latest; [proxy] extra is pure-Python, wheels-only on aarch64 (~16s; validated baseline 1.89.4)
 hash -r
 LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
 VER=$("$LITELLM_BIN" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-[ "$VER" = "1.89.4" ] && echo "GATE PASS: litellm $VER == pin" \
-  || echo "WARN: litellm $VER != pinned 1.89.4 — recon should have flagged the drift; a newer release usually works, but update the PINS row (and re-validate) if this is intended."
+echo "[record in RESULTS] litellm ${VER}   (validated baseline: 1.89.4 on GB10 2026-06-25)"
+# Deliberately NOT version-frozen (CONVENTIONS §3): litellm's surface here (model_list/openai-prefix/api_base,
+# --port, /v1/*) is stable and the no-cloud + routes gates below prove THIS release works at runtime. Recon flags
+# BerriAI/litellm drift; if a future release ever breaks a run, pin it THEN via a PR to the PINS block.
 ```
 
 #### 5.4.2 Deploy the config + start under a USER systemd unit — CPU-pinned disjoint from llama-swap
