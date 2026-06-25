@@ -163,7 +163,7 @@ models:
       - "openai/gpt-oss-20b"
 
   # ---------------------------------------------------------------------------
-  # EMBED — Qwen3-Embedding-0.6B (1024-dim, 32K ctx). RAG embeddings.
+  # EMBED — Qwen3-Embedding-0.6B (1024-dim, served at 8192 ctx — model supports 32K). RAG embeddings.
   # Last-token pooling (Qwen3-Embedding requirement). Negligible footprint.
   # NOTE for GuardKit/Graphiti users: this is 1024-dim. nomic-embed-text-v1.5
   # is the 768-dim drop-in if you must match an existing 768-dim index.
