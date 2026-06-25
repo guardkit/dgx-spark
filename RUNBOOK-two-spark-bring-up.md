@@ -39,7 +39,7 @@ PINS (set 2026-06-22)
   vLLM              jasl/vllm commit dda4668b   (GB10 validation is commit-specific)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
   strategist          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
-  litellm           front door :4000   NO cloud fallback (fallbacks: [] AND context_window_fallbacks: [])
+  litellm           litellm[proxy]==1.89.4   front door :4000; NO cloud fallback (fallbacks: [] AND context_window_fallbacks: []); validated on GB10
   embed             Qwen3-Embedding-0.6B  (1024-dim, always-on; matches the single-Spark public config — pin ONE dim end-to-end)
   MEM_RULE          swap pool XOR TP strategist  (the ~158 GB strategist + a full pool cannot co-reside across 2x128 GB)
   ENDPOINT          LiteLLM :4000  (clients);  llama-swap :9000 + vLLM :8080 remain direct-port fallbacks (DF-001 §3.3)
@@ -272,7 +272,7 @@ echo "$RESP" | jq -e '.choices[0].message.content' >/dev/null \
   || { echo "GATE FAIL: no local completion via :4000 — check LiteLLM + the llama-swap :9000 backend. STOP."; echo "$RESP" | head -c 400; }
 ```
 
-**Install + run it (agent steps — not a pre-install):** the agent runs `pip install --user --break-system-packages 'litellm[proxy]'`, writes the config above to `/opt/litellm/config.yaml` (heredoc), then runs it as a **CPU-pinned user systemd unit** — the same unit as `RUNBOOK-single-spark-bring-up.md` §5.4.2 (`CPUAffinity=0-3`, llama-swap drop-in `4-19`), which is also where the single-node LiteLLM front door (DECISION-DF-005, the precursor to this decision) is specified. Direct ad-hoc start for a quick test: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0`.
+**Install + run it (agent steps — not a pre-install):** the agent runs `pip install --user --break-system-packages 'litellm[proxy]==1.89.4'` (pinned; validated on GB10), writes the config above to `/opt/litellm/config.yaml` (heredoc), then runs it as a **CPU-pinned user systemd unit** — the same unit as `RUNBOOK-single-spark-bring-up.md` §5.4.2 (`CPUAffinity=0-3`, llama-swap drop-in `4-19`), which is also where the single-node LiteLLM front door (DECISION-DF-005, the precursor to this decision) is specified. Direct ad-hoc start for a quick test: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0`.
 
 ---
 

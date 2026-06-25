@@ -41,7 +41,7 @@ PINS (set 2026-06-21)
   chat       GGUF       gpt-oss-20b MXFP4                     unsloth/gpt-oss-20b-GGUF         (general chat)
   embed      GGUF       Qwen3-Embedding-0.6B Q8_0            Qwen/Qwen3-Embedding-0.6B-GGUF    (1024 dims)
   big (opt)  GGUF       gpt-oss-120b MXFP4                    ggml-org/gpt-oss-120b-GGUF       (on-demand Player)
-  litellm    PyPI       litellm[proxy] (record installed ver) pip --user --break-system-packages  (front door :4000; added 2026-06-24)
+  litellm    PyPI       litellm[proxy]==1.89.4               pip --user --break-system-packages  (front door :4000; wheels-only ~16s, validated on GB10 2026-06-25)
   KV_CACHE_TYPE         q8_0                         on large-ctx models (workhorse / coach)
   MEM_CEILING_GB        115                          121 usable; freeze observed at 114 (TOTAL unified, not just compute-apps)
   GB10_CORES            20                           10x Cortex-X925 + 10x Cortex-A725 (NOT 72-core Grace) — for CPUAffinity ranges
@@ -355,10 +355,12 @@ LiteLLM is **additive**: it adds one OpenAI/Anthropic-compatible endpoint (`:400
 #### 5.4.1 Install LiteLLM (agent step — pure-Python, ARM64; not a manual prerequisite)
 
 ```bash
-pip install --user --break-system-packages 'litellm[proxy]'   # the [proxy] extra is pure-Python; resolves on aarch64
+pip install --user --break-system-packages 'litellm[proxy]==1.89.4'   # PINNED; [proxy] extra is pure-Python, wheels-only on aarch64 (~16s, validated on GB10)
 hash -r
 LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
-"$LITELLM_BIN" --version    # PIN: record this version in the PINS block on first run (it floats fast)
+VER=$("$LITELLM_BIN" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+[ "$VER" = "1.89.4" ] && echo "GATE PASS: litellm $VER == pin" \
+  || echo "WARN: litellm $VER != pinned 1.89.4 — recon should have flagged the drift; a newer release usually works, but update the PINS row (and re-validate) if this is intended."
 ```
 
 #### 5.4.2 Deploy the config + start under a USER systemd unit — CPU-pinned disjoint from llama-swap
@@ -453,11 +455,15 @@ PY
 ```bash
 # (a) the front door lists the fleet via :4000
 curl -sf http://localhost:4000/v1/models | jq -r '.data[].id' | sort
-# (b) a claude-* request lands on the LOCAL workhorse (no cloud — there is no cloud model in the config to reach)
+# (b) a claude-* request lands on the LOCAL workhorse (no cloud — there is no cloud model in the config to reach).
+#     max_tokens is generous so workhorse (--reasoning auto) emits real text; accept content OR reasoning_content
+#     — a reasoning model can put its answer in reasoning_content and leave content empty (verified on GB10).
 RESP=$(curl -s http://localhost:4000/v1/chat/completions -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-6","max_tokens":32,"messages":[{"role":"user","content":"reply with the single word: pong"}]}')
-echo "$RESP" | jq -e '.choices[0].message.content' >/dev/null \
-  && echo "GATE PASS: claude-* routed to a local model via :4000 (got a completion)" \
+  -d '{"model":"claude-sonnet-4-6","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
+GEN=$(echo "$RESP" | jq -r '(.choices[0].message.content // "") + (.choices[0].message.reasoning_content // "")')
+SERVED=$(echo "$RESP" | jq -r '.model // "?"')
+[ -n "$GEN" ] \
+  && echo "GATE PASS: claude-* routed to a local model via :4000 (served=${SERVED}, ${#GEN} chars generated)" \
   || { echo "GATE FAIL: no local completion for claude-* via :4000. STOP."; echo "$RESP" | head -c 400; }
 ```
 **Routing safety is structural:** because the public config names **no** cloud model and ships empty fallback lists (5.4.3), a `claude-*` request *cannot* reach a cloud API — there is no target. If the literal `claude-*` wildcard doesn't resolve in your installed LiteLLM version, add explicit `claude-sonnet-4-6` / `claude-opus-4-7` rows mapping to `openai/workhorse` (see the config's note).
