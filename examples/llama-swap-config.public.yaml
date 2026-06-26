@@ -163,10 +163,31 @@ models:
       - "openai/gpt-oss-20b"
 
   # ---------------------------------------------------------------------------
-  # EMBED — Qwen3-Embedding-0.6B (1024-dim, served at 8192 ctx — model supports 32K). RAG embeddings.
-  # Last-token pooling (Qwen3-Embedding requirement). Negligible footprint.
+  # EMBED — Qwen3-Embedding-0.6B (1024-dim). RAG embeddings. Last-token pooling
+  # (a Qwen3-Embedding requirement). Negligible footprint; the model supports 32K.
+  #
+  # ⚠️ EFFECTIVE per-request ctx = --ctx-size ÷ -np. llama.cpp splits n_ctx
+  #    across the -np parallel slots, so 32768 ÷ 4 = 8192 tokens/slot — and that
+  #    8192 (NOT --ctx-size) is the real ceiling on a single /v1/embeddings
+  #    input. Any input over the per-slot ctx returns HTTP 400
+  #    exceed_context_size. This block previously shipped --ctx-size 8192 -np 4
+  #    (= 2048/slot); the first fleet-memory harvest sent multi-chunk episodes
+  #    >2048 tok, got 400s, and silently dropped 109/447 episodes (incident
+  #    2026-06-26, fleet-memory TASK-FIX-EMBEDCTX01). --ubatch-size 8192 matches
+  #    the 8192/slot ctx so a single ≤8192-tok sequence embeds in one pass.
+  #    Consumers MUST keep each embed request ≤ 8192 tokens (the fleet-memory
+  #    relay sub-batches to this budget — TASK-FIX-RELAYBATCH01). For >8192-tok
+  #    single requests you must reduce -np (e.g. -np 1 → 32768/slot) AND raise
+  #    --batch-size/--ubatch-size to match, which needs on-box memory validation.
+  #
   # NOTE for GuardKit/Graphiti users: this is 1024-dim. nomic-embed-text-v1.5
-  # is the 768-dim drop-in if you must match an existing 768-dim index.
+  # is the 768-dim drop-in if you must match an existing 768-dim index — BUT
+  # nomic-embed-text-v1.5 GGUFs report n_ctx_train=2048 and llama.cpp CLAMPS
+  # per-slot ctx to that, so a nomic embedder is HARD-capped at 2048 tokens
+  # regardless of --ctx-size/-np (verified on-box 2026-06-26). Its consumers
+  # must chunk ≤2048 (or enable yarn rope-scaling, at an embedding-quality
+  # risk). Qwen3-Embedding above has n_ctx_train=32768, so bumping its ctx is
+  # genuinely effective — the two embedders are NOT symmetric here.
   # ---------------------------------------------------------------------------
   "embed":
     cmd: >
@@ -177,7 +198,7 @@ models:
       --alias embed
       --embedding
       --pooling last
-      --ctx-size 8192
+      --ctx-size 32768
       --batch-size 8192
       --ubatch-size 8192
       --threads 16
