@@ -234,6 +234,7 @@ It ships the four always-on open models (`workhorse` · `coach` · `chat` · `em
 
 - `healthCheckTimeout: 600` — 120B-class cold load exceeds the default → 504.
 - `matrix.sets` declaring the fleet coexists — without it, llama-swap evicts on every cross-model request → load→kill→load thrash.
+- **Coexistence-set membership (the subtle one):** a model an always-on *service* depends on (e.g. the fleet-memory relay's RAG `embed`) must be a member of **every** coexistence set that runs concurrently with that service — not just `all`. If only `all` lists it, any *other* set requested by a different live service (a vision set, a tutor set) evicts it on a cross-set request, and the service eats an 85–181s cold-start on its next call. A *deliberately* exclusive set (the `big`/120B Player, which you pause for) may still evict it — that's fine. The public config has only `all` + the exclusive `big`, so nothing routine evicts `embed`; richer personal configs with several routine sets must replicate the dependency into each (FEAT-HARV; `TASK-LLSWAP-EMRESIDENT01`).
 - `hooks.on_startup.preload` for all four — deterministic cold-start.
 - Every `cmd`: `--no-mmap`, `--jinja`, `-ngl 999`; `--cache-type-k/v q8_0` on the large-ctx models (workhorse/coach). f16 KV degrades on SM121 / blows the ceiling at large ctx.
 
@@ -518,6 +519,7 @@ Then write `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`:
 | Inference at ~2 tok/s | ARM64 binary fell back to CPU | Phase 2.2 gate; rebuild with `121a-real`; confirm `nvidia-smi` shows `llama-server` with used_memory > 0 |
 | `--config` not parsed / llama-swap won't start | v208+ wants single-dash flags | use `-config` / `-listen` (Phase 4.1) |
 | Requests thrash: load→kill→load on each model | no `matrix.sets` coexistence block | add it (config ships it); `ttl:0` governs idle only, not request-driven eviction |
+| A model that IS in `all` still cold-starts every time a live service calls it | it's only in `all`; another *routine* set (vision/RAG/tutor) requested by a different service omits it → evicts it | add that model to **every** coexistence set it must survive, not just `all` (FEAT-HARV; `TASK-LLSWAP-EMRESIDENT01`) |
 | Box freezes / heavy swap during preload | crossed the 121 GB ceiling | Phase 4.3 **total-unified** gate; trim `--ctx-size` or `-np` (recall: `-np` splits ctx across slots) |
 | Children die and never come back | parent `Restart=` doesn't revive children | install + **start** keep-alive timer (RUNBOOK-v3 §5.6); assert `is-active` |
 | Process vanishes when the editor reloads | tree captured by VS Code Chromium cgroup | Phase 4.2 gate; start via `systemctl --user`, not a terminal |
@@ -566,6 +568,8 @@ The author's own box runs a **diff** against the public config, not a separate p
 - **`coach` → `coach-ft-v3`** — fine-tuned Gemma-4-26B-A4B MoE (Q4_K_M), `--reasoning off` (its trained non-thinking posture), `--ctx-size 98304`, q8_0 KV. Same ~26B-A4B footprint as the stock Coach → memory-neutral swap. The stock `coach` block may be kept as an on-demand fallback.
 - **Drop `chat` and `embed`** — the personal box runs "pure headroom": only `workhorse` + `coach-ft-v3` are always-on (~51 GB resident, ~64 GB free), maximising swap-in room for on-demand `gpt-oss-120b`.
 - **Preload set** = `[workhorse, coach-ft-v3]`; the `all` matrix.set = `wh & cfv3`.
+
+  > **Migration reality (2026-06-27 — `TASK-LLSWAP-EMRESIDENT01`):** "drop `embed`" is the **post-decommission end state**. *During* the Graphiti→fleet-memory cutover the personal box does the opposite — it keeps `embed` (**Qwen3-Embedding-0.6B → 1024 dims**) always-on for the fleet-memory relay's RAG writes, alongside the still-live Graphiti models (`qwen-graphiti` Qwen2.5-14B + `nomic-embed`). Per the coexistence-set rule in §3.2, `embed` is a member of **every** routine set the relay must survive — `all`, `lpa`, `lpa_v3`, `tutor`, `arch` — so a finproxy/granite-vision, study-tutor or architect request can't evict it (the FEAT-HARV harvest stalled until this was fixed). Only the deliberately-exclusive heavy sets (`coach31`, `autobuild_go`, `coder_30b`) omit it — you pause the relay/keepalive for those. The "pure headroom" lineup arrives only once guardkit + forge/jarvis/specialist-agent/tutor are off Graphiti and `qwen-graphiti` is pulled (FEAT-MEM-08/09).
 - **gpt-oss-120b** stays on-demand (set `big: "go & cfv3"`) — the lead single-Spark Player for hard runs; pause the keepalive timer before a long 120b run so it doesn't revive the fleet on top of the 120b → OOM.
 
 **Reproducibility note:** `coach-ft-v3` is a single ~16.8 GB GGUF on the box (`/opt/llama-swap/models/coach-ft-v3/`); back up the GGUF **and** its re-derivation set (the v3 LoRA adapter, the training dataset, and `RESULTS-coach-v3.md`) off-box so the personal config survives a rebuild.
