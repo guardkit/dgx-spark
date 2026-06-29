@@ -3,6 +3,8 @@
 Research, decisions, and deployment docs for the GuardKit inference fleet on the Dell DGX Spark GB10 (Blackwell SM121, 128 GB unified memory).
 
 > **For history**: this directory's primary record is [`AUTOBUILD-ON-LLAMA-SWAP-findings.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md) §1–§11 (chronological, from 2026-05-14 through 2026-05-31). **For current operational state**: the sections immediately below are the source of truth. Update them when the live config changes; don't expect to reconstruct today's reality from the findings doc alone.
+>
+> **For the two-box deployment** (this Dell as Node A + the new DGX Spark as Node B — roles, bring-up order, the three operating modes): [`OPERATOR-two-box-setup.md`](./OPERATOR-two-box-setup.md).
 
 ---
 
