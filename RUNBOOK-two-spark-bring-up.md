@@ -55,10 +55,16 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 This runbook is **purely additive** — it assumes one box already works and layers the second node + the CX-7 interconnect + LiteLLM + the on-demand TP strategist on top. **Nothing here wipes or conflicts with a single-Spark setup;** the engines coexist on distinct ports (llama-swap `:9000`, vLLM `:8080`, LiteLLM `:4000`). **No factory reset is ever required.**
 
 - **Both nodes may be single-Spark boxes.** Running `RUNBOOK-single-spark-bring-up.md` on a box first is fine and recommended — you validate it and get an independently-useful node. It is *not* something to undo.
-- **Node A** = the llama-swap pool host (the always-on fleet, fronted by LiteLLM `:4000`). A single-Spark box *is* Node A as-is — zero change.
-- **Node B** = cross-node TP compute. If Node B also ran single-Spark, its fleet just sits **dormant** during a TP run — you **stop** it, you don't uninstall it (`systemctl --user stop llama-swap`; `start` to revive after). A single GB10 can't hold both its ~65 GB fleet *and* a ~75–80 GB strategist shard, so the fleet and the strategist **time-share** the box (the DF-004 memory rule).
+- **Node A** = the llama-swap pool host (the always-on fleet, fronted by LiteLLM `:4000`). **An existing single-Spark box already IS Node A** — its llama.cpp SM121 build, llama-swap, user unit + linger, and keepalive timer are exactly the single-Spark software baseline (the model config aside). **Do NOT re-run `RUNBOOK-single-spark-bring-up.md` on it** — that would overwrite its config (and `-watch-config` would reload the fleet on the spot). Run **only this** runbook on Node A; its fleet config is otherwise zero-change.
+- **Node B** = cross-node TP compute. This is the box you *do* run `RUNBOOK-single-spark-bring-up.md` on first (validate it + build llama.cpp + get an independently-useful fleet). During a TP run its fleet just sits **dormant** — you **stop** it, you don't uninstall it (`systemctl --user stop llama-swap`; `start` to revive after). A single GB10 can't hold both its ~65 GB fleet *and* a ~75–80 GB strategist shard, so the fleet and the strategist **time-share** the box (the DF-004 memory rule).
 - **What each node needs:** *both* need firmware (Phase 2), the CX-7 fabric (Phases 3–5), and vLLM + the strategist weights (Phase 8). Node B does **not** need its own always-on fleet for TP — but having one (from single-Spark) is harmless.
 - **The only first-run risks are hardware/fabric** (cable link-up, NCCL `NET/IB`, firmware, the TP launch) — never the single-Spark software underneath.
+
+**Three operating modes (time-shared — the DF-004 memory rule):**
+
+1. **Day-to-day fleet (default).** Node A serves its always-on fleet to your agents via LiteLLM `:4000`; Node B runs its own fleet or sits idle. No TP, no cabling exercised in this mode — the two boxes are just two independent single-Spark setups.
+2. **Cross-node strategist (on demand).** To run a model too big for one box (DeepSeek-V4-Flash, ~158 GB → ~79 GB/node), **drain the fleet on BOTH nodes** (stop the keepalive + `systemctl --user stop llama-swap` on each), launch vLLM `--tp 2` across the pair (Phase 8), then tear it down and revive both fleets. The shard **cannot** co-reside with a full fleet (~79 GB strategist + a ~65–81 GB fleet blows the 115 GB ceiling) — so this is **time-shared with mode 1, never concurrent**: you pause day-to-day serving, run the big model, then resume.
+3. **Standalone long-run on one node.** Use **Node B alone** for a long job (e.g. the agentic dataset factory, 50+ hrs) — stop its fleet to free memory, run the job; **Node A is untouched and keeps serving day-to-day.** This mode does **not** use this runbook (no TP, no cabling, no draining Node A) — the two boxes simply operate independently.
 
 ---
 
@@ -228,6 +234,8 @@ router_settings:
   fallbacks: []                  # NO local->cloud fallback (DF-001)
   context_window_fallbacks: []   # also empty — LiteLLM's documented example escalates to claude-opus on overflow (the exact unattended-spend footgun)
 ```
+> **If Node A runs a personal / non-public fleet** (different aliases than the public `workhorse`/`coach`/`chat`/`embed` — e.g. the reference box serves `qwen36-workhorse`, `coach-ft-v3`, `embed`, …), **adapt this `model_list` to Node A's actual `:9000` aliases** before deploying. Each row is `model_name:` (the name your *agents* call, left side) → `model: openai/<llama-swap-alias>` (what it routes to on Node A, right side); `api_base` stays the llama-swap proxy port `:9000`. So map `workhorse` → `openai/qwen36-workhorse`, add a `coach` → `openai/coach-ft-v3` row, etc. `embed` usually matches as-is. Confirm Node A's aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`. The `strategist` and `claude-opus` rows are unchanged.
+
 **▶ GATE — no cloud fallback (DF-001):** the robust invariant is *no cloud model is reachable as a fallback target*. `claude-opus` is *named* (DF-003 attended path) but must never appear in a fallback chain.
 ```bash
 CFG=/opt/litellm/config.yaml
