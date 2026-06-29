@@ -99,6 +99,7 @@ RECON SOURCES (fixed)
   - NVIDIA connect-two-sparks + nccl playbooks (GitHub NVIDIA/dgx-spark-playbooks)   topics: cabling, iface naming, all_gather_perf, env pins
   - NVIDIA DGX Spark forum   topics: CX-7 firmware throttle / all_gather halved, mlnx-fw-updater NIC brick, hard power-off under load, torch 2.10 one-node-drop, vLLM #40969 hang
   - DeepSeek-V4-Flash 2x-Spark recipe thread; "best 2026 model for a 2-node cluster" thread (>128 GB candidates, PP-vs-TP)
+  - DSpark spec-decoding (DeepSeek): github.com/deepseek-ai/DeepSpec releases + vLLM issue #46910 — watch for an SM121/aarch64 path (evolution of the deepseek_mtp we already run; not yet on the jasl fork)
   - corti two-Spark posts; Spark Arena leaderboard
 TASK: "Report only items newer than the PINS date affecting a pinned component or a known gotcha. Emit a drift report. Do NOT propose edited steps. Do NOT change any pin."
 ```
