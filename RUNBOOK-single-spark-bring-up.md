@@ -222,11 +222,20 @@ sudo mkdir -p /opt/llama-swap/{config,logs,models}; sudo chown -R $USER:$USER /o
 
 ### 3.2 Deploy the config — gates baked into the structure
 
-Copy the committed public config into place (it is the single source of truth for this runbook; every non-obvious setting is a gate annotated in-file):
+Copy the committed public config into place (it is the single source of truth for this runbook; every non-obvious setting is a gate annotated in-file). **Back up any existing config first** — llama-swap runs with `-watch-config`, so this overwrite reloads the fleet on the spot; on a configured box you are replacing a live lineup, and the timestamped backup is your undo (matches the `config.yaml.bak-<ts>` discipline):
 
 ```bash
-sudo install -D -m644 examples/llama-swap-config.public.yaml /opt/llama-swap/config/config.yaml
+CFG=/opt/llama-swap/config/config.yaml
+if [ -f "$CFG" ]; then
+  BAK="$CFG.bak-$(date +%Y%m%d-%H%M%S)"
+  sudo cp -a "$CFG" "$BAK"
+  cmp -s "$CFG" examples/llama-swap-config.public.yaml \
+    && echo "[backup] $BAK — existing config already matches the public target (clean re-run, no lineup change)" \
+    || echo "[backup] $BAK — ⚠️  REPLACING A NON-PUBLIC CONFIG: this box runs a different lineup. Review the diff (diff \"$BAK\" examples/llama-swap-config.public.yaml) before continuing; restore with: sudo cp -a \"$BAK\" \"$CFG\""
+fi
+sudo install -D -m644 examples/llama-swap-config.public.yaml "$CFG"
 ```
+On a **fresh box** there is no existing config — the backup step is skipped and the install proceeds. On a **re-run** the backup is a no-op-equivalent (identical content). The ⚠️ line only fires when a *divergent* config is being replaced — your cue that this is not the box you meant to bring up fresh.
 
 It ships the four always-on open models (`workhorse` · `coach` · `chat` · `embed`) plus on-demand `gpt-oss-120b`, with the gotchas encoded as config (each maps to a registry row in conventions §8):
 

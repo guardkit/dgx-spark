@@ -126,7 +126,10 @@ Mirror the llama-swap supervision model (user unit + linger; never a VS Code ter
 
 ```bash
 sudo mkdir -p /opt/litellm && sudo chown -R $USER:$USER /opt/litellm
-sudo install -D -m644 examples/litellm-config.public.yaml /opt/litellm/config.yaml
+# Back up any existing front-door config before overwriting (safe re-run / update; restore with cp -a):
+LCFG=/opt/litellm/config.yaml
+[ -f "$LCFG" ] && sudo cp -a "$LCFG" "$LCFG.bak-$(date +%Y%m%d-%H%M%S)" && echo "[backup] saved $LCFG.bak-* before overwrite"
+sudo install -D -m644 examples/litellm-config.public.yaml "$LCFG"
 LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
 
 mkdir -p ~/.config/systemd/user
