@@ -2,8 +2,9 @@
 # LiteLLM — PUBLIC / general-purpose DGX Spark (GB10) front-door config
 # =============================================================================
 # The single OpenAI/Anthropic-compatible FRONT DOOR (:4000) that sits IN FRONT of
-# the llama-swap fleet (:9000). Deployed by an agent running
-# RUNBOOK-single-spark-bring-up.md Phase 5.4. This is the public, all-open-model
+# the llama-swap fleet (:9000). Deployed by an agent running the additive overlay
+# RUNBOOK-litellm-front-door.md (over a box already green on the base runbook
+# RUNBOOK-single-spark-bring-up.md). This is the public, all-open-model
 # control plane (DECISION-DF-005) — it makes the box a genuine SUPERSET of the
 # community stack (martinB78 -> Dre Dyson -> dasroot:
 #   client -> LiteLLM -> llama-swap -> vLLM/llama.cpp/Ollama), not a subset.
@@ -24,13 +25,13 @@
 # unattended-spend footgun we deliberately disable (the on-camera gate beat).
 #
 # VIRTUAL KEYS + PERSISTED SPEND are OPT-IN and need Postgres (DATABASE_URL +
-# master_key) — see the bottom of this file + RUNBOOK Phase 5.4. DB-less (this
+# master_key) — see the bottom of this file + RUNBOOK-litellm-front-door.md. DB-less (this
 # default) still routes, still applies the no-cloud guard, and still surfaces
 # per-request cost in the `x-litellm-response-cost` response header; it just does
 # not persist keys or the spend dashboard.
 #
 # INSTALL (agent step):  pip install --user --break-system-packages 'litellm[proxy]'
-# RUN (user systemd unit, CPU-pinned DISJOINT from llama-swap): see RUNBOOK Phase 5.4.
+# RUN (user systemd unit, CPU-pinned DISJOINT from llama-swap): see RUNBOOK-litellm-front-door.md.
 # =============================================================================
 
 model_list:

@@ -37,6 +37,32 @@ Inline checks live *in* the step (a `curl … | python3 -c "… print('PASS' if 
 
 ---
 
+## 2.1 Two runbook kinds: fresh bring-up vs additive overlay
+
+A runbook is one of two shapes — both linear, both self-contained, both with **one** PINS block:
+
+- **Fresh bring-up** — takes a machine from some known starting state to a green end-state. Phase 0 recon → pinned steps → Decision Gate. (`RUNBOOK-single-spark-bring-up.md` is the canonical example.)
+- **Additive overlay** — layers one capability **on top of** another runbook's green end-state, without re-running or editing it. Its **Phase 1 is a machine-checked precondition gate** that asserts the base runbook's output is live (not a prose "make sure you ran X first" — an assertion that **halts** if the base isn't green), and from there it executes **only its own delta**. It carries its own PINS sub-block, its own Phase 0 recon, its own gates, and its own `RESULTS-*` artifact.
+
+**Why an overlay is a precondition gate, not a transclusion.** An overlay never says "now go run Phases 0–4 of the base file, then come back" — that breaks the linear, self-contained execution model (an agent running one file can't pause to run another and resume). Instead it asserts the base's *output state* and proceeds. This is how you avoid duplication **by partitioning** (the base owns its phases; the overlay owns only the delta) rather than by copying-with-a-pointer — nothing is shared in prose, so nothing can drift out of sync. An overlay is also the natural **add-it-later** and **update** procedure for the capability it layers on.
+
+Two overlays in this repo: [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) (adds the LiteLLM `:4000` control plane over a green llama-swap `:9000` fleet — its Phase 1 asserts `:9000` is serving the fleet) and [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) (adds Node B + cross-node TP over a green Node A — its Phase 1 asserts `curl :9000/v1/models`).
+
+## 2.2 Execution modes (one file, three ways to run it)
+
+The same runbook serves more than the first bring-up — its phases are idempotent and its gates read the **live machine**, so re-running is safe. State this explicitly at the top of each runbook so it isn't read as fresh-install-only:
+
+```
+Execution modes:
+  fresh    — run top to bottom (first bring-up / first add of an overlay)
+  re-run   — same file on an already-built box; idempotent phases no-op, gates re-verify
+  update   — Phase 0 recon reports drift; re-run the affected phase(s); gates re-prove; record new baselines in RESULTS
+```
+
+This is **naming existing behaviour, not new machinery**: Phase 0 recon is already read-only; staging/install steps already skip-if-present or overwrite safely; gates already assert against the running system, not against session history. For a **float-with-baseline** dependency (§3) the `update` mode *is* the maintenance loop — re-run pulls the latest, the gates re-prove it, RESULTS records the new validated baseline, and a pin lands reactively (a PR) only if a gate fails.
+
+---
+
 ## 3. Pins live in one block
 
 Each runbook opens with a **`PINS`** block — the single source of truth for every version, tag, commit, model repo, and threshold the runbook depends on. Steps reference the pins; gates assert them; recon checks them. Example (real, from the current stack):
@@ -167,6 +193,8 @@ The reusable core: GB10 traps we've hit (ours + the community's), each with the 
 | Embedding dims 1024 | Actual nomic model is 768 | Graphiti config `dimensions: 768` | v3 §7.1 |
 | llama-swap child crash | Parent `Restart=` doesn't revive children; `matrix` only on traffic | keep-alive timer present + firing | v3 §5.6 |
 | Cold-load 504 | `healthCheckTimeout` too short for 120B load | `healthCheckTimeout ≥ 600` | setup §10 |
+| LiteLLM auto cloud-fallback | Headline feature; the exact mechanism behind the April Gemini-spend incident — an unattended run silently bills a frontier API | `fallbacks: []` **and** `context_window_fallbacks: []` (anchored greps) **and**, after stripping `#` comments, no cloud model named in a fallback chain | DF-005; [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) |
+| LiteLLM ↔ llama-swap CPU contention | Sharing a core under concurrent multi-model load → LiteLLM 504s + flaky llama-swap health checks | disjoint `CPUAffinity=` on the two user units (e.g. litellm `0-3`, llama-swap `4-19` on the 20-core GB10) — **WARN**, not STOP (the 504s rationale is community-sourced, see DF-005) | DF-005; [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) |
 
 ---
 
@@ -180,4 +208,4 @@ The reusable core: GB10 traps we've hit (ours + the community's), each with the 
 | `DECISION-<id>.md` | ADR (or a pointer to the canonical one in `guardkit/docs/decisions/`). |
 | `DRIFT-<runbook>-<date>.md` | A committed recon drift report. |
 
-First exemplar to build under these conventions: **`RUNBOOK-single-spark-bring-up.md`** — unboxed GB10 → a trusted multi-model endpoint on `:9000`, with the Phase 0 recon block and the registry rows above wired in as gates. Prove the one exemplar, then extract the template.
+First exemplars to build under these conventions: the **fresh-bring-up + additive-overlay pair** — [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) (unboxed GB10 → a trusted multi-model llama-swap endpoint on `:9000`, recon block + registry rows wired in as gates) and its overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) (the §2.1 precondition-gate shape: add the LiteLLM `:4000` control plane on top). Prove the pair, then extract the template (both kinds in §2.1).

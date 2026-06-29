@@ -130,7 +130,7 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 - [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker) — the vLLM Docker images the granite-docling / granite-vision scripts depend on
 - [martinB78's full-stack repo](https://github.com/mARTin-B78/dgx-spark_lite-llm_llama-swap_vllm_llama-cpp_ollama) — reference implementation for LiteLLM + llama-swap + vLLM + llama.cpp on GB10
 - [AEON-7 DFlash deployment](https://github.com/AEON-7/Qwen3.6-NVFP4-DFlash) — reference for future DFlash integration
-- [LiteLLM](https://docs.litellm.ai/) — unified API proxy (potential Phase 4 target)
+- [LiteLLM](https://docs.litellm.ai/) — unified API proxy; the optional `:4000` front door stood up by the additive overlay `RUNBOOK-litellm-front-door.md` (DECISION-DF-005)
 - [sparkrun](https://sparkrun.dev) — inference orchestration CLI (monitoring for future adoption)
 
 ---

@@ -125,17 +125,17 @@
 ```
 clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
         │
-   LiteLLM :4000      ← the front door  (routing · per-agent keys · spend · no-cloud-fallback gate)
+   LiteLLM :4000      ← act two (optional): the front door  (routing · per-agent keys · spend · no-cloud-fallback gate)
         │
-   llama-swap :9000   ← unified-memory lifecycle  (load · swap · evict, all-llama.cpp)
+   llama-swap :9000   ← act one: unified-memory lifecycle  (load · swap · evict, all-llama.cpp)
    always-on (~65 GB): workhorse · coach · chat · embed
 ```
 - **workhorse** Qwen3.6-35B-A3B · **coach** Gemma-4-26B-A4B · **chat** gpt-oss-20b · **embed** Qwen3-Embedding-0.6B
 - 100% **open, downloadable** models — a viewer can reproduce the whole box.
-- *Two layers, one job each:* **LiteLLM** routes & accounts; **llama-swap** owns GPU memory. This is the **community stack** (martinB78/Dre), built on — not a subset of it.
-- *The one community feature I deliberately **disable**:* auto cloud-fallback — a **gate** enforces no-cloud-on-local (DF-001).
+- *Two layers, two runbooks:* **act one** stands up the **llama-swap `:9000`** fleet — a complete endpoint on its own; **act two** (optional) bolts the **LiteLLM `:4000`** control plane on top. With both, this is the full **community stack** (martinB78/Dre/dasroot) — built on, not a subset of it.
+- *The one community feature I deliberately **disable**:* auto cloud-fallback — a **gate** in act two enforces no-cloud-on-local (DF-001).
 
-**Notes:** New visual (single-Spark, two-layer front door — see `DECISION-DF-005`). LiteLLM is the front door (not a deferred "Phase 4") so the box is a genuine superset of the community stack and continuous with the two-node DF-004 story. Mention the leaderboard-topping Qwen3.6-35B + the 17/17-on-tool-calling Gemma-4 coach so the model picks feel earned. The "feature I disable" line is the honest gotcha→gate beat for this slide.
+**Notes:** New visual (single-Spark, two-layer front door — see `DECISION-DF-005`). Frame it as **two acts / two runbooks**: the fleet is useful on its own, and LiteLLM is the optional control plane you add when you want it (per-project token tracking + AI-gateway experience — not every box needs the extra layer). With it the box is a genuine superset of the community stack, continuous with the two-node DF-004 story. Mention the leaderboard-topping Qwen3.6-35B + the 17/17-on-tool-calling Gemma-4 coach so the model picks feel earned. The "feature I disable" gotcha→gate beat lands in **act two**.
 
 ---
 
@@ -144,13 +144,15 @@ clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
 **On screen:**
 - ```
   git clone …/dgx-spark && cd dgx-spark
-  claude "execute RUNBOOK-single-spark-bring-up.md"
+  claude "execute RUNBOOK-single-spark-bring-up.md"   # act one: the fleet
+  claude "execute RUNBOOK-litellm-front-door.md"      # act two (optional): the front door
   ```
 - **Clone → point an agent at the runbook → walk away.**
 - The agent does *everything*: installs, the ~35 GB model pull, the SM121 build, serve, validate — **inline** (you edit out the wait).
 - One-time box setup: **passwordless sudo** (run once). That's it.
+- *Two runbooks, on purpose:* the fleet is complete on its own; add the gateway later (or never) with the second one.
 
-**Notes:** This is the payoff of the method — not "ask Claude to set it up" (improvised, irreproducible) but "Claude executes a deterministic, gated spec." The downloads/build are the only "wait" and they're edited out.
+**Notes:** This is the payoff of the method — not "ask Claude to set it up" (improvised, irreproducible) but "Claude executes a deterministic, gated spec." The downloads/build are the only "wait" and they're edited out. The second command is the optional overlay — show it, but the live demo can stop after act one if time is tight.
 
 ---
 
@@ -162,8 +164,9 @@ clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
 2. Agent executes the pinned build/serve steps
 3. **A gate fires** on the flagged regression — **halts loudly**
 4. Fix = **a PR**, not a runtime hack → re-run green
+5. *(act two, optional)* run the **front-door overlay** → LiteLLM `:4000` comes up + its **no-cloud-fallback gate** fires (the "feature I deliberately disable")
 
-**Notes:** Frame it before rolling the recording. "Watch it catch a known landmine before it costs me an afternoon."
+**Notes:** Frame it before rolling the recording. "Watch it catch a known landmine before it costs me an afternoon." Act one (the fleet + gate-catch) is the core arc; act two is the optional companion beat — the second runbook's no-cloud gate. Drop act two if time is tight.
 
 ---
 

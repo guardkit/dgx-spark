@@ -31,6 +31,14 @@ claude "execute RUNBOOK-single-spark-bring-up.md"      # or: codex exec … / op
 
 The agent runs **every** step itself — `apt`/`pip` installs, the ~35 GB model pull (Phase 1.5), the llama.cpp build + binary install, llama-swap install, config deploy, start, and the validation gates. Long downloads/builds run **inline** — edit the wait out of any recording. There are **no manual prerequisites** beyond the one-time box setup below.
 
+That gives you the **llama-swap `:9000` fleet** — a complete, useful endpoint on its own. **Want a single OpenAI/Anthropic front door** (`claude-*` routing · per-agent keys · spend tracking · a no-cloud-fallback guard) on top? Run the **optional additive overlay** afterwards — it asserts the fleet is green, then bolts on LiteLLM `:4000`:
+
+```bash
+claude "execute RUNBOOK-litellm-front-door.md"         # run after the base runbook is green
+```
+
+The split is deliberate: the gateway adds power (and one more layer) that not every box needs, so it's a separate runbook you can add later — and the same overlay is how you *update* LiteLLM (it floats to latest; see [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1–§2.2).
+
 ### One-time box setup: passwordless sudo
 
 The runbooks use `sudo` (apt, `install` to `/usr/local/bin`, `mkdir`/`chown` `/opt`, `systemctl`, `fwupdmgr`, …). For the agent to run **unattended**, the operator user needs **passwordless sudo** — otherwise the first `sudo` blocks on a password the agent can't type. The agent can't enable this itself (enabling sudo needs sudo), so run it **once per box** (you enter your password this one time):
@@ -51,7 +59,7 @@ The only other non-agent inputs are **physical** and **two-Spark-only**: pluggin
 
 ## Current stack (steady state)
 
-The architecture the public single-Spark runbook stands up — LiteLLM `:4000` in front of the llama-swap `:9000` fleet ([`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)):
+The full single-Spark steady state — the optional LiteLLM `:4000` front door over the llama-swap `:9000` fleet ([`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)). The **base** runbook stands up the fleet (a complete endpoint on its own); the **overlay** adds the front door, run only if you want the gateway:
 
 ```
 clients (agents, Claude Code, OpenAI/Anthropic-compatible) 
@@ -65,7 +73,7 @@ llama-swap :9000        ← the unified-memory model layer (all-llama.cpp; one p
    └── on-demand: gpt-oss-120b (evicts the fleet)
 ```
 
-- **LiteLLM `:4000` is the front door** — the *full* community stack (martinB78 → Dre Dyson → dasroot: `client → LiteLLM → llama-swap → engines`), not a llama-swap-only subset. It is a router / control plane only (per-agent keys, `claude-*` wildcard, spend, fallback policy); llama-swap underneath owns model lifecycle / unified memory. [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) Phase 5.4 stands it up on one node; [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) extends it across two ([`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md), PROPOSED).
+- **LiteLLM `:4000` is the (optional) front door** — with it, the box is the *full* community stack (martinB78 → Dre Dyson → dasroot: `client → LiteLLM → llama-swap → engines`), not a llama-swap-only subset. It is a router / control plane only (per-agent keys, `claude-*` wildcard, spend, fallback policy); llama-swap underneath owns model lifecycle / unified memory. [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) stands it up on one node as an **additive overlay** over the base fleet (CONVENTIONS §2.1); [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) extends it across two ([`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md), PROPOSED).
 - Constraint **DECISION-DF-001**: no cloud API on the dark-factory critical path — enforced as a LiteLLM config gate (`fallbacks: []` + `context_window_fallbacks: []`, and no cloud model named as a fallback target). Recon/search is *additive*, never on the critical path (see conventions).
 - Hardware: `promaxgb10-41b1`, 121 GB usable of 128 GB unified, safe ceiling ~115 GB. (`:9000` is *this box's* llama-swap port — the upstream community default is `:8080`; the universal part is the single-proxy-port principle.)
 

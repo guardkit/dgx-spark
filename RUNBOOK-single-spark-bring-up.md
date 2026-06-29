@@ -2,31 +2,31 @@
 
 **Status:** Draft (exemplar for the conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md); the DDD South West demo spine). Execute end-to-end at least twice before the talk: once to verify, once as a dress rehearsal. Flip to **Verified** after the first green walkthrough.
 
-**Purpose:** Take a DGX Spark / GB10 from fresh to a **trusted, self-verifying multi-model inference endpoint** — a **LiteLLM `:4000` front door** over the **llama-swap `:9000`** fleet — built by an **agent** (Claude Code / Codex / OpenCode) *executing this runbook*, not by hand. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon pass reports what's drifted upstream before anything runs. It stands up the **public, all-open-model config** committed at [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) + [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml) — every model is downloadable, so a viewer can replicate the whole box. This makes the box a genuine **superset** of the community stack (martinB78 → Dre Dyson → dasroot: `client → LiteLLM → llama-swap → engines`), not a llama-swap-only subset (DECISION-DF-005). (The operator's personal post-Graphiti variant is **Appendix B**.)
+**Purpose:** Take a DGX Spark / GB10 from fresh to a **trusted, self-verifying multi-model inference endpoint on `:9000`** — the **llama-swap** fleet — built by an **agent** (Claude Code / Codex / OpenCode) *executing this runbook*, not by hand. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon pass reports what's drifted upstream before anything runs. It stands up the **public, all-open-model config** committed at [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) — every model is downloadable, so a viewer can replicate the whole box. **Want a single OpenAI/Anthropic front door — `claude-*` routing, per-agent keys, spend tracking — on top?** That is the optional additive overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md), run after this is green; together they are the full community stack (`client → LiteLLM → llama-swap → engines`, DECISION-DF-005), and this base alone is the fleet that stack rests on. (The operator's personal post-Graphiti variant is **Appendix B**.)
 
 ```
 clients (agents, Claude Code — OpenAI / Anthropic-compatible)
    │
    ▼
-LiteLLM :4000             ← the front door (control plane: claude-* wildcard · per-agent keys · spend; NO cloud fallback, DF-001)
-   │   (LiteLLM-down fallback: clients may hit llama-swap :9000 directly — DF-001 §3.3)
-   ▼
-llama-swap :9000          ← the unified-memory model layer (all-llama.cpp; one process tree under a USER systemd unit)
+llama-swap :9000          ← the endpoint / front door (all-llama.cpp; one process tree under a USER systemd unit)
    └── always-on preload (~65 GB resident, ~50 GB headroom) — all open, downloadable:
          workhorse (Qwen3.6-35B-A3B) · coach (Gemma-4-26B-A4B) · chat (gpt-oss-20b) · embed (Qwen3-Embedding-0.6B)
    └── on-demand: gpt-oss-120b ("big-brain" Player; evicts the fleet)
    (vLLM-in-Docker vision models are out of scope — see below)
+   (optional control plane in front: LiteLLM :4000 — RUNBOOK-litellm-front-door.md)
 ```
-> `:9000` is *this box's* llama-swap port (a custom choice); the upstream community default is `:8080`. The universal part is the **single-proxy-port principle** — LiteLLM routes by model name to llama-swap's one port, never to an individual model port (that would bypass the swap).
+> `:9000` is *this box's* llama-swap port (a custom choice); the upstream community default is `:8080`. The universal part is the **single-proxy-port principle** — a front door routes by model name to llama-swap's one port, never to an individual model port (that would bypass the swap).
 
 **Machine:** `promaxgb10-41b1` (the Dell ProMax GB10 reference box) or a fresh DGX Spark / GB10, DGX OS, Blackwell **SM121**, 128 GB unified memory (**121 GB usable**, safe ceiling **115 GB**).
 **Conventions:** [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) — recon → drift report → gates; promotion by PR.
 **One-time box setup:** passwordless sudo for the operator user, and run the agent **as that user** (not root) — see [README → Running a runbook](./README.md#one-time-box-setup-passwordless-sudo). The agent runs every other step itself.
-**Prior art it stands on:** [NVIDIA dgx-spark-playbooks](https://github.com/NVIDIA/dgx-spark-playbooks) (official) · [DGX Spark / GB10 forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-spark-gb10/719) · [martinB78 full-stack guide](https://forums.developer.nvidia.com/t/running-a-full-llm-stack-on-dgx-spark-gb10-your-application-litellm-llama-swap-vllm-llama-cpp-ollama/367580) · [Dre Dyson](https://dredyson.com/) · [dasroot](https://dasroot.net/posts/2026/05/mastering-multi-model-stacks-llama-swap/) · [LiteLLM docs](https://docs.litellm.ai/) · [Spark Arena leaderboard](https://spark-arena.com/leaderboard) · [mostlygeek/llama-swap](https://github.com/mostlygeek/llama-swap). The Phase 0 recon re-checks these at run time.
+**Prior art it stands on:** [NVIDIA dgx-spark-playbooks](https://github.com/NVIDIA/dgx-spark-playbooks) (official) · [DGX Spark / GB10 forum](https://forums.developer.nvidia.com/c/accelerated-computing/dgx-spark-gb10/719) · [martinB78 full-stack guide](https://forums.developer.nvidia.com/t/running-a-full-llm-stack-on-dgx-spark-gb10-your-application-litellm-llama-swap-vllm-llama-cpp-ollama/367580) · [Dre Dyson](https://dredyson.com/) · [dasroot](https://dasroot.net/posts/2026/05/mastering-multi-model-stacks-llama-swap/) · [Spark Arena leaderboard](https://spark-arena.com/leaderboard) · [mostlygeek/llama-swap](https://github.com/mostlygeek/llama-swap). The Phase 0 recon re-checks these at run time. (LiteLLM prior art + docs live with the front-door overlay, [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md).)
 **Source material (now in this repo):** [`RUNBOOK-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RUNBOOK-v3-production-deployment.md) (the proven procedure), [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) (SM121 build flags + dynamic-VRAM launcher + LiteLLM Phase-4 appendix; the §12–§15 merge conflicts are resolved), [`ARCHITECTURE-current.md`](./ARCHITECTURE-current.md) (steady-state lineup). The committed [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) is the runbook's canonical config target.
 **Expected wall-clock:** fresh box **~60–90 min** (the llama.cpp build + model staging dominate); a re-run on a built box **~15 min**.
 **On-stage target:** the demo is the **recon → execute → gate-catch arc** on a box with llama.cpp already built — **~8–10 min** (see Talk Track).
 **Outputs:** `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`, the committed `DRIFT-single-spark-bring-up-<YYYY-MM-DD>.md`, and the live `/opt/llama-swap/config/config.yaml`.
+
+**Execution modes (CONVENTIONS §2.2):** `fresh` — run top to bottom (first bring-up). `re-run` — same file on a built box; idempotent phases no-op (Phase 1.5 skips staged models, the config deploy overwrites, the gates re-verify against the live machine) — **~15 min**. `update` — Phase 0 recon reports drift; promote a pin via PR, re-run the affected phase, gates re-prove. The front-door overlay updates independently — see [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md).
 
 ---
 
@@ -41,12 +41,10 @@ PINS (set 2026-06-21)
   chat       GGUF       gpt-oss-20b MXFP4                     unsloth/gpt-oss-20b-GGUF         (general chat)
   embed      GGUF       Qwen3-Embedding-0.6B Q8_0            Qwen/Qwen3-Embedding-0.6B-GGUF    (1024 dims)
   big (opt)  GGUF       gpt-oss-120b MXFP4                    ggml-org/gpt-oss-120b-GGUF       (on-demand Player)
-  litellm    PyPI       litellm[proxy]  (latest)             pip --user --break-system-packages  (front door :4000; floated not frozen — stable interface + gate-protected, see CONVENTIONS §3; validated at 1.89.4 on GB10 2026-06-25, wheels-only ~16s)
   KV_CACHE_TYPE         q8_0                         on large-ctx models (workhorse / coach)
   MEM_CEILING_GB        115                          121 usable; freeze observed at 114 (TOTAL unified, not just compute-apps)
-  GB10_CORES            20                           10x Cortex-X925 + 10x Cortex-A725 (NOT 72-core Grace) — for CPUAffinity ranges
-  ENDPOINT              LiteLLM :4000 (clients)      llama-swap :9000 remains a direct-port fallback (DF-001 §3.3)
-  CONFIG                examples/llama-swap-config.public.yaml + examples/litellm-config.public.yaml   (this runbook's canonical targets)
+  ENDPOINT              llama-swap :9000             the clients' endpoint (the optional LiteLLM :4000 front door is the overlay, with its own PINS)
+  CONFIG                examples/llama-swap-config.public.yaml   (this runbook's canonical target)
 ```
 
 When recon flags drift on a pin, the fix is a **PR editing this block** — never a runtime edit (conventions §6).
@@ -56,7 +54,8 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 ## What this runbook does NOT cover
 
 - **vLLM-in-Docker vision models** (`granite-docling`, `granite-vision-*`). Separate; the LPA POC owns them.
-- **vLLM / cross-node TP *behind* LiteLLM.** This runbook stands up the LiteLLM `:4000` front door over the single-node llama-swap fleet only (Phase 5.4). Adding vLLM backends, or a tensor-parallel model split across two Sparks, is the **two-Spark** runbook ([`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md)) — DF-005 (single node) is the precursor to DF-004 (two nodes).
+- **The LiteLLM `:4000` front door.** This runbook stands up the llama-swap `:9000` fleet only. The optional OpenAI/Anthropic control plane in front (per-agent keys, spend, `claude-*` wildcard routing, the no-cloud-fallback gate) is the **additive overlay** [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md), run after this is green (DECISION-DF-005).
+- **vLLM backends / cross-node TP.** Adding vLLM backends, or a tensor-parallel model split across two Sparks, is the **two-Spark** runbook ([`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md)) — DF-005 (single node) is the precursor to DF-004 (two nodes).
 - **The operator's personal fine-tuned Coach (`coach-ft-v3`) + the post-Graphiti lineup.** That is **Appendix B** — a diff against the public config, not the public demo.
 - **Two-Spark / tensor-parallel.** That's the second talk; capture spine in `RUNBOOK-two-spark-video-capture.md`.
 - **Fine-tuning / dataset work.** Out of scope.
@@ -66,18 +65,18 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 
 ## Demo narrative (Talk Track) — read this first
 
-The runbook below is the operator script; this is what you say while the agent runs it. The on-stage demo runs Phase 0 + a thin slice of Phases 2–5 on a box that already has llama.cpp built.
+The runbook below is the operator script; this is what you say while the agent runs it. The demo is **two acts on a box that already has llama.cpp built**: **act one** (this runbook) — Phase 0 recon + a thin slice of Phases 2–5 stands up the fleet and a gate catches a landmine; **act two** (the optional overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md)) — bolt the LiteLLM control plane on top and watch *its* gate refuse the cloud-failover footgun.
 
 1. **Frame** (~45s): "I'm going to stand up a multi-model inference box — but I'm not going to type setup commands. I'm going to have a coding agent *run a runbook*, and watch it catch a known landmine before it costs me an afternoon."
-2. **Credit the giants** (~30s): topology slide; name NVIDIA's playbooks, the forum, martinB78, Dre Dyson, dasroot, Spark Arena, llama-swap — and **LiteLLM as the front door**, the full community stack (`client → LiteLLM → llama-swap → engines`). "I'm standing on all of this — the *whole* stack, not a trimmed-down version of it. What I added is the layer that makes it reproducible and self-checking."
+2. **Credit the giants** (~30s): topology slide; name NVIDIA's playbooks, the forum, martinB78, Dre Dyson, dasroot, Spark Arena, llama-swap — and **LiteLLM as the front door** I add in act two, so the box is the *whole* community stack (`client → LiteLLM → llama-swap → engines`), not a trimmed-down version of it. "I'm standing on all of this. What I added is the layer that makes it reproducible and self-checking."
 3. **Run Phase 0 recon** (~2 min): kick it off; **show the drift report** — the deterministic pin checks (`llama-swap`, `llama.cpp`, model repos) plus the forum scan, with one flagged regression. "Notice it didn't rewrite a single step. It told me what changed since I pinned this, and left the procedure alone."
 4. **Agent executes** (~3 min): let it move through the pinned build/serve steps; narrate over it.
 5. **A gate fires** (~2 min) — the money shot. The run hits the assertion for the flagged regression (e.g. the ARM64 silent-CPU-fallback gate, or the 115 GB memory-ceiling gate) and **halts loudly**. "That's the difference between a blog post and a runbook. The blog says *watch out*. The gate *stops*."
-   - *Optional companion beat (the deliberately-disabled feature):* the LiteLLM front door comes up (Phase 5.4) and its **no-cloud-fallback gate** fires — "LiteLLM's headline feature is automatic cloud failover; it's also exactly what ran up a surprise Gemini bill. So the one community feature I *deliberately disable* is the one a gate now refuses to let back in." (The same gate is how DF-001 stops becoming prose.)
 6. **Fix is a PR, not a hack** (~1 min): update the pin, reviewed, re-run green. "Reproducible, not improvised."
-7. **Land it** (~45s): "Got it reliable on one box. The next question is two boxes — and the answer surprised me." → tee the capacity-not-speed talk.
+7. **Act two — bolt on the front door** (~2 min, optional): run [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md); LiteLLM `:4000` comes up over the green fleet and its **no-cloud-fallback gate** fires — "LiteLLM's headline feature is automatic cloud failover; it's also exactly what ran up a surprise Gemini bill. So the one community feature I *deliberately disable* is the one a gate now refuses to let back in." (The same gate is how DF-001 stops becoming prose.) Skip this act for a fleet-only box.
+8. **Land it** (~45s): "Got it reliable on one box. The next question is two boxes — and the answer surprised me." → tee the capacity-not-speed talk.
 
-On-stage total: ~8–10 min. Buffer for the agent's pace.
+On-stage total: ~8–10 min (act one) + ~2 min (act two). Buffer for the agent's pace.
 
 ---
 
@@ -118,7 +117,6 @@ RECON SOURCES (fixed)
   - github.com/NVIDIA/dgx-spark-playbooks   (llama-cpp / cli-coding-agent updates)
   - github.com/mostlygeek/llama-swap   releases + open issues
   - github.com/ggml-org/llama.cpp      releases + SM121-tagged issues
-  - github.com/BerriAI/litellm         releases (proxy extra / ARM64 wheel) since the PINS date
   - Spark Arena leaderboard            (model-ranking shifts)
   - Dre Dyson blog                     new posts since the PINS date
 TASK: "Report only items newer than the PINS date that affect a pinned component
@@ -265,7 +263,7 @@ The reference box supervises llama-swap as a **user** unit. A `User=root` *syste
 mkdir -p ~/.config/systemd/user /opt/llama-swap/logs
 cat > ~/.config/systemd/user/llama-swap.service <<'EOF'
 [Unit]
-Description=llama-swap (all-llama.cpp model layer; LiteLLM :4000 fronts it)
+Description=llama-swap (all-llama.cpp model layer; :9000 endpoint)
 After=network-online.target
 [Service]
 Type=simple
@@ -319,7 +317,7 @@ systemctl is-active --quiet llama-swap-keepalive.timer \
 
 ---
 
-## Phase 5: Validate the fleet + stand up the LiteLLM front door (the trust gates)
+## Phase 5: Validate the fleet (the trust gates)
 
 ### 5.1 Models list
 
@@ -349,131 +347,9 @@ DIM=$(curl -s http://localhost:9000/v1/embeddings -H "Content-Type: application/
 ```
 **▶ GATE:** the served dim must equal what your RAG index expects (a mismatch silently corrupts retrieval). The public config ships Qwen3-Embedding-0.6B at **1024** dims; nomic-embed-text-v1.5 is the **768**-dim drop-in (the original wrong-dim gotcha was a config claiming 1024 against a 768-dim nomic model — set `EXPECT_DIM` to whatever you serve). Graphiti extraction smoke is out of scope for the public box (Appendix B / the personal config).
 
-### 5.4 LiteLLM `:4000` front door — the control plane in front of the fleet
-
-LiteLLM is **additive**: it adds one OpenAI/Anthropic-compatible endpoint (`:4000`) with per-agent keys, spend tracking, `claude-*` wildcard routing, and the no-cloud-fallback policy — and routes by model name to llama-swap `:9000`. **llama-swap is unchanged underneath**, and **direct `:9000` stays a documented fallback** if LiteLLM is down (DF-001 §3.3). Deploys [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml). (Per DECISION-DF-005; this is the single-node precursor to the two-Spark front door in DF-004.)
-
-#### 5.4.1 Install LiteLLM (agent step — pure-Python, ARM64; not a manual prerequisite)
-
-```bash
-pip install --user --break-system-packages 'litellm[proxy]'   # latest; [proxy] extra is pure-Python, wheels-only on aarch64 (~16s; validated baseline 1.89.4)
-hash -r
-LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
-VER=$("$LITELLM_BIN" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-echo "[record in RESULTS] litellm ${VER}   (validated baseline: 1.89.4 on GB10 2026-06-25)"
-# Deliberately NOT version-frozen (CONVENTIONS §3): litellm's surface here (model_list/openai-prefix/api_base,
-# --port, /v1/*) is stable and the no-cloud + routes gates below prove THIS release works at runtime. Recon flags
-# BerriAI/litellm drift; if a future release ever breaks a run, pin it THEN via a PR to the PINS block.
-```
-
-#### 5.4.2 Deploy the config + start under a USER systemd unit — CPU-pinned disjoint from llama-swap
-
-Mirror the llama-swap supervision model (user unit + linger; never a VS Code terminal — the §4.2 cgroup trap applies equally). The unit's `CPUAffinity=` is pinned to a **disjoint** core range from llama-swap so the two never contend under concurrent multi-model load (the gate in 5.4.4). GB10 is a **20-core** CPU (PINS `GB10_CORES`) — here LiteLLM takes `0-3`, llama-swap takes `4-19` via a drop-in (keeps the Phase 4.1 unit untouched):
-
-```bash
-sudo mkdir -p /opt/litellm && sudo chown -R $USER:$USER /opt/litellm
-sudo install -D -m644 examples/litellm-config.public.yaml /opt/litellm/config.yaml
-LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
-
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/litellm.service <<EOF
-[Unit]
-Description=LiteLLM front door (:4000) -> llama-swap :9000
-After=network-online.target llama-swap.service
-Wants=llama-swap.service
-[Service]
-Type=simple
-CPUAffinity=0-3
-ExecStart=${LITELLM_BIN} --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0
-Restart=on-failure
-RestartSec=5
-StandardOutput=append:/opt/litellm/litellm.log
-StandardError=append:/opt/litellm/litellm.log
-[Install]
-WantedBy=default.target
-EOF
-
-# Pin llama-swap onto the COMPLEMENTARY cores via a drop-in (Phase 4.1 unit untouched):
-mkdir -p ~/.config/systemd/user/llama-swap.service.d
-cat > ~/.config/systemd/user/llama-swap.service.d/10-cpu-affinity.conf <<'EOF'
-[Service]
-CPUAffinity=4-19
-EOF
-
-systemctl --user daemon-reload
-systemctl --user restart llama-swap        # picks up the affinity drop-in (no config/model change)
-systemctl --user enable --now litellm
-sudo loginctl enable-linger "$USER"         # boots without a login (same model as llama-swap)
-```
-Manage it with `systemctl --user … litellm` (note the `--user`). `:9000` is unchanged — only its CPU affinity is pinned.
-
-#### 5.4.3 **▶ GATE — no cloud fallback (DF-001)**
-
-The robust invariant is *no cloud model is reachable as a fallback target* — assert BOTH fallback lists are empty **AND** no cloud model is named in a fallback chain. (LiteLLM's own documented `context_window_fallbacks` example escalates to `claude-opus` on context overflow — the exact unattended-spend footgun. The empty-list "disable" is an undocumented inference, so we also assert the absence of any cloud target.)
-
-```bash
-CFG=/opt/litellm/config.yaml
-grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallbacks:\s*\[\]' "$CFG" \
-  && echo "GATE PASS: both fallback lists empty" \
-  || echo "GATE FAIL: a fallback list is populated — DF-001 risk. STOP."
-# The `^\s*` anchor is load-bearing: without it an empty `context_window_fallbacks: []`
-# line satisfies the first grep's `fallbacks: []` substring even when `fallbacks:` is populated.
-! sed 's/#.*//' "$CFG" | grep -qiE 'fallback.*(claude|gemini|anthropic|vertex|bedrock|openai/gpt)' \
-  && echo "GATE PASS: no cloud model named as a fallback target" \
-  || echo "GATE FAIL: a cloud model appears in a fallback chain — DF-001 violation. STOP."
-# `sed 's/#.*//'` strips comments FIRST — the in-file note "…escalates to claude-opus on overflow"
-# is prose, not a route, and must not false-FAIL the gate. The check is on YAML values only.
-```
-**FAIL → halt.** This is the on-camera "the one community feature I deliberately disable" beat. Cloud models may be *named* only for the attended DF-003 path (the public box names none at all).
-
-#### 5.4.4 **▶ GATE — CPU-pin LiteLLM disjoint from llama-swap (WARN, not STOP)**
-
-Under concurrent multi-model load, LiteLLM and llama-swap sharing a core can yield LiteLLM 504s + flaky llama-swap health checks. The disjointness check is sound and self-verifying; the 504s rationale is community-sourced and **not** authoritative (see DF-005's verification note), so this **WARNs, it does not halt**:
-
-```bash
-LSW=$(systemctl --user show llama-swap.service -p CPUAffinity --value 2>/dev/null)
-LIT=$(systemctl --user show litellm.service   -p CPUAffinity --value 2>/dev/null)
-python3 - "$LSW" "$LIT" <<'PY'
-import sys
-def expand(s):
-    out=set()
-    for tok in (s or "").replace(',',' ').split():
-        if '-' in tok:
-            a,b=tok.split('-'); out|=set(range(int(a),int(b)+1))
-        elif tok.isdigit(): out.add(int(tok))
-    return out
-lsw, lit = expand(sys.argv[1]), expand(sys.argv[2])
-if not lsw or not lit:
-    print("GATE WARN: CPUAffinity not set on both units — pin them disjoint (e.g. litellm 0-3, llama-swap 4-19 on the 20-core GB10).")
-elif lsw & lit:
-    print(f"GATE WARN: CPUAffinity overlaps on cores {sorted(lsw & lit)} — make the two units' core sets disjoint (re-derive for 20 cores).")
-else:
-    print("GATE PASS: litellm and llama-swap CPUAffinity are disjoint.")
-PY
-```
-> Why WARN, not STOP: a full-page fetch of dredyson.com refuted the "Dre Dyson's #1 mistake / 72-core" framing an early draft used (his actual #1 is `gpu-memory-utilization`; the community deploys via Docker `cpuset`, so `CPUAffinity=` is *our* systemd remedy). The pin is still worth doing; it just isn't a hard gate.
-
-#### 5.4.5 **▶ GATE — front door answers + `claude-*` routes to a local model**
-
-```bash
-# (a) the front door lists the fleet via :4000
-curl -sf http://localhost:4000/v1/models | jq -r '.data[].id' | sort
-# (b) a claude-* request lands on the LOCAL workhorse (no cloud — there is no cloud model in the config to reach).
-#     max_tokens is generous so workhorse (--reasoning auto) emits real text; accept content OR reasoning_content
-#     — a reasoning model can put its answer in reasoning_content and leave content empty (verified on GB10).
-RESP=$(curl -s http://localhost:4000/v1/chat/completions -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-6","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
-GEN=$(echo "$RESP" | jq -r '(.choices[0].message.content // "") + (.choices[0].message.reasoning_content // "")')
-SERVED=$(echo "$RESP" | jq -r '.model // "?"')
-[ -n "$GEN" ] \
-  && echo "GATE PASS: claude-* routed to a local model via :4000 (served=${SERVED}, ${#GEN} chars generated)" \
-  || { echo "GATE FAIL: no local completion for claude-* via :4000. STOP."; echo "$RESP" | head -c 400; }
-```
-**Routing safety is structural:** because the public config names **no** cloud model and ships empty fallback lists (5.4.3), a `claude-*` request *cannot* reach a cloud API — there is no target. If the literal `claude-*` wildcard doesn't resolve in your installed LiteLLM version, add explicit `claude-sonnet-4-6` / `claude-opus-4-7` rows mapping to `openai/workhorse` (see the config's note).
-
 ---
 
-### 5.5 Decision Gate
+### 5.4 Decision Gate
 
 | Gate | Result | Note |
 |---|---|---|
@@ -486,9 +362,8 @@ SERVED=$(echo "$RESP" | jq -r '.model // "?"')
 | P5.1 four always-on aliases listed | | workhorse · coach · chat · embed |
 | P5.2 workhorse tool-call + throughput | | **record tok/s** |
 | P5.3 embeddings dim == configured (1024) | | |
-| P5.4.3 LiteLLM no-cloud fallback (both lists empty + no cloud target) | | DF-001 — FAIL→STOP |
-| P5.4.4 LiteLLM ↔ llama-swap CPUAffinity disjoint | | **WARN** (not hard-gated) |
-| P5.4.5 front door `:4000` answers + `claude-*` → local | | no outbound cloud (structural) |
+
+> Adding the LiteLLM `:4000` front door? Its three gates (no-cloud fallback · CPUAffinity disjoint · front-door routes) live in the overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 5 Decision Gate, run after this is green.
 
 ---
 
@@ -504,7 +379,7 @@ Then write `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`:
 
 ```
 # RESULTS — Single-Spark Bring-Up (<YYYY-MM-DD>)
-## Gate outcomes        (the Phase 5.5 table, filled)
+## Gate outcomes        (the Phase 5.4 table, filled)
 ## Recorded numbers     total unified GB · workhorse tok/s · embed dims
 ## Drift report         link to DRIFT-<date>.md + what was promoted (if anything)
 ## Failures & follow-ups
@@ -528,22 +403,20 @@ Then write `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`:
 | RAG retrieval garbage / dim error | served embed dim ≠ index dim | Phase 5.3 gate; match `EXPECT_DIM` to the served model (1024 Qwen3-Embedding / 768 nomic) |
 | Plain text where a `tool_use` was expected | `--jinja` missing | add `--jinja` to the model `cmd` |
 | `curl /v1/models` refused | llama-swap not running | `systemctl --user status llama-swap`; tail `/opt/llama-swap/logs/llama-swap.log` (native process — `docker logs` won't work) |
-| LiteLLM 504s / flaky health under concurrent load | LiteLLM & llama-swap sharing a CPU core | Phase 5.4.4 — set disjoint `CPUAffinity=` (litellm 0-3 / llama-swap 4-19; re-derive for the 20-core GB10) |
-| `:4000` refused but `:9000` works | LiteLLM down | use llama-swap `:9000` directly (documented DF-001 §3.3 fallback); `systemctl --user status litellm`; tail `/opt/litellm/litellm.log` |
-| `claude-*` request errors / not routed | the `claude-*` wildcard isn't matched in your LiteLLM version | Phase 5.4.5 — add explicit `claude-sonnet-4-6` / `claude-opus-4-7` → `openai/workhorse` rows |
-| `claude-*` reaches a cloud API | a cloud model was added to the config / a fallback chain | Phase 5.4.3 no-cloud gate; the public config names NO cloud model (DF-001) |
+
+> LiteLLM `:4000` front-door failure modes (504s / `:4000` refused / `claude-*` not routed / `claude-*` reaching cloud) live in the overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 7.
 
 ---
 
 ## Phase 8: Demo close
 
 - [ ] Phase 0 drift report committed (`DRIFT-*`)
-- [ ] Decision Gate table (5.5) all green, numbers recorded
-- [ ] LiteLLM `:4000` front door up + no-cloud gate green (`systemctl --user is-active litellm`)
+- [ ] Decision Gate table (5.4) all green, numbers recorded
 - [ ] RESULTS file written, evidence bundle saved
 - [ ] If green: tag the commit (`git tag single-spark-bring-up-rehearsal-$(date +%F)`)
+- [ ] *(optional act two)* add the LiteLLM front door — run [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) and confirm its no-cloud gate green (`systemctl --user is-active litellm`)
 
-Leave running for subsequent work: `litellm` (`:4000`, the front door) over `llama-swap` (`:9000`, the model layer) — together they *are* the endpoint. Nothing to tear down — the endpoint staying up is the deliverable. For the **stage** run, the win is the recon → execute → **gate-catch** arc landing in ~8–10 min; the box staying served afterward is the proof.
+Leave running for subsequent work: `llama-swap` (`:9000`) *is* the endpoint. Nothing to tear down — the endpoint staying up is the deliverable. For the **stage** run, the win is the recon → execute → **gate-catch** arc landing in ~8–10 min; the box staying served afterward is the proof. (Bolt the LiteLLM `:4000` control plane on top with the overlay when you want per-agent keys + spend tracking.)
 
 ---
 
@@ -551,8 +424,7 @@ Leave running for subsequent work: `litellm` (`:4000`, the front door) over `lla
 
 - [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) — the method (recon → drift → gates) and the full gotcha→gate registry.
 - [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) — the canonical llama-swap (`:9000`) config this runbook deploys.
-- [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml) — the canonical LiteLLM (`:4000`) front-door config this runbook deploys (Phase 5.4).
-- [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md) — why LiteLLM `:4000` is the single-Spark front door (and the single-node precursor to DF-004).
+- [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) — the optional additive overlay that adds the LiteLLM `:4000` front door (deploying [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml)) on top of this fleet; [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md) is the rationale (single-node precursor to DF-004).
 - [`RUNBOOK-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RUNBOOK-v3-production-deployment.md) — the proven end-to-end procedure this exemplar distils.
 - [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) — SM121 build flags, model downloads, the dynamic-VRAM launcher, the LiteLLM Phase-4 appendix (merge conflicts resolved).
 - `TALK-ddd-southwest-got-a-spark-now-what.md` — the talk this runbook is the live demo for.

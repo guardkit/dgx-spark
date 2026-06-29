@@ -57,9 +57,10 @@ Live, we'll watch the agent run a bring-up: it produces a drift report against c
 The demo *is* the differentiator. Screen-record a real run; narrate. Beats:
 
 1. **Kick off recon.** Agent hits the fixed source list, runs the deterministic pin checks (`llama-swap` release, `llama.cpp` HEAD, the pinned model revisions) and the forum scan. **Show the drift report** — one flagged regression (e.g. a CX-7 firmware thread, or a `gpu-memory-utilization` change), procedure unchanged.
-2. **Agent executes the pinned steps** — build/serve behind the **LiteLLM `:4000` → llama-swap `:9000`** front door. Let it move; talk over it.
+2. **Agent executes the pinned steps** — build/serve the **llama-swap `:9000`** fleet (act one). Let it move; talk over it.
 3. **A gate fires.** The run hits the assertion for the regression the drift report flagged (e.g. the ARM64 silent-CPU-fallback gate, or the memory-ceiling gate) and **halts loudly**. This is the money shot: the gate caught a known trap before it cost an afternoon.
 4. **Show the fix is a PR, not a runtime hack** — the pin gets updated, reviewed, re-run green. Reproducible, not improvised.
+5. **Act two (optional): bolt on the front door.** Run the second runbook; **LiteLLM `:4000`** comes up over the green fleet and its **no-cloud-fallback gate** fires — the "one community feature I deliberately disable" beat. This is where the box becomes the full community stack (`client → LiteLLM → llama-swap → engines`). Skip it if time is tight — the fleet is a complete endpoint without it.
 
 If a beat doesn't land live, a second take is fine — but keep it real (the gotchas are the content).
 
@@ -69,7 +70,7 @@ If a beat doesn't land live, a second take is fine — but keep it real (the got
 
 - **Commands rot**, fast, on the Spark especially. So the durable thing I'm selling is the **method and the gates**, not the exact commands; the repo is a living artifact, and Phase 0 recon is precisely the response to staleness.
 - **Recon degrades gracefully.** No live internet to the forum? The runbook still executes the pinned procedure and notes `recon: skipped`. The network is additive, never on the critical path (DECISION-DF-001).
-- **Honest about the stack:** the front door is **LiteLLM on `:4000`**, routing to **llama-swap on `:9000`** (the unified-memory lifecycle layer for the all-llama.cpp fleet). That's the same martinB78/community stack — *built on*, not stripped down. The one community feature I deliberately **disable**: auto cloud-fallback — encoded as a gate that keeps the unattended path local (DECISION-DF-001, spec'd in DF-005). The talk presents it that way, and direct `:9000` stays documented as the LiteLLM-down fallback.
+- **Honest about the stack (and why it's two acts):** the box comes up in two runbooks. **Act one** is the **llama-swap `:9000`** fleet — a complete, useful endpoint on its own. **Act two** (an optional second runbook) bolts the **LiteLLM `:4000`** control plane on top — the same martinB78/community stack, *built on*, not stripped down — for anyone who wants per-agent keys + spend tracking. I split them deliberately: a gateway is power not every box needs, and the seam keeps each runbook a clean, self-contained spec. The one community feature I deliberately **disable** (in act two): auto cloud-fallback — a gate that keeps the unattended path local (DECISION-DF-001, spec'd in DF-005). Direct `:9000` stays the documented LiteLLM-down fallback.
 
 ---
 
