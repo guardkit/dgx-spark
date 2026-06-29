@@ -77,6 +77,35 @@ sudo systemctl start llama-swap-keepalive.timer
 
 ---
 
+## Distillation mode — Player-Coach placement on two boxes (candidate, not committed)
+
+> **Status: under consideration.** The distillation-mode/dataset-factory *design* lives in the external **guardkit** repo, not here — this section is only the **serving/memory placement** analysis for running it across these two boxes. Two accuracy flags: the PP-vs-TP throughput numbers below are **PROPOSED (cited), not yet measured on this hardware** (DF-004 flips PROPOSED→ACCEPTED only after the two-Spark Phase 9 benchmark), and **uneven PP on the pinned `jasl/vllm dda4668b` build is unverified** — a test item, not a known capability.
+
+**The question:** run a big teacher Player (DeepSeek-V4-Flash) + the Coach for a long (50+ hr) distillation run. The aggregate memory fits easily (2×115 ≈ 230 GB vs DeepSeek ~158 + Coach ~17), so can the *per-box* split be made **uneven** to give the Coach headroom?
+
+**Does TP=2 have to be ~50/50? Yes — confirmed.** Tensor parallelism shards every weight matrix across the two ranks (each tensor dim ÷ TP size), so a uniform-architecture model splits ~50/50 by construction; there is no asymmetric-TP knob. (~158 GB → ~79 GB/node — `RUNBOOK-two-spark-bring-up.md:289`.)
+
+**The lever for an UNEVEN split is Pipeline Parallelism** — PP splits by contiguous *layers*, not tensor dimensions, so you can put fewer layers on the Coach's box:
+- **SGLang** supports it explicitly — `SGLANG_PP_LAYER_PARTITION=15,15,15,16` names the per-rank layer counts.
+- **vLLM** (incl. the pinned `jasl/vllm dda4668b`) exposes **no flag** to specify the partition; its default is an even split. **Treat user-controlled uneven PP on vLLM as unproven until you test it on the pinned build.**
+- PP is also plausibly the *throughput-correct* cross-node choice for a batch job anyway (lower per-pass link traffic than TP's per-forward-pass all-reduce; the repo cites **PP ~555 vs TP ~252 tok/s @batch128** — PROPOSED). TP wins only single-stream (batch=1).
+
+So your intuition is right: **the aggregate fits; TP's forced 50/50 is what makes one box tight.** Going TP→PP and skewing layers off the Coach box rebalances it — but then **watch the heavy box as the new KV constraint** at long context (under PP, KV follows layer ownership; rebalance toward ~45/55 if it grows).
+
+**Placements, ranked (per-box vs the 115 GB safe ceiling):**
+
+| Rank | Placement | Coach box | Other box | Verdict |
+|---|---|---|---|---|
+| **1 — default** | `gpt-oss-120b` Player + Coach, **one box, NO cross-node** | Coach ~17–26 GB (+ ~65 GB fleet if the Dell keeps serving) | Player ~65–93 GB (gpt-oss 63 + KV) | **comfortable**; Dell **stays up** (this *is* Mode 3); no interconnect tax. Cost: gpt-oss-120b is a **weaker teacher** than 284B DeepSeek. |
+| **2 — your question, literally** | DeepSeek **PP=2 uneven** (~40/60 layers), Coach on the light box | ~81–99 GB | ~97–110 GB | **comfortable IF uneven PP works on your build**; takes **both boxes → Dell down** 50+ hr; vLLM uneven-PP unverified (or use SGLang). |
+| **3 — avoid** | DeepSeek **TP=2** + co-resident Coach on one box | ~98–117+ GB at the factory regime → trips the ceiling | ~76–91 GB | **tight→no**; both boxes + Dell down, and only fits if you starve ctx / `--max-num-seqs 2` — which defeats a throughput/batch job (and decode collapses under concurrency; MTP makes TP worse cross-node). |
+
+**A simplifier worth knowing:** the factory's Player and Coach run **sequentially** — the Coach grades *after* the Player generates (`gb10-model-requirements-matrix.md` R5/R6, marked never-concurrent). They never compute at the same instant. In row 1 they even **co-fit resident** (~80 GB on one box), so the Coach grades between Player batches with no swap thrash and the Dell untouched.
+
+**Recommendation:** default to **row 1** — one-box `gpt-oss-120b` Player + Coach (the repo's already-documented Mode 3). Only go cross-node if **DeepSeek-class teacher quality is the actual factory bottleneck**; if so, prefer **PP over TP**, and first run two tests on the pinned `jasl/vllm dda4668b`: (a) whether uneven PP partitioning is configurable at all, and (b) the PP-vs-TP throughput on *your* hardware — falling back to **SGLang** (explicit `SGLANG_PP_LAYER_PARTITION`) or **even PP=2 with the Coach placed off the strategist boxes** if vLLM won't take an uneven partition. Either way, a DeepSeek cross-node Player takes the Dell's day-to-day fleet **down for the whole run** (Mode 2 territory).
+
+---
+
 ## Safety — never clobber the Dell
 - **Do not run `RUNBOOK-single-spark-bring-up.md`, or deploy the public llama-swap config, on the Dell.** It overwrites `/opt/llama-swap/config/config.yaml`; `-watch-config` reloads instantly, tearing down `coach-ft-v3`, Graphiti, the fleet-memory relay's `embed`, and the vision models. The Dell's config is my **Appendix-B personal variant**.
 - The Dell keeps timestamped `config.yaml.bak-<ts>` backups before every change — keep that discipline (the runbooks now do this automatically before any config overwrite).
