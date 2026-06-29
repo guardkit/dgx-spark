@@ -104,6 +104,15 @@ So your intuition is right: **the aggregate fits; TP's forced 50/50 is what make
 
 **Recommendation:** default to **row 1** — one-box `gpt-oss-120b` Player + Coach (the repo's already-documented Mode 3). Only go cross-node if **DeepSeek-class teacher quality is the actual factory bottleneck**; if so, prefer **PP over TP**, and first run two tests on the pinned `jasl/vllm dda4668b`: (a) whether uneven PP partitioning is configurable at all, and (b) the PP-vs-TP throughput on *your* hardware — falling back to **SGLang** (explicit `SGLANG_PP_LAYER_PARTITION`) or **even PP=2 with the Coach placed off the strategist boxes** if vLLM won't take an uneven partition. Either way, a DeepSeek cross-node Player takes the Dell's day-to-day fleet **down for the whole run** (Mode 2 territory).
 
+**Swap cost & batching (why "sequential" doesn't mean "reload each time").** Player and Coach running sequentially does **not** imply unloading one to run the other:
+
+- **Default (row 1): no swapping at all.** `gpt-oss-120b` (~63 GB) + Coach (~17 GB) = ~80–95 GB with KV, under the 115 GB ceiling — so both stay **resident** as a llama-swap coexistence set (the `matrix.sets` mechanism), and llama-swap just *routes* between them. The Coach grades while the Player idles; both stay warm the whole run. Swap cost = zero.
+- **A swap is only forced when they can't co-fit** (the DeepSeek TP=2 case, row 3). There the load is chunky — gpt-oss-120b cold load runs to minutes (the runbook's `healthCheckTimeout: 600` exists for exactly this 120B-class load), and DeepSeek cross-node is **~6 min cold**. So:
+  - **Per-item swapping** (generate one → swap → grade one → swap → …) pays minutes *every iteration* → over thousands of items it dwarfs the actual work. **Prohibitive — don't.**
+  - **Phased/batched** (bulk-generate N candidates → swap **once** → bulk-grade the batch → swap back) is **2 swaps per batch**, amortized to single-digit-% overhead. Distillation data-gen is an offline batch job, so phase it this way — it's also the only thing that makes the cross-node DeepSeek path tolerable (you eat the ~6 min reload a handful of times, not thousands).
+
+**Rule:** co-reside if they fit (default — no swap); if they don't, **batch the pipeline**, never swap per item.
+
 ---
 
 ## Safety — never clobber the Dell
