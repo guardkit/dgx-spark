@@ -36,7 +36,7 @@ PINS (set 2026-06-22)
   DGX OS / driver   7.5.0 / 580.159.03 / CUDA 13.0.2 / UEFI 1.108.20   (both nodes, matched)
   nccl-tests        v2.28.9-1   built make MPI=1, NVCC_GENCODE sm_121
   BUSBW_PASS_GBPS   20          healthy single-cable ~22.1; 25 = theoretical ceiling, NOT the bar; ~15.5 = fw-degraded; ~10.25 = both-ports-miswired
-  vLLM              jasl/vllm commit dda4668b   (GB10 validation is commit-specific)
+  vLLM              jasl/vllm commit dda4668b   (PINNED DEFAULT for the V4-Flash TP build; GB10 validation is commit-specific. Alt installer: eugr/spark-vllm-docker — Phase 8)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
   strategist          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
   litellm           litellm[proxy] (latest)   front door :4000; NO cloud fallback (fallbacks: [] AND context_window_fallbacks: []); floated not frozen (CONVENTIONS §3); validated at 1.89.4 on GB10
@@ -291,9 +291,14 @@ The ~158 GB Strategist shards to ~75–80 GB/node + KV — it claims the large m
 
 ```bash
 # 0. One-time, ON BOTH NODES: install the pinned vLLM (agent step — heavy build, edit out the wait).
-#    GB10-validated commit jasl/vllm dda4668b + torch 2.9.1 (2.10 breaks CUDA graphs). Use the recipe's
-#    installer (eugr/spark-vllm-docker) OR a venv:  python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install
-#    -U pip torch==2.9.1 && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
+#    PINNED DEFAULT = jasl/vllm @ dda4668b + torch 2.9.1 — the GB10-validated, commit-specific build for the
+#    V4-Flash TP strategist (torch 2.10 breaks CUDA graphs). Install into a venv:
+#      python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install -U pip torch==2.9.1 \
+#        && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
+#    ALTERNATIVE = eugr/spark-vllm-docker (the recipe's Docker installer — --no-ray, fastsafetensors, the
+#    -lgc power-off mitigation baked in). Use it if you prefer containers, but the jasl PIN above is the
+#    commit THIS runbook validates against; eugr's image tracks its own vLLM version, so re-check Phase 0 if you take it.
+#    (Separately, eugr still supplies the granite-vision vLLM images and the 121a-real llama.cpp build flag — unchanged.)
 # 0b. The strategist weights (~158 GB) load LOCALLY PER NODE for mp/no-ray TP — vLLM pulls them to EACH
 #     node's HF cache on first launch (so it downloads on BOTH A and B). Pre-stage to avoid inline waits:
 #     hf download deepseek-ai/DeepSeek-V4-Flash   (run on each node)  — or point --model at a shared NFS dir.
