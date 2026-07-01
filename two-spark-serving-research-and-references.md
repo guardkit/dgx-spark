@@ -102,8 +102,28 @@ Rendered SVGs live in `diagrams/` (clean-line renderings of the architecture; an
 ## Serving-layer tooling
 
 - LiteLLM docs — https://docs.litellm.ai/ · docker quick start — https://docs.litellm.ai/docs/proxy/docker_quick_start · routing / load-balancing / fallbacks — https://docs.litellm.ai/docs/routing-load-balancing · config.yaml spec — https://docs.litellm.ai/docs/proxy/configs
-- Sparkrun — https://sparkrun.dev · CLI overview — https://sparkrun.dev/cli/overview/ · proxy gateway — https://sparkrun.dev/tutorials/proxy-gateway/ · multi-node TP — https://sparkrun.dev/tutorials/multi-node/ · repo — https://github.com/spark-arena/sparkrun
+- Sparkrun — https://sparkrun.dev · CLI overview — https://sparkrun.dev/cli/overview/ · proxy gateway — https://sparkrun.dev/tutorials/proxy-gateway/ · multi-node TP — https://sparkrun.dev/tutorials/multi-node/ · repo — https://github.com/spark-arena/sparkrun · web UI — https://github.com/mcampa/sparkrun-ui (see "Considered and deferred: sparkrun" below)
 - spark-arena.com — community GB10 benchmarks / leaderboard — https://spark-arena.com · https://spark-arena.com/leaderboard
+
+## Considered and deferred: sparkrun (2026-07-01)
+
+Evaluated as a candidate to absorb parts of the hand-rolled two-Spark bring-up (`RUNBOOK-two-spark-bring-up.md`) and/or the LiteLLM front-door overlay. **Verdict: not adopted** — the division of labour turned out narrower than it first looked.
+
+**Genuinely replaces (mechanical boilerplate):**
+- SSH mesh setup; CX-7 IP/netplan config (`sparkrun setup cx7` — static IPs, MTU 9000, jumbo frames — **IP addressing only, not firmware**)
+- NCCL env-var computation + multi-node launch syntax (`--tp N` → head/worker container launch, automatic node-count trimming)
+- Model + container distribution to remote hosts over the CX-7 link
+
+**Does NOT replace (the load-bearing gates — still ours regardless):**
+- **CX-7 firmware currency** (28.45.4028+, the all_gather-halving fix). `setup cx7` never touches firmware — that's a separate `mlxconfig`/`mlnx-fw-updater`/DOCA-OFED path. Our Phase 2 gate + the NIC-brick guard (`apt-mark hold mlnx-fw-updater`) stay necessary either way.
+- **The two-signal transport gate** (busbw ≥ 20GB/s AND `NET/IB` not `NET/Socket`). Sparkrun's own docs treat a slow multi-node launch as reactive troubleshooting ("make sure CX-7 is configured") rather than a pre-launch assertion — exactly the "blog says watch out" pattern the gate exists to replace. A healthy busbw number can still mask a silent TCP fallback; this needs verifying no matter what launched the job.
+- **The power-off mitigation** (`nvidia-smi -lgc 200,2150` before any TP launch). Not documented on sparkrun's native `vllm-distributed` runtime; may be inherited only via the `eugr`-delegating runtime.
+- **vLLM commit/torch pinning** for the actual DeepSeek-V4-Flash launch (`jasl/vllm @ dda4668b` + torch 2.9.1, the cudagraph mode avoiding vLLM #40969). Writing a sparkrun recipe with these exact pins is the same pinning work as the runbook — just serialised as YAML instead of bash + gates.
+- **DF-001 no-cloud-fallback enforcement.** Sparkrun's `proxy` command is a LiteLLM-powered auto-discovery gateway (convenience-oriented); no documented equivalent to our `fallbacks: []` + no-cloud-target assertion.
+
+**Dependency-cost note:** sparkrun bundles LiteLLM, a fast-release CLI (uv-installed, 40+ releases), and git-based community recipe registries by default — more third-party surface, in exchange for automating the lower-risk half of the bring-up while the higher-risk half (the gates above) still has to be hand-written on top. Same supply-chain caution already applied to LiteLLM itself applies here; net complexity doesn't obviously drop if the gates still have to run regardless of what did the launching.
+
+**Where it's a genuinely good idea, not yet built:** sparkrun's `runtime` layer is a Python-entry-point plugin system — `vllm-distributed`, `vllm`/Ray, `sglang`, `llama-cpp`, `trt-llm`/MPI, and an `eugr`-delegating runtime all coexist as plugins today. A **`llama-swap` runtime** — rendering a recipe into a `matrix.sets` entry in a shared `config.yaml` and triggering `-watch-config`, instead of launching a standalone container — is architecturally native to that system, not a fork. It would combine sparkrun's recipe registry / VRAM pre-flight / CX-7 distribution with llama-swap's actual differentiator: memory-aware coexistence across a fixed always-on fleet. Scope note: only helps the single-node fleet host (Node A) — doesn't touch the cross-node TP strategist story, which stays sparkrun's (or our Phase 8's) territory either way. **Not scheduled** — logged here as a backlog idea, and a plausible future video hook in its own right ("the gap in the DGX Spark tooling ecosystem").
 
 ## Related local docs
 
