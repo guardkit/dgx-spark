@@ -1,0 +1,16 @@
+{
+  "workflow": "slotted_flux.api.json",
+  "model_override": null,
+  "steps_override": null,
+  "seed": 42,
+  "seed_field": "noise_seed",
+  "text_field": "text",
+  "size": [
+    1280,
+    720
+  ],
+  "seconds": 360.9,
+  "prompt_id": "382bf646-15ee-4ddb-822b-19d4b2ee8529",
+  "sha256": "d625a1c0724dde62d843fecae4cde9a56290ee62e68529779598dfdf905f5440",
+  "out": "results/final-fluxdev.png"
+}

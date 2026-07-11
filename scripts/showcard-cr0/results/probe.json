@@ -1,0 +1,24 @@
+{
+  "wire": "json_schema",
+  "model": "granite-vision-4-1-4b",
+  "seed": 42,
+  "max_tokens": 500,
+  "scores": {
+    "composite.png": {
+      "headline_legibility": 0.8,
+      "focal_clarity": 0.7,
+      "contrast": 0.9
+    },
+    "composite-lowcontrast.png": {
+      "headline_legibility": 0.8,
+      "focal_clarity": 0.7,
+      "contrast": 0.9
+    },
+    "composite-tinytext.png": {
+      "headline_legibility": 0.8,
+      "focal_clarity": 0.7,
+      "contrast": 0.9
+    }
+  },
+  "discrimination": "CLUMPED"
+}
