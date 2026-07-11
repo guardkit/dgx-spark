@@ -1,0 +1,103 @@
+# =============================================================================
+# LiteLLM — PUBLIC / general-purpose DGX Spark (GB10) front-door config
+# =============================================================================
+# The single OpenAI/Anthropic-compatible FRONT DOOR (:4000) that sits IN FRONT of
+# the llama-swap fleet (:9000). Deployed by an agent running the additive overlay
+# RUNBOOK-litellm-front-door.md (over a box already green on the base runbook
+# RUNBOOK-single-spark-bring-up.md). This is the public, all-open-model
+# control plane (DECISION-DF-005) — it makes the box a genuine SUPERSET of the
+# community stack (martinB78 -> Dre Dyson -> dasroot:
+#   client -> LiteLLM -> llama-swap -> vLLM/llama.cpp/Ollama), not a subset.
+#
+# WHAT LiteLLM IS HERE: a router + control plane ONLY — keys, aliases, spend,
+# fallback policy. It NEVER loads or evicts a model (that is llama-swap's job).
+# Every model_list entry points at llama-swap's SINGLE proxy port (:9000/v1),
+# NOT an individual model port — pointing at a model port bypasses the swap.
+#   ( :9000 is THIS box's llama-swap port. The upstream community default is
+#     :8080 — the single-proxy-port PRINCIPLE is the universal part, not the
+#     number. Keep :9000 here; never call it "the standard llama-swap port". )
+#
+# DF-001 GUARD (no cloud on the unattended path): this config names NO cloud
+# model at all (no anthropic/ , no gemini/ upstream), AND ships empty fallback
+# lists. So a claude-* request can ONLY reach the local workhorse — there is no
+# cloud target to escalate to. LiteLLM's own documented context_window_fallbacks
+# example escalates to claude-opus on context overflow; that is the exact
+# unattended-spend footgun we deliberately disable (the on-camera gate beat).
+#
+# VIRTUAL KEYS + PERSISTED SPEND are OPT-IN and need Postgres (DATABASE_URL +
+# master_key) — see the bottom of this file + RUNBOOK-litellm-front-door.md. DB-less (this
+# default) still routes, still applies the no-cloud guard, and still surfaces
+# per-request cost in the `x-litellm-response-cost` response header; it just does
+# not persist keys or the spend dashboard.
+#
+# INSTALL (agent step):  pip install --user --break-system-packages 'litellm[proxy]'
+# RUN (user systemd unit, CPU-pinned DISJOINT from llama-swap): see RUNBOOK-litellm-front-door.md.
+# =============================================================================
+
+model_list:
+  # ---------------------------------------------------------------------------
+  # Fleet -> llama-swap :9000. `model:` is the openai/<llama-swap-alias> the
+  # request is demultiplexed by; `api_base` is the llama-swap PROXY port (:9000),
+  # never an individual model's port. `api_key: none` is a placeholder llama-swap
+  # ignores (keeps strict OpenAI clients happy).
+  # ---------------------------------------------------------------------------
+  - model_name: workhorse
+    litellm_params:
+      model: openai/workhorse          # Qwen3.6-35B-A3B-Instruct (Player / agentic coder)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: coach
+    litellm_params:
+      model: openai/coach              # Gemma-4-26B-A4B-it (stock; the open Coach base)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: chat
+    litellm_params:
+      model: openai/chat               # gpt-oss-20b (fast general chat / reasoner)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: embed
+    litellm_params:
+      model: openai/embed              # Qwen3-Embedding-0.6B (1024-dim, RAG)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: openai/gpt-oss-120b       # on-demand "big-brain" Player (evicts the fleet)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+
+  # ---------------------------------------------------------------------------
+  # claude-* wildcard -> local workhorse. Anthropic/OpenAI SDK clients (Claude
+  # Code, DeepAgents, AutoBuild) need only point base_url at :4000 — no code
+  # change. NOTE (F5): confirm the literal `claude-*` pattern resolves in YOUR
+  # installed LiteLLM version — the doc-blessed forms are `provider/*`, `*`, and
+  # custom prefixes. If it does not match, add explicit rows
+  # (claude-sonnet-4-6 / claude-opus-4-7 -> openai/workhorse) instead.
+  # ---------------------------------------------------------------------------
+  - model_name: "claude-*"
+    litellm_params:
+      model: openai/workhorse
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+
+litellm_settings:
+  drop_params: true                    # silently drop params an upstream doesn't support, rather than 500
+
+# DF-001: BOTH fallback lists empty AND no cloud model anywhere above -> there is
+# no cloud target to escalate to. The runbook's no-cloud GATE asserts both empty
+# lists AND the absence of any cloud model in a fallback chain (the robust
+# invariant — empty-list "disable" is undocumented; a present cloud target is what
+# actually fires).  https://docs.litellm.ai/docs/routing-load-balancing
+router_settings:
+  fallbacks: []                        # NO local->cloud fallback
+  context_window_fallbacks: []         # also empty — the documented example escalates to claude-opus on overflow
+
+# -----------------------------------------------------------------------------
+# OPT-IN: per-agent virtual keys + a persisted spend/usage dashboard at :4000/ui.
+# Requires Postgres. Uncomment, set the two env vars (master_key MUST start with
+# `sk-`), then mint per-agent keys with POST /key/generate. DB-less runs skip this.
+# -----------------------------------------------------------------------------
+# general_settings:
+#   master_key: "os.environ/LITELLM_MASTER_KEY"   # e.g. sk-... ; gates the admin API + /key/generate
+#   database_url: "os.environ/DATABASE_URL"        # postgresql://user:pw@localhost:5432/litellm

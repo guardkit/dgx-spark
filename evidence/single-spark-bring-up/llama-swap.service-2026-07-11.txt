@@ -1,0 +1,13 @@
+# /home/richardwoollcott/.config/systemd/user/llama-swap.service
+[Unit]
+Description=llama-swap (all-llama.cpp model layer; :9000 endpoint)
+After=network-online.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/llama-swap -config /opt/llama-swap/config/config.yaml -listen :9000 -watch-config
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/llama-swap/logs/llama-swap.log
+StandardError=append:/opt/llama-swap/logs/llama-swap.log
+[Install]
+WantedBy=default.target

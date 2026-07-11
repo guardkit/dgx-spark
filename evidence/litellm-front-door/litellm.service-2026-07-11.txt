@@ -1,0 +1,15 @@
+# /home/richardwoollcott/.config/systemd/user/litellm.service
+[Unit]
+Description=LiteLLM front door (:4000) -> llama-swap :9000
+After=network-online.target llama-swap.service
+Wants=llama-swap.service
+[Service]
+Type=simple
+CPUAffinity=0-3
+ExecStart=/home/richardwoollcott/.local/bin/litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/litellm/litellm.log
+StandardError=append:/opt/litellm/litellm.log
+[Install]
+WantedBy=default.target

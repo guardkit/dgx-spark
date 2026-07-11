@@ -1,0 +1,5 @@
+pid, process_name, used_gpu_memory [MiB]
+2126129, /usr/local/bin/llama-server, 23409 MiB
+2126201, /usr/local/bin/llama-server, 18748 MiB
+2126243, /usr/local/bin/llama-server, 12447 MiB
+2126282, /usr/local/bin/llama-server, 9279 MiB
