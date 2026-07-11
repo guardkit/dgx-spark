@@ -39,8 +39,13 @@ stage() {
 stage "unsloth/Qwen3.6-35B-A3B-GGUF"      "qwen36-35b"   "Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"       "*UD-Q4_K_XL*"
 # coach — stock Gemma-4-26B-A4B-it (~17 GB)
 stage "unsloth/gemma-4-26B-A4B-it-GGUF"   "gemma4-coach" "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"    "*UD-Q4_K_XL*"
-# chat — gpt-oss-20b (MXFP4-native, ~12 GB). Case-tolerant (Unsloth ships *MXFP4*).
-stage "unsloth/gpt-oss-20b-GGUF"          "gpt-oss-20b"  "gpt-oss-20b-mxfp4.gguf"                "*mxfp4*" "*MXFP4*"
+# chat — gpt-oss-20b NATIVE MXFP4 (~12 GB). Source is ggml-org, NOT unsloth: the
+# official ggml-org/gpt-oss-20b-GGUF ships the single native-MXFP4 file
+# gpt-oss-20b-mxfp4.gguf, whereas unsloth/gpt-oss-20b-GGUF has only re-quantised
+# variants (F16/Q4_K_M/UD-Q4_K_XL/…) with NO *mxfp4* file — so the old unsloth
+# glob matched nothing, produced no .gguf, and aborted staging under `set -e`
+# before embed ever ran (observed 2026-07-11). Keep gpt-oss native MXFP4.
+stage "ggml-org/gpt-oss-20b-GGUF"         "gpt-oss-20b"  "gpt-oss-20b-mxfp4.gguf"                "*mxfp4*" "*MXFP4*"
 # embed — Qwen3-Embedding-0.6B (Q8_0, ~0.6 GB)
 stage "Qwen/Qwen3-Embedding-0.6B-GGUF"    "qwen3-embed"  "Qwen3-Embedding-0.6B-Q8_0.gguf"        "*Q8_0*" "*q8_0*"
 

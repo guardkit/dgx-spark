@@ -38,7 +38,7 @@ PINS (set 2026-06-21)
   llama.cpp             SM121 build, 121a-real       PR #17570 (Anthropic Messages API); last-verified build b9430 (2026-05-30)
   workhorse  GGUF       Qwen3.6-35B-A3B-Instruct UD-Q4_K_XL   unsloth/Qwen3.6-35B-A3B-GGUF     (Player)
   coach      GGUF       Gemma-4-26B-A4B-it UD-Q4_K_XL         unsloth/gemma-4-26B-A4B-it-GGUF  (Coach; stock/open)
-  chat       GGUF       gpt-oss-20b MXFP4                     unsloth/gpt-oss-20b-GGUF         (general chat)
+  chat       GGUF       gpt-oss-20b MXFP4 (native)           ggml-org/gpt-oss-20b-GGUF        (general chat; ggml-org ships the native gpt-oss-20b-mxfp4.gguf — unsloth has no *mxfp4* file)
   embed      GGUF       Qwen3-Embedding-0.6B Q8_0            Qwen/Qwen3-Embedding-0.6B-GGUF    (1024 dims)
   big (opt)  GGUF       gpt-oss-120b MXFP4                    ggml-org/gpt-oss-120b-GGUF       (on-demand Player)
   KV_CACHE_TYPE         q8_0                         on large-ctx models (workhorse / coach)
@@ -212,10 +212,20 @@ awk -v u="$USED" 'BEGIN{exit !(u>0)}' \
 ### 3.1 Install llama-swap (pinned, not `latest`)
 
 ```bash
-ARCH=$(uname -m); case "$ARCH" in aarch64|arm64) BIN=llama-swap-linux-arm64;; *) echo "unsupported $ARCH"; exit 1;; esac
-sudo curl -L -o /usr/local/bin/llama-swap \
-  "https://github.com/mostlygeek/llama-swap/releases/download/v219/$BIN"   # PIN, per PINS block
-sudo chmod +x /usr/local/bin/llama-swap
+# v219 releases ship per-platform TARBALLS (llama-swap_219_linux_<arch>.tar.gz), NOT a
+# bare `llama-swap-linux-<arch>` binary — the old bare-binary URL 404s (verified 2026-07-11).
+# The release TAG is `v219`; the asset uses the bare number `219`.
+case "$(uname -m)" in
+  aarch64|arm64) ASSET=llama-swap_219_linux_arm64.tar.gz;;
+  x86_64|amd64)  ASSET=llama-swap_219_linux_amd64.tar.gz;;
+  *) echo "unsupported $(uname -m)"; exit 1;;
+esac
+TMP=$(mktemp -d)
+curl -fL -o "$TMP/llama-swap.tgz" \
+  "https://github.com/mostlygeek/llama-swap/releases/download/v219/$ASSET"   # PIN, per PINS block
+tar -xzf "$TMP/llama-swap.tgz" -C "$TMP"
+sudo install -m755 "$TMP/llama-swap" /usr/local/bin/llama-swap
+rm -rf "$TMP"
 sudo mkdir -p /opt/llama-swap/{config,logs,models}; sudo chown -R $USER:$USER /opt/llama-swap
 ```
 **Pass:** binary present (`llama-swap --version` → `version: 219`). (Pinning, not floating `latest`, is itself a convention — the release cadence is several versions/week. v219+ keeps the single-dash flag contract.)
@@ -316,9 +326,39 @@ awk -v g="$TOTAL_USED_GB" 'BEGIN{exit !(g < 115)}' \
   && echo "GATE PASS: total unified ${TOTAL_USED_GB} GB < 115 GB ceiling" \
   || echo "GATE FAIL: total unified ${TOTAL_USED_GB} GB ≥ 115 GB — freeze risk (114 GB freeze on record). Trim ctx/-np or a model. STOP."
 ```
-**Expected:** ~65 GB resident for the four, ~50 GB headroom. Then install the keep-alive timer (RUNBOOK-v3 §5.6) — **llama-swap does not auto-revive crashed children** (registry row) — **and assert it is actually firing** (enabled-but-stopped is the real failure state; `is-enabled` is not enough):
+**Expected:** ~65 GB resident for the four, ~50 GB headroom. Then install the keep-alive timer — **llama-swap does not auto-revive crashed children** (registry row) — **and assert it is actually firing** (enabled-but-stopped is the real failure state; `is-enabled` is not enough). Install the **PUBLIC-fleet** variant [`scripts/llama-swap-keepalive.public.sh`](./scripts/llama-swap-keepalive.public.sh): its `MODEL_PROBE_KIND` (workhorse/coach/chat/embed) equals this config's `hooks.on_startup.preload`. Do **not** install the repo's [`scripts/llama-swap-keepalive.sh`](./scripts/llama-swap-keepalive.sh)/`.service`/`.timer` here — those are the operator's personal lineup (`qwen-graphiti`/`nomic-embed`/`coach-ft-v3`, a guardkit `ExecStart` path) and would probe models the public config doesn't serve. These are **system** units (need `sudo`); the `.service` runs as `$USER`:
 
 ```bash
+sudo install -m755 scripts/llama-swap-keepalive.public.sh /usr/local/bin/llama-swap-keepalive.sh
+sudo tee /etc/systemd/system/llama-swap-keepalive.service >/dev/null <<EOF
+[Unit]
+Description=llama-swap keep-alive (revive crashed model children) — public fleet
+After=network.target
+Wants=network.target
+[Service]
+Type=oneshot
+User=$USER
+Group=$USER
+ExecStart=/usr/local/bin/llama-swap-keepalive.sh
+TimeoutStartSec=400
+StandardOutput=journal
+StandardError=journal
+SuccessExitStatus=0 1 3
+EOF
+sudo tee /etc/systemd/system/llama-swap-keepalive.timer >/dev/null <<'EOF'
+[Unit]
+Description=Run llama-swap keep-alive every 5 minutes
+Requires=llama-swap-keepalive.service
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=llama-swap-keepalive.service
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now llama-swap-keepalive.timer
+
 systemctl is-active --quiet llama-swap-keepalive.timer \
   && echo "GATE PASS: keepalive timer active" \
   || echo "GATE FAIL: keepalive timer not active (enabled ≠ active) — run: sudo systemctl start llama-swap-keepalive.timer. STOP."
