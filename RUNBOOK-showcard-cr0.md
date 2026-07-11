@@ -51,7 +51,9 @@ draft tier              black-forest-labs/FLUX.2-klein-9B (public repo, verified
                         FLUX.1-dev + `--steps 8` on the same slotted graph (SC_STEPS slot;
                         pre-authorized by the lane spec §4.1)
 DRAFT_FAST_STEPS        8
-VLM seat                granite-vision-4-1-4b on llama-swap :9000/v1 (Node B; standing since the LPA work)
+VLM seat                granite-vision-4-1-4b on llama-swap :9000/v1 — a vLLM container seat, NOT a
+                        GGUF (built on Node A 2026-05-30 for the LPA work; provision on Node B via
+                        RUNBOOK-granite-vision-seat.md if Phase 1 fails)
 Pillow                  11.3.0 (pip, venv-local — overlay + probe variants only)
 ports                   ComfyUI :8188 · llama-swap :9000
 DISK_FLOOR_GB           60   (FLUX.1-dev fp8 + text encoders + VAE ≈ 34GB; klein adds ~18GB)
@@ -115,7 +117,7 @@ curl -s http://127.0.0.1:9000/v1/chat/completions -H 'Content-Type: application/
   | grep -q '"content"' && echo PASS-vlm-answers || echo FAIL-vlm-answers
 ```
 
-**HALT on FAIL** — the base llama-swap runbook owns the fix; this file never edits Node B's serving state.
+**HALT on FAIL** — this file never edits Node B's serving state. If `granite-vision-4-1-4b` is missing (a fresh bring-up won't have it): **execute `RUNBOOK-granite-vision-seat.md` (this repo) first** — it provisions the vLLM seat repeatably (provenance, weights, image, script, config stanza) and includes the HF-token-onto-this-box prerequisite this runbook's Phase 0.5/3 also need. Then re-run this gate.
 
 ## Phase 2: ComfyUI up (dockerized playbook image — the vendored-container pattern)
 

@@ -83,7 +83,9 @@ def score(endpoint: str, model: str, image: Path, use_schema: bool,
     out = {c: float(parsed[c]) for c in CRITERIA}
     bad = {c: v for c, v in out.items() if not 0.0 <= v <= 1.0}
     if bad:
-        # llama.cpp grammars don't enforce numeric min/max — gate client-side.
+        # Structured-output backends (llama.cpp grammars, vLLM xgrammar/
+        # outlines — the fleet seat is vLLM) don't reliably enforce numeric
+        # min/max — gate client-side.
         raise ValueError(f"scores out of 0..1 range: {bad}")
     return out
 
