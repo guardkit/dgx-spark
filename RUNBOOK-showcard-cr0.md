@@ -32,8 +32,10 @@ Execution modes:
 ## PINS (runbook v2, set 2026-07-11)
 
 ```
-DGX_SPARK_REPO          ~/dgx-spark            (the clone of THIS repo on Node B; every phase
-                                                cd's here explicitly — cwd never assumed to persist)
+DGX_SPARK_REPO          ~/Projects/appmilla_github/dgx-spark
+                                               (fleet convention: every box — MacBook/GB10/Spark —
+                                                mirrors /home/richardwoollcott/Projects/appmilla_github/<repo>;
+                                                every phase cd's here explicitly — cwd never assumed to persist)
 HF_TOKEN source         ~/.cache/huggingface/token  (written by `huggingface-cli login`, done
                                                 2026-07-10; every phase that needs it runs
                                                 `export HF_TOKEN=$(cat ~/.cache/huggingface/token)`
@@ -87,7 +89,7 @@ sudo -n true 2>/dev/null && echo PASS-sudo || echo "FAIL-sudo (one-time box setu
 [ -s ~/.cache/huggingface/token ] && echo PASS-token-file || echo "FAIL-token-file (huggingface-cli login was done 2026-07-10 — if the file is absent on THIS box, run huggingface-cli login once; the licence acceptance already exists)"
 export HF_TOKEN=$(cat ~/.cache/huggingface/token)
 curl -s -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/whoami-v2 | grep -q '"name"' && echo PASS-token-valid || echo FAIL-token-valid
-[ -x ~/dgx-spark/scripts/showcard-cr0/cr0_render.py ] && echo PASS-repo || echo "FAIL-repo (clone this repo to ~/dgx-spark on Node B first)"
+[ -x ~/Projects/appmilla_github/dgx-spark/scripts/showcard-cr0/cr0_render.py ] && echo PASS-repo || echo "FAIL-repo (clone this repo to ~/Projects/appmilla_github/dgx-spark on Node B first — the fleet folder convention)"
 { [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ] || [ -f /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf ]; } && echo PASS-fonts || echo "FAIL-fonts (apt install fonts-dejavu-core)"
 ! ss -tlnp 2>/dev/null | grep -q ':8188 ' && echo PASS-port-free || echo "WARN: :8188 already bound (re-run mode? check it's ComfyUI)"
 docker info >/dev/null 2>&1 && echo PASS-docker || echo "WARN: no docker — use the native comfy-ui playbook README (fallback path, Phase 2b)"
@@ -173,7 +175,7 @@ Note: "does the pinned ComfyUI have node support for klein" is **not evaluable h
 2. **Slot it** (the format gate now verifies the export was done right):
 
 ```bash
-cd ~/dgx-spark/scripts/showcard-cr0
+cd ~/Projects/appmilla_github/dgx-spark/scripts/showcard-cr0
 python3 cr0_slot_graph.py ~/base_flux.api.json -o slotted_flux.api.json
 ```
 
@@ -182,7 +184,7 @@ Ratify the printed slot map (one wrong slot ⇒ the render gate below catches it
 3. **Final-tier render, then the UMA flush, then the draft tier:**
 
 ```bash
-cd ~/dgx-spark/scripts/showcard-cr0
+cd ~/Projects/appmilla_github/dgx-spark/scripts/showcard-cr0
 python3 cr0_render.py slotted_flux.api.json --prompt "dramatic teal-and-orange tech workshop background, dgx spark on desk, shallow depth of field, no text" --seed 42 -o results/final-fluxdev.png --timeout 900
 sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
 # Draft tier — klein if Phase 3 staged it:
@@ -196,7 +198,7 @@ Gate: **both** renders print `PASS … 1280x720 in <N>s` (receipts land beside t
 ## Phase 5: Deterministic typography offline (+ probe variants)
 
 ```bash
-cd ~/dgx-spark/scripts/showcard-cr0
+cd ~/Projects/appmilla_github/dgx-spark/scripts/showcard-cr0
 ~/cr0-venv/bin/python cr0_overlay.py results/final-fluxdev.png -o results/composite.png --variants
 ```
 
@@ -205,7 +207,7 @@ Gate: `PASS` with three files written + the fitted px + headline bbox metadata p
 ## Phase 6: The two VLM probes (the load-bearing unknowns)
 
 ```bash
-cd ~/dgx-spark/scripts/showcard-cr0
+cd ~/Projects/appmilla_github/dgx-spark/scripts/showcard-cr0
 python3 cr0_vlm_probe.py results/composite.png results/composite-lowcontrast.png results/composite-tinytext.png \
   --endpoint http://127.0.0.1:9000/v1 --model granite-vision-4-1-4b -o results/probe.json
 ```
