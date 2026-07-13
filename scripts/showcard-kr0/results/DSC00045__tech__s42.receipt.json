@@ -1,0 +1,21 @@
+{
+  "workflow": "/home/richardwoollcott/showcard-kr0/slotted_kontext.api.json",
+  "subject": "/home/richardwoollcott/showcard-subjects-curated/DSC00045.JPG",
+  "uploaded_as": "DSC00045.JPG",
+  "prompt": "Place this man at a rim-lit high-tech desk surrounded by glowing computer monitors and server hardware, moody cinematic teal-and-orange colour grade, dramatic side rim lighting, shallow depth of field, photographic. Keep this man's face, glasses, hair and shirt exactly as in the photo.",
+  "model_override": null,
+  "steps_override": null,
+  "guidance_override": null,
+  "seed": 42,
+  "seed_field": "noise_seed",
+  "text_field": "text",
+  "size": [
+    1280,
+    720
+  ],
+  "seconds": 50.1,
+  "prompt_id": "4e03935c-108d-49c4-b400-dbd2ed99bc98",
+  "sha256": "148f049ab66740a39cba9b47226367121d993cbd191fe1ee270ba25d9ebca1f0",
+  "model_file_sha256": null,
+  "out": "/home/richardwoollcott/showcard-kr0/renders/DSC00045__tech__s42.png"
+}

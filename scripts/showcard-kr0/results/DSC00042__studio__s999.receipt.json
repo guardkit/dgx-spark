@@ -1,0 +1,21 @@
+{
+  "workflow": "/home/richardwoollcott/showcard-kr0/slotted_kontext.api.json",
+  "subject": "/home/richardwoollcott/showcard-subjects-curated/DSC00042.JPG",
+  "uploaded_as": "DSC00042.JPG",
+  "prompt": "Place this man in a clean professional photo studio against a single solid deep-teal backdrop, chest-up framing with generous empty negative space above and to one side for a headline, soft even key lighting, sharp focus, photographic. Keep this man's face, glasses, hair and shirt exactly as in the photo.",
+  "model_override": null,
+  "steps_override": null,
+  "guidance_override": null,
+  "seed": 999,
+  "seed_field": "noise_seed",
+  "text_field": "text",
+  "size": [
+    1280,
+    720
+  ],
+  "seconds": 50.1,
+  "prompt_id": "653c9b31-388f-47b9-970d-a31827f23b47",
+  "sha256": "c70775c4688c73937a1f7c2eed28f85b2580c3ff20e20c0fb41410b76f58e147",
+  "model_file_sha256": null,
+  "out": "/home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s999.png"
+}

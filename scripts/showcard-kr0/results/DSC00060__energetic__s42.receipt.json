@@ -1,0 +1,21 @@
+{
+  "workflow": "/home/richardwoollcott/showcard-kr0/slotted_kontext.api.json",
+  "subject": "/home/richardwoollcott/showcard-subjects-curated/DSC00060.JPG",
+  "uploaded_as": "DSC00060.JPG",
+  "prompt": "Place this man against a bold vibrant abstract background of colourful energy streaks and a high-contrast gradient of saturated light, dynamic punchy composition, high energy. Keep this man's face, glasses, hair and shirt exactly as in the photo.",
+  "model_override": null,
+  "steps_override": null,
+  "guidance_override": null,
+  "seed": 42,
+  "seed_field": "noise_seed",
+  "text_field": "text",
+  "size": [
+    1280,
+    720
+  ],
+  "seconds": 50.1,
+  "prompt_id": "7c537b3c-1724-48f1-8730-dad239cec937",
+  "sha256": "ba7ab013a2484686cf5ea915da32042509e03f446de1e556f2a313f26e710dd5",
+  "model_file_sha256": null,
+  "out": "/home/richardwoollcott/showcard-kr0/renders/DSC00060__energetic__s42.png"
+}

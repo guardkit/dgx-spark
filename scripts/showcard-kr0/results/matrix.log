@@ -1,0 +1,113 @@
+=== KR0-MATRIX start Mon Jul 13 11:37:50 AM UTC 2026 ===
+--- pre-run memory [mem_avail=27086MB free=6954MB used=97522MB] ---
+--- unloading llama-swap seats (GET :9000/unload) ---
+OK
+--- post-unload memory [mem_avail=97149MB free=77019MB used=27460MB] ---
+
+>>> 11:37:55  DSC00042 x studio x seed42   [mem_avail=97149MB free=77019MB used=27460MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=86ee8bbc-5d1a-4be1-86d8-64daba1a248f
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s42.receipt.json)
+    post-render [mem_avail=96442MB free=76278MB used=28167MB]
+
+>>> 11:38:45  DSC00042 x tech x seed42   [mem_avail=96442MB free=76277MB used=28167MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=c9758f83-3e60-4b33-9be0-2219ea502d69
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__tech__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__tech__s42.receipt.json)
+    post-render [mem_avail=96611MB free=76445MB used=27998MB]
+
+>>> 11:39:35  DSC00042 x energetic x seed42   [mem_avail=96611MB free=76445MB used=27998MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=f83dc52f-d774-41ca-8f9c-62c56d85e3a9
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__energetic__s42.png 1280x720 in 50.2s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__energetic__s42.receipt.json)
+    post-render [mem_avail=31535MB free=6735MB used=93074MB]
+
+>>> 11:40:25  DSC00045 x studio x seed42   [mem_avail=31975MB free=7161MB used=92634MB]
+uploaded subject -> DSC00045.JPG (type=input)
+submitted prompt_id=9ba73f9d-b8b3-4759-aaf0-90a77b012d81
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00045__studio__s42.png 1280x720 in 54.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00045__studio__s42.receipt.json)
+    post-render [mem_avail=26547MB free=5637MB used=98062MB]
+
+>>> 11:41:20  DSC00045 x tech x seed42   [mem_avail=26547MB free=5637MB used=98062MB]
+uploaded subject -> DSC00045.JPG (type=input)
+submitted prompt_id=4e03935c-108d-49c4-b400-dbd2ed99bc98
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00045__tech__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00045__tech__s42.receipt.json)
+    post-render [mem_avail=26520MB free=5606MB used=98089MB]
+
+>>> 11:42:10  DSC00045 x energetic x seed42   [mem_avail=26519MB free=5605MB used=98090MB]
+uploaded subject -> DSC00045.JPG (type=input)
+submitted prompt_id=1c54cf58-1c18-4bd0-bc3b-8b4ffb13be30
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00045__energetic__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00045__energetic__s42.receipt.json)
+    post-render [mem_avail=26558MB free=5636MB used=98051MB]
+
+>>> 11:43:00  DSC00060 x studio x seed42   [mem_avail=26557MB free=5636MB used=98052MB]
+uploaded subject -> DSC00060.JPG (type=input)
+submitted prompt_id=1fbda125-1822-485e-a156-50173e9df11f
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00060__studio__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00060__studio__s42.receipt.json)
+    post-render [mem_avail=24101MB free=3630MB used=100508MB]
+
+>>> 11:43:50  DSC00060 x tech x seed42   [mem_avail=24324MB free=3854MB used=100285MB]
+uploaded subject -> DSC00060.JPG (type=input)
+submitted prompt_id=ec1a22d5-6444-4567-b382-9e8c3a44ff86
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00060__tech__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00060__tech__s42.receipt.json)
+    post-render [mem_avail=26110MB free=5637MB used=98499MB]
+
+>>> 11:44:40  DSC00060 x energetic x seed42   [mem_avail=26110MB free=5637MB used=98499MB]
+uploaded subject -> DSC00060.JPG (type=input)
+submitted prompt_id=7c537b3c-1724-48f1-8730-dad239cec937
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00060__energetic__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00060__energetic__s42.receipt.json)
+    post-render [mem_avail=26075MB free=5598MB used=98533MB]
+
+>>> 11:45:30  DSC00069 x studio x seed42   [mem_avail=26075MB free=5598MB used=98534MB]
+uploaded subject -> DSC00069.JPG (type=input)
+submitted prompt_id=eb80cb23-4f81-4ab3-a040-ec956b39892c
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00069__studio__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00069__studio__s42.receipt.json)
+    post-render [mem_avail=25966MB free=5468MB used=98643MB]
+
+>>> 11:46:21  DSC00069 x tech x seed42   [mem_avail=25966MB free=5468MB used=98643MB]
+uploaded subject -> DSC00069.JPG (type=input)
+submitted prompt_id=573a4487-c3bc-4551-aa0e-f53bbfd5e72f
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00069__tech__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00069__tech__s42.receipt.json)
+    post-render [mem_avail=26115MB free=5614MB used=98494MB]
+
+>>> 11:47:11  DSC00069 x energetic x seed42   [mem_avail=26113MB free=5613MB used=98496MB]
+uploaded subject -> DSC00069.JPG (type=input)
+submitted prompt_id=d0e4a7d9-be7b-49dd-a044-a6aed8a3a0c6
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00069__energetic__s42.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00069__energetic__s42.receipt.json)
+    post-render [mem_avail=26122MB free=5619MB used=98487MB]
+
+>>> 11:48:01  DSC00042 x studio x seed7   [mem_avail=26122MB free=5619MB used=98487MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=9137df7b-eb67-4498-b3a8-343f062a5055
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s7.png 1280x720 in 52.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s7.receipt.json)
+    post-render [mem_avail=26002MB free=5490MB used=98607MB]
+
+>>> 11:48:53  DSC00042 x studio x seed123   [mem_avail=26001MB free=5490MB used=98608MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=e6a6e007-fed7-40bd-b5d6-cae33e1c6e99
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s123.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s123.receipt.json)
+    post-render [mem_avail=26135MB free=5622MB used=98474MB]
+
+>>> 11:49:43  DSC00042 x studio x seed999   [mem_avail=26135MB free=5621MB used=98474MB]
+uploaded subject -> DSC00042.JPG (type=input)
+submitted prompt_id=653c9b31-388f-47b9-970d-a31827f23b47
+PASS: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s999.png 1280x720 in 50.1s (receipt: /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s999.receipt.json)
+    post-render [mem_avail=26109MB free=5594MB used=98500MB]
+
+=== KR0-MATRIX done Mon Jul 13 11:50:33 AM UTC 2026 ===
+--- rendered files ---
+-rw-rw-r-- 1 richardwoollcott richardwoollcott 1360030 Jul 13 11:40 /home/richardwoollcott/showcard-kr0/renders/DSC00042__energetic__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  849984 Jul 13 11:49 /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s123.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  736707 Jul 13 11:38 /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  891122 Jul 13 11:48 /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s7.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  857306 Jul 13 11:50 /home/richardwoollcott/showcard-kr0/renders/DSC00042__studio__s999.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  775890 Jul 13 11:39 /home/richardwoollcott/showcard-kr0/renders/DSC00042__tech__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott 1416493 Jul 13 11:43 /home/richardwoollcott/showcard-kr0/renders/DSC00045__energetic__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  857627 Jul 13 11:41 /home/richardwoollcott/showcard-kr0/renders/DSC00045__studio__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  773424 Jul 13 11:42 /home/richardwoollcott/showcard-kr0/renders/DSC00045__tech__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott 1357517 Jul 13 11:45 /home/richardwoollcott/showcard-kr0/renders/DSC00060__energetic__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  802290 Jul 13 11:43 /home/richardwoollcott/showcard-kr0/renders/DSC00060__studio__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  793529 Jul 13 11:44 /home/richardwoollcott/showcard-kr0/renders/DSC00060__tech__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott 1465052 Jul 13 11:48 /home/richardwoollcott/showcard-kr0/renders/DSC00069__energetic__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  849199 Jul 13 11:46 /home/richardwoollcott/showcard-kr0/renders/DSC00069__studio__s42.png
+-rw-rw-r-- 1 richardwoollcott richardwoollcott  820483 Jul 13 11:47 /home/richardwoollcott/showcard-kr0/renders/DSC00069__tech__s42.png
