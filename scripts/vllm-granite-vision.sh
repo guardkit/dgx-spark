@@ -60,6 +60,17 @@ GPU_UTIL="${VLLM_GV_GPU_UTIL:-0.12}"
 MAX_LEN="${VLLM_GV_MAX_LEN:-8192}"
 MAX_SEQS="${VLLM_GV_MAX_SEQS:-4}"
 
+# PER-BOX --limit-mm-per-prompt.image VALUE (Rich RATIFIED 2026-07-15):
+#   Node A (promaxgb10-41b1) keeps image=1 — its granite-vision serves
+#   lpa-platform-poc / docling single-image OCR under the fleet memory budget.
+#   Node B (spark-fcf6) runs image=6 — the showcard anchors-AS-IMAGES
+#   experiment needs >1 image per prompt (07-12 S-C session; anchors degraded
+#   to text at cap=1); live-proven on Node B since SC-LIVE2. The Node B delta
+#   is exactly that one flag (verified at ratification: live == the pre-change
+#   .bak + that line; the .bak was then deleted — THIS record is the recovery).
+#   A re-provision of Node B re-applies image=6 by hand from this note.
+#   See llama-swap-seat-leases.md §Residue for the decision trail.
+
 # Remove any stale container from a prior crash so --name does not conflict.
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 

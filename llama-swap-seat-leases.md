@@ -102,8 +102,13 @@ done in this pass after all:
   carries `--limit-mm-per-prompt.image=6`. A re-provision can now be recovered from this
   record either way.
 
-**What remains Rich's (the only open leg): the ratify-or-revert call on `image=1 → 6`.**
-Ratify = commit the live script's cap here as configuration-of-record (and delete the `.bak`);
-revert = restore the `.bak`. Context: register MA-26 + the recorded Node B drift in
-[`DRIFT-granite-vision-seat-2026-07-11.md`](./DRIFT-granite-vision-seat-2026-07-11.md). For
-reference, Node A's tracked `scripts/vllm-granite-vision.sh` still ships `image=1`.
+**~~What remains Rich's: the ratify-or-revert call on `image=1 → 6`.~~ RATIFIED (Rich,
+2026-07-15, with the LPA no-break check).** The confirmation that gated it: lpa-platform-poc
+calls **Node A's** granite-vision (`localhost:9000`; zero `spark-fcf6` references), and Node A's
+launch scripts keep `image=1` untouched — the ratified cap is Node B's box-local value, a
+different box entirely; Node B has served at `image=6` since SC-LIVE2 loaded it. Recorded as a
+**per-box value** in [`scripts/vllm-granite-vision.sh`](./scripts/vllm-granite-vision.sh) (the
+dated comment block above the launch command — Node A `=1` for LPA/docling single-image OCR,
+Node B `=6` for showcard anchors-as-images; the repo script stays byte-identical to BOTH boxes'
+deployed copies modulo that one flag on Node B). The Node B `.bak` is deleted; recovery either
+way = this record.
