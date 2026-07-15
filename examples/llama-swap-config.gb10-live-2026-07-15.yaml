@@ -1,0 +1,958 @@
+# =============================================================================
+# CONFIGURATION-OF-RECORD — llama-swap on Node A (GB10)
+# -----------------------------------------------------------------------------
+# Source box:   promaxgb10-41b1  (Node A, GB10 fleet host)
+# Source path:  /opt/llama-swap/config/config.yaml
+# Captured:     2026-07-15  (MA-26 — the seat topology of record was previously
+#               a box-local, un-tracked file; this commit tracks it)
+#
+# SYNC LAW: the box file is the LIVE TRUTH; this tracked copy is the RECORD.
+# Any edit to /opt/llama-swap/config/config.yaml on the box MUST update this
+# copy in the SAME session (capture -> commit), so the record never drifts
+# behind the live seat topology. Do not hand-edit this copy as if it were live;
+# edit the box, then re-capture.
+#
+# Leak-swept on capture (grep -iE 'key|token|secret|password|bearer|api'):
+# the only hits are the word "token" in comments (max_tokens / token chunks)
+# and TASK ids — no credentials. Model paths, aliases and ports are public.
+#
+# The seat aliases below (models.<name>) are exactly the seats the seat-lease
+# convention reserves — see llama-swap-seat-leases.md and scripts/seat-lease.sh.
+# =============================================================================
+
+# =============================================================================
+# llama-swap production config — all-llama.cpp architecture
+# =============================================================================
+# Port: :9000
+# Memory budget (validated 2026-04-28): ~60 GB / 128 GB for the original 4 models.
+# Updated 2026-05-03: added architect-agent (~17 GB). New total ~82 GB / 121 GB
+# unified — comfortable, but watch GPU memory if adding a 6th model.
+# Updated 2026-05-07: bumped architect-agent --ctx-size 32768 → 65536. KV cache
+# delta ~+5 GB → new total ~87 GB / 121 GB unified.
+# Updated 2026-06-06 (TASK-HMIG-013): rotated preload architect-agent →
+# gemma4-coach (base Gemma 4 26B-A4B-IT UD-Q4_K_XL). Same Gemma 4 26B-A4B
+# Q4_K_XL family + ctx 65536 as outgoing architect — net always-on RAM
+# delta ≈ 0. Architect-agent moves to on-demand via the new `arch` matrix.set,
+# mirroring §9.9's tutor→architect rotation. See findings §9.13.
+#
+# matrix.sets[all] declares all 5 models can run concurrently, so the solver
+# never evicts when forwarding requests.
+# hooks.on_startup.preload loads them all at boot.
+# =============================================================================
+
+healthCheckTimeout: 600
+startPort: 5800
+logLevel: info
+globalTTL: 0           # never auto-unload on idle
+
+models:
+  # 2026-05-25: --ctx-size 32768 → 65536, -np 6 → 4, concurrencyLimit 8 → 6.
+  # graphiti-core was emitting 9443-token chunks (workflow rule for the DDD
+  # South West Graphiti architecture seed) that 400'd against the previous
+  # ~5.6 K-per-slot ceiling (32768 / 6). New layout: 16 K per slot
+  # (65536 / 4) covers the 9-12 K chunk band with headroom for
+  # graphiti-core's prompt scaffolding. -np trimmed 6 → 4 to keep the KV
+  # delta in budget (~+6 GB instead of ~+12-16 GB); 4 slots still absorbs
+  # graphiti-core's typical 3-5-call add_episode fan-out, though a worst-
+  # case 5-burst will queue briefly. concurrencyLimit 6 keeps the same
+  # ~1.5× admin-probe buffer over -np. See
+  # docs/research/dgx-spark/AUTOBUILD-ON-LLAMA-SWAP-findings.md §9.1.
+  "qwen-graphiti":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen2.5-14b/qwen2.5-14b-instruct-q8_0-00001-of-00004.gguf
+      --alias qwen-graphiti
+      --ctx-size 65536
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --temp 0.0
+      -np 4
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 6
+    aliases:
+      - "neuralmagic/Qwen2.5-14B-Instruct-FP8-dynamic"
+      - "graphiti-llm"
+      - "jarvis-router"
+
+  "nomic-embed":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/nomic-embed/nomic-embed-text-v1.5.f16.gguf
+      --alias nomic-embed
+      --embedding
+      --ctx-size 8192
+      --batch-size 8192
+      --ubatch-size 8192
+      --threads 16
+      -ngl 999
+      --no-mmap
+      -np 4
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 8
+    aliases:
+      - "nomic-embed-text-v1.5"
+      - "nomic-ai/nomic-embed-text-v1.5"
+      - "embeddings"
+
+  # EMBED — Qwen3-Embedding-0.6B (1024-dim, --pooling last; Qwen3-Embedding
+  # requires last-token pooling). RAG embeddings for fleet-memory (qwen-embed
+  # switch, 2026-06-26). nomic-embed (768) stays for graphiti-mcp + forge.
+  # The `embeddings` alias is intentionally OMITTED — nomic-embed already owns
+  # it (duplicate-alias collision); the relay calls the literal `embed`.
+  "embed":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen3-embed/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --alias embed
+      --embedding
+      --pooling last
+      --ctx-size 32768
+      --batch-size 8192
+      --ubatch-size 8192
+      --threads 16
+      -ngl 999
+      --no-mmap
+      -np 4
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 8
+    aliases:
+      - "qwen3-embedding"
+
+  "qwen36-workhorse":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen36-35b/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+      --alias qwen36-workhorse
+      --ctx-size 131072
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --reasoning auto
+      --temp 0.6
+      --top-p 0.95
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "autobuild-player"
+      - "coach"
+      - "jarvis-reasoner"
+      - "forge-orchestrator"
+      # 2026-07-11 (2nd move, final): product-owner-agent RESTORED here after
+      # the architect-agent retarget broke the LIVE session (OutputParseError:
+      # the gemma4-thinking template does not yield parseable JSON on the
+      # session's tool-bound langchain path; raw-completion A/B had passed).
+      # qwen36 completes the loop end-to-end (dfmt2: 8m17s, parseable doc).
+      # Real content fix = specialist-side prompt changes (POCONTENT task),
+      # queued behind FEAT-DF12. INTERIM until the PO fine-tune decision.
+      - "product-owner-agent"
+      - "dataset-factory"
+      - "claude-sonnet-4-6"
+      - "claude-opus-4-7"
+      - "claude-sonnet-4-5-20250929"
+      # 2026-05-30 workhorse-for-Graphiti experiment (both -np 1 and -np 2)
+      # could not be made to work — see findings §9.5 + §9.6. The
+      # graphiti-llm-experimental alias was removed.
+
+  "qwen3-coder-30b":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen3-coder-30b/Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL.gguf
+      --alias qwen3-coder-30b
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --temp 0.2
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 600                 # on-demand: auto-unload after 10 min idle
+    concurrencyLimit: 2
+    aliases:
+      - "autobuild-coder"
+      # Note (2026-05-14): claude-sonnet-* and autobuild aliases live on
+      # workhorse to preserve original Jarvis/forge/autobuild behaviour.
+      # To experiment with coder for autobuild pass --model autobuild-coder.
+      # 2026-05-28: now in its own exclusive `coder_30b` set (mirrors
+      # coder_next) — requesting it evicts all but docling. Pause the
+      # keepalive timer while using it, else workhorse-revive evicts it.
+
+  # 2026-05-30: qwen-coder-next REMOVED. Per AUTOBUILD-ON-LLAMA-SWAP-findings.md
+  # §9.9: forum AgentBench shows Qwen3.6 27B (workhorse family) beats
+  # Qwen3-Coder-Next 46% vs 59%, and coder-next's ~92 GB resident footprint
+  # blocked Graphiti during every autobuild run. Workhorse stays the autobuild
+  # default; qwen3-coder-30b stays as the opt-in code-tuned alternative.
+  # Restore recipe (config block + vllm-coder-next.sh + HF cache size) is
+  # captured in §9.9 of the findings doc. The launch script is preserved at
+  # /opt/llama-swap/scripts/vllm-coder-next.sh and the 75 GB HF cache at
+  # ~/.cache/huggingface/hub/models--Qwen--Qwen3-Coder-Next-FP8 is intact
+  # — to fully reverse, restore the config block from §9.9, re-add `qcn` to
+  # matrix.vars, re-add `coder_next: "qcn"` to matrix.sets.
+
+  "gemma4-tutor":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-tutor/gemma-4-26b-a4b-it.Q4_K_M.gguf
+      --alias gemma4-tutor
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --chat-template-file /opt/llama-swap/config/gemma4-tutor.jinja
+      --temp 0.7
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    # 2026-05-30: demoted from preload to on-demand. Architect-agent took its
+    # always-on slot (same GGUF family but with the thinking template for
+    # design work). Tutor loads on first `study-tutor` request; the `tutor`
+    # matrix.set below pairs it with workhorse for tutor sessions.
+    ttl: 0                   # R-G5 2026-07-06: tutor set is the standing default; always resident (was 1800)
+    concurrencyLimit: 2
+    aliases:
+      - "study-tutor"
+      - "gcse-tutor"
+      - "gemma4-specialist"
+
+  "architect-agent":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/architect-agent/architect-agent.Q4_K_M.gguf
+      --alias architect-agent
+      --ctx-size 65536
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --chat-template-file /opt/llama-swap/config/gemma4-thinking.jinja
+      --temp 0.4
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    # 2026-05-30: promoted from on-demand to preload. Replaces gemma4-tutor in
+    # the always-on slot — same Gemma 4 26B-A4B GGUF family but with the
+    # thinking template used by /system-arch, /system-design, /arch-refine,
+    # /system-plan flows. Tutor moved to on-demand via the `tutor` matrix.set.
+    # 2026-06-06 (TASK-HMIG-013): demoted to on-demand again. gemma4-coach
+    # (base Gemma 4 26B-A4B-IT) takes the always-on slot to close the F17
+    # Coach verdict-emission gap before the 2026-06-15 cutover. Architect
+    # sessions now load via the `arch` matrix.set — same pattern as `tutor`.
+    # See findings §9.13.
+    ttl: 1800
+    concurrencyLimit: 2
+    aliases:
+      - "software-architect"
+      - "ddd-architect"
+
+  # ===========================================================================
+  # AUTOBUILD COACH — base Gemma 4 26B-A4B-IT (UD-Q4_K_XL).
+  #
+  # Filed by TASK-HMIG-013 (Stage 1 of the two-stage substrate strategy
+  # adopted in commit 86cf71be for the 2026-06-15 Anthropic-SDK-subscription
+  # cutover deadline). Exxact's DGX Spark agentic benchmark scored base
+  # gemma4:26b 17/17 on JSON-discipline / tool-calling / argument-validation
+  # tests at 52.7 tok/s — exactly the substrate posture the Coach role needs
+  # to close the F17 verdict-emission gap that qwen36-workhorse exhibits at
+  # ~67 % reliability (per run-5 sample) and ~602 chars-of-prose on run 6
+  # turn 1 under Shape A's simpler fenced-JSON contract. Substrate problem,
+  # not contract problem — model swap, not parser change.
+  #
+  # IMPORTANT: this is the BASE Gemma 4 26B-A4B-IT (Unsloth's pre-quantised
+  # UD-Q4_K_XL from huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF), NOT
+  # gemma4-tutor (fine-tuned for Socratic GCSE dialogue, wrong posture for
+  # terse JSON Coach output) and NOT architect-agent (fine-tuned for DDD
+  # thinking, also wrong posture). The Exxact 17/17 score was on the BASE
+  # model — fine-tuned variants do not inherit that JSON-discipline.
+  #
+  # Coach-posture parameters: --temp 0.1 --top-p 0.9 (deterministic JSON
+  # emission), --jinja with model's embedded IT chat template (no role-
+  # specific .jinja file — architect's gemma4-thinking.jinja and tutor's
+  # gemma4-tutor.jinja encode the wrong personas). --reasoning off is
+  # load-bearing: base Gemma 4 IT is a hybrid reasoning model and its
+  # embedded chat template defaults to emitting chain-of-thought into
+  # message.reasoning_content with an empty message.content (finish_reason
+  # 'length' on short max_tokens budgets). Coach turns must emit a fenced
+  # JSON block directly into message.content — any pre-emit reasoning is
+  # exactly the F17 prose-before-JSON failure mode we are trying to close.
+  # --ctx-size 65536 matches outgoing architect's ctx so KV-footprint stays
+  # budget-neutral. See findings §9.13 "Reasoning-off lesson".
+  #
+  # ROUTING NOTE: the legacy `coach` alias remains on qwen36-workhorse for
+  # backwards compatibility. TASK-HMIG-013 AC-004 ships an orchestrator-side
+  # per-role override (LangGraphHarness in guardkitfactory) that emits
+  # model=gemma4:26b explicitly for Coach turns. Once that lands, the `coach`
+  # alias can move here and be removed from workhorse.
+  #
+  # See findings §9.13 (this revision's full deployment + rollback recipe).
+  "gemma4-coach":
+    # 2026-06-06 (TASK-FIX-COACHBUDG01 follow-on): bumped --ctx-size
+    # 65536 → 131072 to give Coach turns enough room to carry the full
+    # task plan + Player report + reasoning preamble + verdict without
+    # the LangGraph orchestrator running out of context mid-loop. Latest
+    # autobuild run ran out of context on a complex turn with ctx 65 K.
+    #
+    # Memory-budget protection: paired with --cache-type-k q8_0
+    # --cache-type-v q8_0 so the doubled-ctx × half-precision KV nets
+    # to roughly memory-neutral vs the prior shape (steady-state
+    # ~107 GB used / 121 GB total observed under load before this bump;
+    # f16 KV at ctx 131 K would have added ~5-10 GB and risked OOM).
+    # Mirrors gpt-oss-120b's historical config (`q8_0` KV + flash-attn).
+    # q8 KV at q4_k_xl weights is well-validated for instruction-following
+    # quality on Gemma-4-class models — acceptable trade for the ctx
+    # doubling. If verdict-emission quality regresses under load, revert
+    # to ctx 65 K + f16 KV (single config edit + restart).
+    #
+    # 2026-06-07 (run-11 F23A forensics): trimmed --ctx-size 131072 →
+    # 98304 after run-11 OOM-killed by the kernel mid-Coach at ~19 min
+    # of sustained reasoning. journalctl --user -u llama-swap.service
+    # cites it verbatim: "A process of this unit has been killed by the
+    # OOM killer" / "Failed with result 'oom-kill'" at 2026-06-07
+    # 14:30:43 BST (= 13:30:43 UTC, ~1110 s into Coach LLM invocation,
+    # matching the orchestrator's `Connection error` traceback in run-11
+    # log line 350). KV at ctx 131 K + q8 + sustained reasoning growth
+    # exceeded the ~30 GB headroom under live load (GUI apps,
+    # forge-autobuild-runner, langgraph, all 4 always-on models). 98304
+    # gives back ~25% KV cost while still being 50% more capacity than
+    # the original 65 K that exhausted in earlier runs. Matches the
+    # qwen3-coder-30b ctx (`98304`) precedent. Rollback recipe: revert
+    # to ctx 131 K + drop competing user services (forge-autobuild-runner,
+    # langgraph) before the run + close GB10 desktop GUI apps. See
+    # `docs/state/TASK-REV-HMIG/run-11-f23-forensics-handoff.md` §9.
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+      --alias gemma4-coach
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "gemma4:26b"
+      - "gemma-4-26b-a4b-it"
+      - "autobuild-coach"
+      - "coach_test"
+
+  # ===========================================================================
+  # AUTOBUILD COACH — FINE-TUNED Gemma-4-26B-A4B MoE (coach v3 LoRA → GGUF q4_k_m).
+  #
+  # 2026-06-21: takes gemma4-coach's always-on slot (memory-neutral swap — same
+  # 26B-A4B family/footprint, ctx 98304, q8 KV). Trained on the PRODUCTION
+  # evidence-bundle prompt (train==serve); serve-validated the same day: holdout
+  # FA 0.0% / FF 6.7% / 96.7% correct (== bf16), no <|channel>thought / <|turn>
+  # leaks, COACHSPLIT schema. --reasoning OFF = the FT's trained non-thinking
+  # posture (straight to the verdict). The base gemma4-coach block is KEPT
+  # (on-demand) so manual `gemma4:26b` / `autobuild-coach` runs still resolve.
+  # Rollback: restore preload + the `all` set (gc), delete this block + the
+  # `cfv3` matrix.var, or restore config.yaml.bak-*-pre-coach-ft-v3.
+  # See domains/coach-agent/RESULTS-coach-v3.md.
+  "coach-ft-v3":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/coach-ft-v3/coach-gemma4-26b-moe-v3.Q4_K_M.gguf
+      --alias coach-ft-v3
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning off
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "autobuild-coach-ft"
+      - "coach_test_ft"
+
+  # ===========================================================================
+  # STUDY-TUTOR COACH — base Gemma-4-26B-A4B-IT (UD-Q4_K_XL), REASONING OFF.
+  #
+  # 2026-07-05 (FEAT-APP-001 latency fix): dedicated Coach for the study-tutor
+  # tutoring loop (roles/tutor/prompts/coach.md). That loop's parser
+  # (study_tutor.tutoring.coach.rubric.parse_coach_output) does a STRICT
+  # json.loads on message.content — it does NOT strip reasoning preambles or
+  # ```json fences. The old `tutor` set used qwen36-workhorse (--reasoning auto),
+  # which emitted CoT into content (often leaving content empty) → a
+  # MalformedCoachOutputError on EVERY turn (coach silently bypassed via the
+  # unevaluated-turn fallback) plus ~33-43s latency, breaching SR-07
+  # (p95<10s / 30s ceiling). Base Gemma-4-26B scores 17/17 on JSON discipline
+  # and, with reasoning fully OFF, emits a clean UNFENCED CoachVerdict object
+  # straight into content in ~9s warm — validated 2026-07-05 against the real
+  # parser (reasoning=0, parse OK, decision=accept, 6 criteria). Same GGUF as
+  # gemma4-coach (memory-neutral); ctx 32768 (tutoring prompts are small) keeps
+  # KV tiny so it co-resides with gemma4-tutor (gt) + embed (em) in the `tutor`
+  # set — lighter than the old gt+qw pairing (qw was 35B @ ctx 131072).
+  # coach-ft-v3 was rejected: --reasoning off but its autobuild fine-tune emits
+  # ```json fences that break the strict parser. --reasoning-budget 0 forces
+  # immediate thinking-end (belt-and-braces with --reasoning off).
+  "tutor-coach":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+      --alias tutor-coach
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --reasoning off
+      --reasoning-budget 0
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+
+  # ===========================================================================
+  # AUTOBUILD PLAYER CANDIDATE — OpenAI GPT-OSS 120B (MXFP4).
+  #
+  # Filed 2026-06-15 (Player-model upgrade experiment). Candidate replacement
+  # for qwen3-coder-30b / qwen36-workhorse as the autobuild PLAYER, to clear the
+  # HMIG-010 "first clean fresh-feature convergence" gate: qwen3-coder-30b
+  # (~3B-active, ~22% SWE-bench) could not converge the complexity-7 FEAT-9DDE
+  # TSJ-001 producer — it rewrote the script from scratch each turn and never
+  # applied the dual-mode-import fix from Coach feedback. GPT-OSS-120B (~5.1B
+  # active, ~62% SWE-bench, native tool-calling) is the strongest agentic coder
+  # that fits ONE GB10, and it has run on this box before (~63 GB resident,
+  # 56.4 tok/s; see docs/research/dgx-spark/).
+  #
+  # MXFP4 GGUF: ggml-org/gpt-oss-120b-GGUF (official llama.cpp org, public). The
+  # Blackwell SM121 kernels live in the llama.cpp-new build, NOT the GGUF.
+  #
+  # CO-RESIDENCY: ~63 GB weights + gemma4-coach (~16 GB) + KV ≈ ~95-105 GB peak
+  # on the 121 GB box — fits ONLY as the exclusive Player+Coach `autobuild_go`
+  # matrix.set (evicts the qg/ne/qw/dl fleet). REQUIRES the keepalive timer
+  # paused (sudo systemctl stop llama-swap-keepalive.timer) + the autobuild run
+  # launched with `--no-context`, exactly like `coach31`. On-demand (ttl 600),
+  # NOT in preload/all — the default fleet is undisturbed until an
+  # autobuild-player request loads it. Rollback: delete this block + the `go`
+  # matrix.var + the `autobuild_go` set (restore from the .bak-preGPTOSS backup).
+  "gpt-oss-120b":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gpt-oss-120b/gpt-oss-120b-mxfp4-00001-of-00003.gguf
+      --alias gpt-oss-120b
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.7
+      --top-p 0.95
+      -np 1
+    checkEndpoint: /health
+    ttl: 600                 # on-demand: auto-unload after 10 min idle
+    concurrencyLimit: 2
+    aliases:
+      - "openai/gpt-oss-120b"
+      - "gpt-oss"
+
+  # ===========================================================================
+  # AUTOBUILD COACH CANDIDATE — Gemma 4 31B DENSE QAT (q4_0).
+  #
+  # Filed by TASK-OPS-COACH31B (2026-06-08). Runs 12-14 proved the current
+  # Coach substrate (gemma4-coach = base Gemma 4 26B-A4B-IT, an MoE with only
+  # ~3.8B ACTIVE params) cannot organise agentic reasoning to a fenced-JSON
+  # verdict — run-14 turn-1 produced 49,720 chars of reasoning_content and NO
+  # verdict in ~45 min. Three non-hardware levers were exhausted: route-level
+  # GBNF grammar (Path 1A, no-op — llama.cpp bypasses --grammar-file when a
+  # request carries `tools`, and the deepagents Coach always sends tools),
+  # decisive-prompt + self-check (Path 1B, made it worse), and more time
+  # (--sdk-timeout 3600, also worse). The wall is the model's ACTIVE reasoning
+  # capacity, not the scaffolding.
+  #
+  # This route is the no-new-hardware capacity fix: google/gemma-4-31B-it-qat-
+  # q4_0-gguf is a DENSE 30.7B model (30.7B active vs the MoE's 3.8B) at
+  # quantization-aware-training int4 quality, 17.65 GB on disk (gemma-4-31B
+  # _q4_0-it.gguf) — ~= the current Coach's 17.0 GB footprint. 256K context.
+  #
+  # POSTURE: identical to gemma4-coach so the substrate is the only variable
+  # under test — base Gemma-4 IT EMBEDDED chat template via --jinja (NO
+  # --chat-template-file: the GGUF ships the base IT template; architect's
+  # gemma4-thinking.jinja forces extra deliberation, the opposite of what the
+  # Coach needs), --reasoning auto, --temp 0.1 --top-p 0.9, q8_0 KV. NO
+  # --grammar-file (Path 1A is reverted/no-op for tool-bound Coach agents).
+  #
+  # MEMORY / CTX — the F20↔F23A tension (tuned empirically on the GB10):
+  #  * runs 15+16 (ctx 98304, FULL coach31 fleet incl. qwen-graphiti ~25.6 GB):
+  #    F23A global OOM — no GPU/unified headroom for g31's KV on a big Coach
+  #    prompt. Fixed by trimming the `coach31` matrix.set to "qw & g31" (drop
+  #    qg+ne+dl, ~26 GB freed) + running autobuild with `--no-context`.
+  #  * run-17 (ctx 65536, minimal fleet): NO OOM (memory fix worked) but F20
+  #    context overflow — HTTP 400 "request (66687 tokens) exceeds the available
+  #    context size (65536)". The 41-file Player payload produced a 66.7 K-token
+  #    Coach prompt. 65536 was too small.
+  # 2026-06-09: set --ctx-size 98304 (covers the 66.7 K prompt with margin;
+  # run-15-proven value). Now memory-safe because qg is no longer co-resident
+  # (qw ~25.6 GB + g31 ~25 GB static, peaks ~48 GB under a large-prompt run →
+  # ~89 GB total, ~35 GB headroom). NOTE g31's RSS BLOATS under a long Coach
+  # loop (observed 48.5 GB at ctx 65536 while processing the 66.7 K prompt) —
+  # restart g31 (config reload) clears it. If a bigger payload (e.g. run-16's
+  # 71 files ≈ 115 K tokens) re-triggers F20, the real fix is capping the Coach
+  # prompt (orchestrator code / D-3), NOT endless ctx growth (which re-arms
+  # F23A). 12B dense QAT remains the lower-footprint fallback.
+  #
+  # NOT in `preload`, NOT in `all`, NOT in the keepalive allowlist — loads
+  # ONLY when `gemma4:31b` is explicitly requested (via the `coach31` matrix
+  # set below), so adding this route does not disturb the default fleet.
+  # Rollback: delete this block + the `g31` matrix.var + the `coach31` set.
+  # See TASK-OPS-COACH31B + run-14 artifacts.
+  "gemma4-31b":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-31b-coach/gemma-4-31B_q4_0-it.gguf
+      --alias gemma4-31b
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "gemma4:31b"
+      - "gemma-4-31b-it-qat"
+      - "coach31"
+
+  # ===========================================================================
+  # gemma4-26b — BASE Gemma-4-26B-A4B-IT MoE, purpose-named handle for the
+  # Product-Owner fine-tune work (Phase 0 base diagnosis + the generative-mode
+  # base/eval). SAME weights as gemma4-coach (unsloth gemma-4-26B-A4B-it
+  # UD-Q4_K_XL) but a NEUTRAL base id, not overloaded with coach/autobuild
+  # semantics. On-demand only (deliberately NOT added to the `all` preload set),
+  # so it is memory-neutral — llama-swap loads it on first request and evicts it
+  # to serve always-on models. Smaller ctx (32768) than gemma4-coach's 98304 —
+  # a decomposition Player/eval doesn't need coach-sized context, keeping KV
+  # modest. --reasoning auto so it can emit the mandatory <think> block; --jinja
+  # default template (no persona). Clients set temperature per request, so the
+  # --temp default here is only a fallback.
+  # NOTE: the dense gemma4-31b above is a QAT coach-FALLBACK substrate (the
+  # `coach31` matrix set), NOT the base — left untouched deliberately.
+  # Added 2026-07-02 (PO Phase 0). Rollback: delete this block (or restore
+  # config.yaml.bak-20260702-pre-gemma4-26b-base).
+  # ===========================================================================
+  "gemma4-26b":
+    cmd: >
+      /home/richardwoollcott/llama.cpp-new/build/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+      --alias gemma4-26b
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.3
+      --top-p 0.95
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "gemma4-26b-base"
+      - "gemma-4-26b-a4b-moe"
+
+  # 2026-05-28: IBM Granite Docling 258M (VLM) for the LPA extraction project,
+  # served via vLLM in Docker (/opt/llama-swap/scripts/vllm-docling.sh) — same
+  # reason as qwen-coder-next (vLLM model, not llama.cpp). Brought under
+  # llama-swap because run standalone on :8002 it crashed in vLLM's KV-cache
+  # memory profiling when llama-swap swapped models in the shared unified pool
+  # ("Error in memory profiling ... other processes release GPU memory while
+  # vLLM is profiling"). One memory manager removes the clash. See
+  # AUTOBUILD-ON-LLAMA-SWAP-findings.md §9.3, DECISION-DF-001 §4.4.
+  #
+  # TINY (~2 GB weights, ~11 GB resident w/ KV). In the `all` set only (2026-05-29):
+  # putting it in the coder sets made the solver LOAD a coder to serve a docling
+  # request (§9.4). So it co-resides with the family but is evicted when an
+  # exclusive coder runs — lpa extraction and autobuild are mutually exclusive.
+  # Not preloaded; loads on first LPA request (do that against a stable memory
+  # state — vLLM profiling runs once on load). LPA clients use
+  # http://promaxgb10-41b1:9000 with model "granite-docling-258M" (was :8002).
+  "granite-docling":
+    cmd: /opt/llama-swap/scripts/vllm-docling.sh ${PORT}
+    cmdStop: docker stop vllm-docling
+    checkEndpoint: /health
+    ttl: 1800                # on-demand: auto-unload after 30 min idle
+    concurrencyLimit: 8
+    aliases:
+      - "granite-docling-258M"
+      - "docling"
+
+  # 2026-05-30: IBM Granite Vision 4.1-4b (4B params, bf16) — LPA POC's
+  # planned replacement for granite-docling-258M after smoke-3 showed the
+  # 258M model could not structure attorney form-grids on UK LPA Sections
+  # 2/4/7 (lpa-platform-poc/docs/history/lpa-extraction-e2e-smoke-4.md,
+  # Option 3 / AC-009 unblocker). Same vLLM-in-Docker pattern as docling
+  # (one memory manager avoids the KV-cache profiling clash from §9.3).
+  # Launch script at /opt/llama-swap/scripts/vllm-granite-vision.sh uses
+  # vllm/vllm-openai:cu130-nightly — NOT the NGC 26.01-py3 image the LPA
+  # runbook suggested, which fails the idefics2/3 conv2d patch embed on
+  # Blackwell sm_121 (same lesson docling learned in §9.3).
+  #
+  # FIRST LOAD: downloads ~8 GB to ~/.cache/huggingface (no HF_HUB_OFFLINE).
+  # Subsequent loads are local. Do the first load against a stable memory
+  # state, similar to docling's profiling-once-on-load constraint.
+  #
+  # RESIDENCY: ~12-15 GB resident (8 GB bf16 weights + KV at ctx 8192 +
+  # activations). Co-resident with the family ~95 GB total, well under the
+  # 121 GB ceiling. Member of `all` (loads on-demand alongside the family)
+  # and `lpa` (minimal layout for memory-constrained LPA runs).
+  "granite-vision-4-1-4b":
+    cmd: /opt/llama-swap/scripts/vllm-granite-vision.sh ${PORT}
+    cmdStop: docker stop vllm-granite-vision
+    checkEndpoint: /health
+    ttl: 1800                # on-demand: auto-unload after 30 min idle
+    concurrencyLimit: 4
+    aliases:
+      - "granite-vision-4.1-4b"
+      - "granite-vision"
+
+  # 2026-05-31: granite-vision-3.3-2b registered as a FALLBACK from 4.1-4b
+  # for the LPA POC. The 4.1-4b model collapses to a 1-token EOS on
+  # Ashworth page-4-Section-2 in greedy decoding, and the per-page tuning
+  # axes (prompt, temperature, max_tokens) all confirmed the
+  # "per-page tuning → pipeline regression" pattern in 7 full Ashworth
+  # smokes (see lpa-platform-poc/docs/history/lpa-extraction-e2e-smoke-4.md
+  # and TASK-FIX-LPA02-F progress log). 3.3-2b uses a different architecture
+  # family (LlavaNextForConditionalGeneration vs Granite4VisionForCondi-
+  # tionalGeneration) and a more mature release lineage (April 2026) — may
+  # not share the EOS-collapse signature. Also smaller (3B vs 4B) so should
+  # help the AC-007 runtime budget. 4.1-4b is KEPT registered alongside for
+  # comparison / rollback — pick which via DOCLING_VLM_MODEL env var on the
+  # LPA POC side. See findings §9.12.
+  "granite-vision-3-3-2b":
+    cmd: /opt/llama-swap/scripts/vllm-granite-vision-3-3-2b.sh ${PORT}
+    cmdStop: docker stop vllm-granite-vision-3-3-2b
+    checkEndpoint: /health
+    ttl: 1800                # on-demand: auto-unload after 30 min idle
+    concurrencyLimit: 4
+    aliases:
+      - "granite-vision-3.3-2b"
+
+  # 2026-07-05 (RUNBOOK-gb10-voice-unified): Parakeet TDT 0.6B v3 STT —
+  # unified voice pin per study-tutor unified-voice-orientation §2 (supersedes
+  # the June Parakeet-1.1B/:9100 plan; Kokoro demoted to named TTS fallback).
+  # Community GB10 container via launch script (same wiring as granite-vision);
+  # llama-swap proxies its OpenAI-compatible /v1/audio/transcriptions. Model
+  # weights are baked into the image; HF_HUB_OFFLINE enforced in the script
+  # (ADR-POC-015 local-only). Measured 2026-07-05: ~4.7 GB resident, /health
+  # ready ~15 s after cold start, webm/opus + wav both accepted.
+  #
+  # RESIDENCY: ttl 0 + `pk` is a member of EVERY matrix.set below — the
+  # persistent audio group (with qwen3-tts-0.6b) mirrors the embeds: no
+  # workload switch may evict the voice pair, and a voice request must never
+  # trigger a set switch. NOT in the keepalive allowlist (no chat/embed probe
+  # shape); if the container dies, the next voice request reloads it (~15 s).
+  "parakeet-tdt-0.6b-v3":
+    cmd: /opt/llama-swap/scripts/audio-parakeet.sh ${PORT}
+    cmdStop: docker stop audio-parakeet
+    checkEndpoint: /health
+    ttl: 0                   # persistent, never idle-unloaded
+    concurrencyLimit: 4
+    aliases:
+      - "parakeet-tdt"       # LPA STT_MODEL default resolves with zero env change
+      - "parakeet"
+
+  # 2026-07-05 (RUNBOOK-gb10-voice-unified): Qwen3-TTS 0.6B CustomVoice —
+  # unified TTS pin (Apache-2.0; Kokoro-82M demoted to named fallback, see
+  # LPA docker-compose TTS_MODEL env). faster-qwen3-tts community GB10
+  # container, cu130 wheels, CUDA-graph serving. /health is PATCHED in the
+  # mounted server code (/opt/llama-swap/audio/qwen3-tts-config) to 503 until
+  # load + CUDA-graph warmup complete, so checkEndpoint-ready ⇒ warmed and
+  # the first real synthesis never pays the capture (~25 s at cold start
+  # WITH free memory — see the launch script's memory trap note).
+  # English voices: Ryan (LPA TTS_VOICE pin), Aiden. Measured 2026-07-05:
+  # warm whole-file mp3 synthesis ~2 s/sentence; STT round-trip verbatim.
+  #
+  # RESIDENCY: ttl 0 + `qt` in EVERY matrix.set (persistent audio group with
+  # pk). Same keepalive posture as pk: not probed; crash ⇒ next request
+  # reloads (~25 s if memory is free — keep the audio pair FIRST in preload
+  # so a llama-swap restart loads them before the family fills the box).
+  "qwen3-tts-0.6b":
+    cmd: /opt/llama-swap/scripts/audio-qwen3tts.sh ${PORT}
+    cmdStop: docker stop audio-qwen3tts
+    checkEndpoint: /health
+    ttl: 0                   # persistent, never idle-unloaded
+    concurrencyLimit: 2
+    aliases:
+      - "qwen3-tts"          # LPA TTS_MODEL env value
+      - "tts-1"              # OpenAI default model name some clients send
+
+# Default: original 5-model concurrent set (workhorse + 4 others).
+# Coder is defined but NOT preloaded — on-demand only, evicts workhorse
+# when a coder alias (e.g. autobuild-coder) is requested.
+matrix:
+  vars:
+    qg: qwen-graphiti
+    ne: nomic-embed
+    qw: qwen36-workhorse
+    qc: qwen3-coder-30b
+    gt: gemma4-tutor
+    aa: architect-agent
+    gc: gemma4-coach
+    cfv3: coach-ft-v3
+    tc: tutor-coach
+    g31: gemma4-31b
+    go: gpt-oss-120b
+    g26: gemma4-26b
+    dl: granite-docling
+    gv: granite-vision-4-1-4b
+    gv33: granite-vision-3-3-2b
+    em: embed
+    pk: parakeet-tdt-0.6b-v3
+    qt: qwen3-tts-0.6b
+  sets:
+    # 2026-07-05 (voice-unified): `pk` (Parakeet STT, ~5 GB) joins EVERY set
+    # so the persistent audio group is never evicted by a set switch and a
+    # voice request never evicts the active workload. Even the tight
+    # exclusive sets (coach31/autobuild_go/po_eval, ~95-105 GB peak) absorb
+    # it: worst case ~100-110 GB of 121 GB. If a future exclusive set truly
+    # cannot spare ~5 GB, drop pk from THAT set knowingly (voice requests
+    # would then evict the exclusive workload — never do it silently).
+    # 2026-05-30: tutor moved out of `all` to a dedicated `tutor` set.
+    # `all` now holds the always-on family (qg + ne + qw + aa, ~80 GB) plus
+    # docling on-demand (~11 GB resident when loaded). Architect-agent took
+    # tutor's preload slot (see entry comments + findings §9.9).
+    #
+    # docling lives in `all` only. It must NOT be in the coder sets: when it
+    # was (`qc & dl`, `qcn & dl`), the solver could satisfy a docling request
+    # via a coder set and would LOAD A CODER to serve docling — thrashing
+    # docling's lifecycle (exit 1 / swapState wedge) so :9000 hung while the
+    # container was healthy. docling is now a normal `all` member: co-resident
+    # with the family, evicted only when an exclusive coder runs (lpa
+    # extraction and autobuild are then mutually exclusive — acceptable).
+    #
+    # granite-vision-4-1-4b (gv) lives in `lpa` ONLY, NOT in `all`. The
+    # initial design had gv in `all` for on-demand co-residency (assumed
+    # ~12-15 GB footprint); first-load measured 2026-05-30 showed it
+    # actually consumes ~26 GB resident, which pushed `all` + gv to ~106 GB
+    # and crossed the §9.4 freeze threshold. So gv is exclusively in `lpa`,
+    # making it a mutually-exclusive workload like the (removed) coder-next:
+    # requesting gv switches to the `lpa` set, evicts qg + aa + dl, keeps
+    # qw + ne. After ttl 1800 idle, gv unloads and the family revives on
+    # the next probe. See findings §9.10 (+ §9.11 if added).
+    # 2026-06-06 (TASK-HMIG-013): rotated `aa` → `gc`. gemma4-coach (base
+    # Gemma 4 26B-A4B-IT UD-Q4_K_XL) takes architect-agent's always-on slot
+    # to close the F17 Coach verdict-emission gap before the 2026-06-15
+    # cutover. Architect-agent moves to on-demand via the new `arch` set
+    # below — same pattern as `tutor`. See findings §9.13.
+    # 2026-06-21: rotated gc → cfv3 (coach-ft-v3 — fine-tuned bundle-format Coach;
+    # same 26B-A4B footprint as gemma4-coach → memory-neutral). See RESULTS-coach-v3.md.
+    # 2026-07-12 (Lane A specialist-deploy, Rich's in-session call): `gc` JOINS
+    # `all` and `qg` LEAVES it. Before this, NO set held both qw and gc, so every
+    # factory Player↔Coach call pair (007/008 headless drives, autobuild turns)
+    # switched sets — evicting/reloading ~20 GB each way, and twice tonight a
+    # mid-switch request starved >30 min behind interleaved s2s traffic (both
+    # gate drives died on the wall clock; gemma4-coach slot idle throughout).
+    # Co-residency removes the swap from the factory hot path entirely.
+    # Memory: all was ~80 GB; − qg (~25.6 GB, see coach31 note) + gc (~20 GB
+    # incl. 98K q8 KV, see po_eval sizing) ≈ ~75 GB of 121 GB. cfv3 stays.
+    # qg moves to the on-demand `graphiti` set below (tutor/arch pattern) —
+    # graphiti extraction becomes mutually exclusive with the factory family.
+    # Keepalive allowlist unaffected (R-G5: it probes the tutor set only).
+    # Rollback: config.yaml.bak-20260712-pre-gc-coresident.
+    all: "ne & qw & gc & cfv3 & dl & em & pk & qt"
+    # 2026-07-12 (same change): qwen-graphiti on-demand set — requesting qg
+    # evicts the factory family (loud, documented; same pattern as tutor/arch).
+    graphiti: "qg & ne & em & pk & qt"
+    # 2026-06-08 (TASK-OPS-COACH31B): coach31 set — swaps the Coach slot gc → g31
+    # (Gemma 4 31B dense QAT). Requesting `gemma4:31b` switches to this set,
+    # EVICTING gemma4-coach. The keepalive timer probes gemma4-coach every 5 min,
+    # which would revive gc ON TOP of g31 → OOM/freeze; for any g31 session you
+    # MUST first pause it:  sudo systemctl stop llama-swap-keepalive.timer
+    # (re-enable after:     sudo systemctl start llama-swap-keepalive.timer).
+    #
+    # 2026-06-09 (runs 15+16 F23A → GPU/unified-memory exhaustion): trimmed the
+    # set from "qg & ne & qw & g31 & dl" to MINIMAL "qw & g31" (Player + Coach
+    # ONLY). nvidia-smi showed qwen-graphiti alone holds ~25.6 GB GPU; runs 15/16
+    # OOM-killed g31 because the full coach31 fleet left no headroom for g31's KV
+    # to grow on a large Coach prompt (run-16: 71-file Player payload). Dropping
+    # qg + ne + dl frees ~26 GB of unified memory so the dense 31B has room.
+    # REQUIRED: run with `--no-context` so the orchestrator does NOT call graphiti
+    # (qg) / embed (ne) mid-run — else llama-swap would switch sets and evict g31.
+    # If a future run needs Graphiti context, add qg & ne back AND shrink the
+    # Coach (12B QAT) or qw's ctx instead. See run-16-artifacts/README.md.
+    coach31: "qw & g31 & pk & qt"
+    # 2026-05-30: tutor set — `study-tutor` request loads tutor + workhorse
+    # only (evicts graphiti + embed + architect + docling). Sized for short
+    # tutor sessions (~45 GB resident). If a tutor session needs to survive
+    # keepalive probes (5-min cadence revives the `all` family, evicting
+    # tutor), pause the timer first:
+    #     sudo systemctl stop llama-swap-keepalive.timer
+    # Re-enable after the session. Short turns (<5 min between messages) are
+    # unlikely to be hit.
+    # 2026-07-05 (FEAT-APP-001): Coach slot qw → tc (tutor-coach). qwen36-workhorse
+    # (reasoning) emitted non-JSON → MalformedCoachOutputError every turn + ~33-43s;
+    # tutor-coach (base Gemma-4-26B, reasoning off) returns a clean CoachVerdict in
+    # ~9s. Lighter footprint too (no 35B @ 131072 ctx). See the tutor-coach entry.
+    tutor: "gt & tc & em & pk & qt"
+    # 2026-06-06 (TASK-HMIG-013): arch set — `software-architect` /
+    # `architect-agent` request loads architect + workhorse only (evicts
+    # graphiti + embed + gemma4-coach + docling). Sized for /system-arch,
+    # /system-design, /arch-refine, /system-plan sessions (~50 GB resident).
+    # Same keepalive-eviction discipline as `tutor`: pause the timer for
+    # long architect sessions. See findings §9.13.
+    arch: "aa & qw & em & pk & qt"
+    # 2026-05-30/31: LPA sets — granite-vision + workhorse + embed for the
+    # LPA extraction pipeline (vision turns each page into markdown;
+    # workhorse handles downstream structured-extraction reasoning; embed
+    # for vector search). Two parallel sets, one per vision model, both
+    # mutually exclusive with `all` (each evicts qg + aa + dl when loaded).
+    # The LPA POC picks which vision model via DOCLING_VLM_MODEL env var:
+    #   lpa     → granite-vision-4-1-4b   (~56 GB resident; per §9.11)
+    #   lpa_v3  → granite-vision-3-3-2b   (~45-50 GB resident; per §9.12,
+    #              fallback after 4.1-4b's page-4 EOS-collapse pattern
+    #              proved un-tuneable across 7 Ashworth smokes)
+    # Only one vision model loads at a time — they're substitutable. See
+    # lpa-platform-poc/docs/history/lpa-extraction-e2e-smoke-4.md.
+    lpa: "gv & qw & ne & em & pk & qt"
+    lpa_v3: "gv33 & qw & ne & em & pk & qt"
+    # 2026-05-30: coder-next removed — see findings §9.9. coder-30b remains as
+    # an opt-in code-tuned alternative (requesting `autobuild-coder` evicts
+    # the family for the build).
+    coder_30b: "qc & pk & qt"
+    # 2026-06-15: autobuild Player-upgrade experiment. GPT-OSS-120B Player +
+    # gemma4-coach Coach, EXCLUSIVE — requesting `autobuild-player` / `gpt-oss-120b`
+    # evicts the qg/ne/qw/dl fleet. ~95-105 GB peak / 121 GB. MUST pause the
+    # keepalive timer (sudo systemctl stop llama-swap-keepalive.timer) + run
+    # autobuild with `--no-context` (same discipline as coach31), else the
+    # keepalive revives the fleet on top of gpt-oss → OOM.
+    autobuild_go: "go & gc & pk & qt"
+    # 2026-07-02 (PO Phase 0 golden-set diagnosis): po_eval set — gemma4-26b
+    # (g26, the MoE base UNDER TEST) + gpt-oss-120b (go, the Coach/gate),
+    # co-resident so score_golden_set.py hits BOTH without per-item swapping.
+    # Same footprint as autobuild_go (~95-105 GB peak / 121 GB: go ~63 GB + a
+    # 26B gemma ~20 GB + KV); evicts the qg/ne/qw/cfv3/dl fleet. Requesting
+    # gemma4-26b activates this set. REQUIRES the keepalive timer paused
+    # (sudo systemctl stop llama-swap-keepalive.timer) — same discipline as
+    # autobuild_go/coach31 — else keepalive revives the fleet on top → OOM.
+    # Rollback: delete this set + the `g26` var.
+    po_eval: "go & g26 & pk & qt"
+
+# 2026-05-30: preload set rotated — gemma4-tutor → architect-agent (same Gemma
+# 4 26B-A4B GGUF family, different chat template/role). Tutor moved to
+# on-demand via the `tutor` matrix.set; architect-agent took the always-on
+# slot to keep /system-arch /system-design /arch-refine /system-plan hot.
+# Steady-state ~80 GB (was ~76 with tutor; architect's ctx 65K adds ~5 GB KV
+# vs tutor's ctx 32K). MUST equal the keepalive allowlist in
+# scripts/llama-swap-keepalive.sh (MODEL_PROBE_KIND). See findings §9.9.
+#
+# 2026-06-06 (TASK-HMIG-013): preload set rotated again — architect-agent →
+# gemma4-coach (base Gemma 4 26B-A4B-IT UD-Q4_K_XL, same family / ctx 65K /
+# Q4_K_XL footprint, different posture: no Socratic / no thinking template).
+# Coach role is the active hot path before the 2026-06-15 cutover; architect
+# is now on-demand via the `arch` matrix.set. Same MUST-equal-keepalive
+# discipline as §9.9. Steady-state ~80 GB unchanged. See findings §9.13.
+hooks:
+  on_startup:
+    preload:
+      # voice-unified 2026-07-05: audio pair FIRST — small (~8 GB combined)
+      # and their CUDA context creation fails if the family loads first and
+      # leaves the box near the ceiling (see audio-qwen3tts.sh memory trap).
+      - parakeet-tdt-0.6b-v3
+      - qwen3-tts-0.6b
+      # R-G5 2026-07-06: `tutor` set is the standing default (decided 2026-07-05,
+      # executed at W0-R Phase 6). Old `all`-family preload (qg/ne/qw/cfv3) retired
+      # from startup — those models now load on demand via their sets. MUST equal
+      # the keepalive allowlist in /usr/local/bin/llama-swap-keepalive.sh.
+      - gemma4-tutor
+      - tutor-coach
+      - embed
+
+# gpt-oss-120b Player entry staged 2026-06-15 (TASK Player-upgrade experiment)
