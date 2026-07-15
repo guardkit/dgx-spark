@@ -1,0 +1,386 @@
+# =============================================================================
+# CONFIGURATION-OF-RECORD — Node B (spark-fcf6) llama-swap live config
+# Source box: spark-fcf6 · source path: /opt/llama-swap/config/config.yaml
+# Captured: 2026-07-15 (read-only over ssh, keyring agent socket) by the
+# register close-out coordinator (MA-26 Node B leg — the Node A capture's twin).
+# Sync law: the box file is the live truth; this tracked copy is the record;
+# any box edit updates this copy in the same session.
+# Leak-swept on capture (grep -icE 'password|secret|bearer|api[_-]?key'): 0 hits.
+# Known un-ratified divergence pinned at capture (register MA-26, Rich's call):
+#   /opt/llama-swap/scripts/vllm-granite-vision.sh line 88:
+#     .bak-20260712-pre-image-limit: --limit-mm-per-prompt.image=1
+#     live:                          --limit-mm-per-prompt.image=6
+# =============================================================================
+# =============================================================================
+# llama-swap — PUBLIC / general-purpose DGX Spark (GB10) config
+# =============================================================================
+# A reproducible, all-open-model multi-model inference box on :9000, built to be
+# stood up by an agent running RUNBOOK-single-spark-bring-up.md. Every model here
+# is a public, downloadable GGUF — no fine-tunes — so a viewer can replicate the
+# whole box (this is the config the DDD South West / YouTube demo deploys).
+#
+# Hardware target: NVIDIA GB10 (Blackwell SM121), 128 GB unified (~121 GB usable,
+# safe ceiling ~115 GB). Served by a llama.cpp built for SM121 (121a-real).
+#
+# -----------------------------------------------------------------------------
+# Always-on fleet (preloaded) — ~65-71 GB resident, ~45 GB headroom:
+#   workhorse  Qwen3.6-35B-A3B-Instruct  (Player / agentic coder)
+#   coach      Gemma-4-26B-A4B-it  (stock — the open base of the GuardKit Coach)
+#   chat       gpt-oss-20b  (fast general chat / reasoner)
+#   embed      Qwen3-Embedding-0.6B  (RAG; 1024-dim)
+# On-demand (optional, exclusive — evicts the fleet while loaded):
+#   gpt-oss-120b  the "big-brain" Player you can swap in for hard runs
+#
+# This pair (Qwen3.6-35B-A3B + Gemma-4-26B-A4B) is the community/NVIDIA-proven
+# single-GB10 lineup: Spark Arena ranks Qwen3.6-35B quants top of the leaderboard
+# (beating gpt-oss-120B and Gemma-4-26B), NVIDIA's own dgx-spark-playbooks demo
+# Qwen3.6-35B-A3B UD-Q4_K_XL for local coding agents, and Gemma-4-26B-A4B scored
+# 17/17 on JSON-discipline + tool-calling (Exxact benchmark) — the Coach posture.
+# Why MoE, not dense: GB10's ~270 GB/s unified bandwidth makes dense models
+# bandwidth-bound (~8 tok/s); MoE moves only active params → 31-50 tok/s.
+#
+# -----------------------------------------------------------------------------
+# Models to download (HuggingFace) into /opt/llama-swap/models/<dir>/ :
+#   unsloth/Qwen3.6-35B-A3B-GGUF          UD-Q4_K_XL  (~22 GB)  -> qwen36-35b/
+#   unsloth/gemma-4-26B-A4B-it-GGUF       UD-Q4_K_XL  (~17 GB)  -> gemma4-coach/
+#   unsloth/gpt-oss-20b-GGUF              MXFP4       (~12 GB)  -> gpt-oss-20b/
+#   Qwen/Qwen3-Embedding-0.6B-GGUF        Q8_0        (~0.6 GB) -> qwen3-embed/
+#   ggml-org/gpt-oss-120b-GGUF            MXFP4       (~63 GB)  -> gpt-oss-120b/  (optional)
+# Use HF_HUB_ENABLE_HF_TRANSFER=1; glob with -iname (files are lowercase on disk).
+# Adjust the absolute --model paths below to wherever you stage the GGUFs.
+#
+# -----------------------------------------------------------------------------
+# Gotchas encoded AS config (each maps to a RUNBOOK-CONVENTIONS §8 registry row):
+#   --no-mmap            mmap on unified memory is severely slow on GB10
+#   --cache-type-k/v q8_0  on large-ctx models (f16 KV degrades / blows the ceiling)
+#   -ngl 999             offload all layers to the GPU
+#   --jinja              required for tool-calling (else plain text, no tool_use)
+#   --reasoning off/auto Gemma-4 / gpt-oss leak chain-of-thought into
+#                        reasoning_content with empty content unless set correctly
+#   healthCheckTimeout 600   120B-class cold load exceeds the default -> 504
+#   matrix.sets[all]     declares the fleet coexists -> no load->kill->load thrash
+#   binary at /usr/local/bin/llama-server  (the SM121 build, copied there in
+#                        RUNBOOK Phase 2; confirm it shows up in nvidia-smi
+#                        compute-apps during inference — not a CPU fallback)
+# =============================================================================
+
+healthCheckTimeout: 600
+startPort: 5800
+logLevel: info
+globalTTL: 0           # never auto-unload on idle (preloaded fleet stays hot)
+
+models:
+  # ---------------------------------------------------------------------------
+  # WORKHORSE / Player — Qwen3.6-35B-A3B-Instruct (35B total / 3B active MoE).
+  # The agentic coder. Native 262K ctx; runs 131072 here. ~41 tok/s warm.
+  # GuardKit autobuild Player + a Claude-compatible alias so Claude Code /
+  # OpenCode / Codex clients can point straight at it.
+  # ---------------------------------------------------------------------------
+  "workhorse":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen36-35b/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+      --alias workhorse
+      --ctx-size 131072
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.6
+      --top-p 0.95
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "autobuild-player"
+      - "qwen36-workhorse"
+      - "claude-sonnet-4-6"   # so Claude Code / Anthropic-compatible clients resolve
+
+  # ---------------------------------------------------------------------------
+  # COACH — stock Gemma-4-26B-A4B-it (25B total / 3.8B active MoE), UD-Q4_K_XL.
+  # The OPEN base of GuardKit's fine-tuned Coach, so the Player/Coach autobuild
+  # demo is identical to production with a fully downloadable model. Coach
+  # posture: deterministic JSON (--temp 0.1). q8_0 KV keeps the doubled ctx in
+  # budget. --reasoning auto (the base IT model's embedded template); if Coach
+  # turns emit empty content + chain-of-thought in reasoning_content, switch to
+  # --reasoning off (see CONVENTIONS §8 reasoning row).
+  # ---------------------------------------------------------------------------
+  "coach":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+      --alias coach
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "autobuild-coach"
+      - "gemma4-coach"
+      - "gemma4:26b"
+
+  # ---------------------------------------------------------------------------
+  # CHAT — gpt-oss-20b (21B total / 3.6B active, native MXFP4), ~50 tok/s.
+  # Fast general chat / light reasoner so the box is a real local-AI box, not
+  # just an autobuild rig. gpt-oss uses the harmony format via --jinja;
+  # --reasoning auto controls effort. OpenAI's recommended sampling is temp 1.0.
+  # ---------------------------------------------------------------------------
+  "chat":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gpt-oss-20b/gpt-oss-20b-mxfp4.gguf
+      --alias chat
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --reasoning auto
+      --temp 1.0
+      --top-p 1.0
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "gpt-oss-20b"
+      - "openai/gpt-oss-20b"
+
+  # ---------------------------------------------------------------------------
+  # EMBED — Qwen3-Embedding-0.6B (1024-dim). RAG embeddings. Last-token pooling
+  # (a Qwen3-Embedding requirement). Negligible footprint; the model supports 32K.
+  #
+  # ⚠️ EFFECTIVE per-request ctx = --ctx-size ÷ -np. llama.cpp splits n_ctx
+  #    across the -np parallel slots, so 32768 ÷ 4 = 8192 tokens/slot — and that
+  #    8192 (NOT --ctx-size) is the real ceiling on a single /v1/embeddings
+  #    input. Any input over the per-slot ctx returns HTTP 400
+  #    exceed_context_size. This block previously shipped --ctx-size 8192 -np 4
+  #    (= 2048/slot); the first fleet-memory harvest sent multi-chunk episodes
+  #    >2048 tok, got 400s, and silently dropped 109/447 episodes (incident
+  #    2026-06-26, fleet-memory TASK-FIX-EMBEDCTX01). --ubatch-size 8192 matches
+  #    the 8192/slot ctx so a single ≤8192-tok sequence embeds in one pass.
+  #    Consumers MUST keep each embed request ≤ 8192 tokens (the fleet-memory
+  #    relay sub-batches to this budget — TASK-FIX-RELAYBATCH01). For >8192-tok
+  #    single requests you must reduce -np (e.g. -np 1 → 32768/slot) AND raise
+  #    --batch-size/--ubatch-size to match, which needs on-box memory validation.
+  #
+  # NOTE for GuardKit/Graphiti users: this is 1024-dim. nomic-embed-text-v1.5
+  # is the 768-dim drop-in if you must match an existing 768-dim index — BUT
+  # nomic-embed-text-v1.5 GGUFs report n_ctx_train=2048 and llama.cpp CLAMPS
+  # per-slot ctx to that, so a nomic embedder is HARD-capped at 2048 tokens
+  # regardless of --ctx-size/-np (verified on-box 2026-06-26). Its consumers
+  # must chunk ≤2048 (or enable yarn rope-scaling, at an embedding-quality
+  # risk). Qwen3-Embedding above has n_ctx_train=32768, so bumping its ctx is
+  # genuinely effective — the two embedders are NOT symmetric here.
+  # ---------------------------------------------------------------------------
+  "embed":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/qwen3-embed/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --alias embed
+      --embedding
+      --pooling last
+      --ctx-size 32768
+      --batch-size 8192
+      --ubatch-size 8192
+      --threads 16
+      -ngl 999
+      --no-mmap
+      -np 4
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 8
+    aliases:
+      - "qwen3-embedding"
+      - "embeddings"
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL on-demand "big-brain" Player — gpt-oss-120b (117B / 5.1B active,
+  # native MXFP4, ~63 GB weights). CANNOT be always-on: 63 GB + KV cannot
+  # co-reside with the fleet under 115 GB. Lives in its own exclusive matrix.set
+  # (`big`) — requesting it EVICTS the fleet. On a fresh box, delete this block
+  # if you don't want the ~63 GB download. Single-node ~35 tok/s stock (the
+  # 80 tok/s figure is TP=2 across TWO Sparks — not single-node).
+  # ---------------------------------------------------------------------------
+  "gpt-oss-120b":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gpt-oss-120b/gpt-oss-120b-mxfp4-00001-of-00003.gguf
+      --alias gpt-oss-120b
+      --ctx-size 98304
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --jinja
+      --reasoning auto
+      --temp 0.7
+      --top-p 0.95
+      -np 1
+    checkEndpoint: /health
+    ttl: 600                 # on-demand: auto-unload after 10 min idle
+    concurrencyLimit: 2
+    aliases:
+      - "openai/gpt-oss-120b"
+      - "gpt-oss"
+
+  # ---------------------------------------------------------------------------
+  # VLM SEAT — granite-vision-4.1-4b (IBM, Apache-2.0) served by vLLM in a docker
+  # container spawned per-request by llama-swap (NOT llama.cpp/GGUF). Added by
+  # RUNBOOK-granite-vision-seat.md 2026-07-11 (this box's first docker seat).
+  # On-demand (ttl 1800). Member of the `all` set below: fleet ~71 GB + gv ~26 GB
+  # observed resident ≈ 97 GB, under the ~115 GB ceiling — so gv co-resides with
+  # the always-on fleet (deliberate matrix-set decision, RESULTS-granite-vision-
+  # seat-spark-fcf6.md), which also avoids the keepalive-eviction thrash Node A's
+  # lpa-only set hit. Launch/serving WHY lives in the script header.
+  # ---------------------------------------------------------------------------
+  "granite-vision-4-1-4b":
+    cmd: /opt/llama-swap/scripts/vllm-granite-vision.sh ${PORT}
+    cmdStop: docker stop vllm-granite-vision
+    checkEndpoint: /health
+    ttl: 1800                # on-demand: auto-unload after 30 min idle
+    concurrencyLimit: 4
+    aliases:
+      - "granite-vision-4.1-4b"
+      - "granite-vision"
+
+# matrix.sets declare which models may be co-resident so the solver never evicts
+# a fleet member to serve a sibling request (the v208+ eviction-thrash gotcha).
+
+  # ---------------------------------------------------------------------------
+  # STUDY-TUTOR PAIR — added 2026-07-13 (gamification-engine live walk; served
+  # to the Dell GB10's study_tutor_http :8100 container over tailnet).
+  # Entries mirror the Dell's /opt/llama-swap/config.yaml verbatim (tutor-coach
+  # MUST keep --reasoning off / --reasoning-budget 0 — the thinking template
+  # does not yield parseable CoachVerdict JSON). Same coach GGUF the `coach`
+  # entry serves; separate process, separate flags.
+  # CAPACITY (121 GB box): pair ≈ 33 GB resident. Does NOT fit alongside the
+  # full fleet + ComfyUI (~107 GB observed 2026-07-13) — hence the `tutor`
+  # matrix set below swaps out wh+co instead of joining `all`. Pause the
+  # keepalive timer during tutoring windows or its wh/co probes ping-pong the
+  # pair:  sudo systemctl stop llama-swap-keepalive.timer
+  # ---------------------------------------------------------------------------
+  "gemma4-tutor":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-tutor/gemma-4-26b-a4b-it.Q4_K_M.gguf
+      --alias gemma4-tutor
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --chat-template-file /opt/llama-swap/config/gemma4-tutor.jinja
+      --temp 0.7
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+    aliases:
+      - "study-tutor"
+      - "gcse-tutor"
+
+  "tutor-coach":
+    cmd: >
+      /usr/local/bin/llama-server
+      --port ${PORT}
+      --host 0.0.0.0
+      --model /opt/llama-swap/models/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+      --alias tutor-coach
+      --ctx-size 32768
+      --batch-size 2048
+      --ubatch-size 2048
+      --threads 16
+      -ngl 999
+      --no-mmap
+      --flash-attn on
+      --jinja
+      --reasoning off
+      --reasoning-budget 0
+      --temp 0.1
+      --top-p 0.9
+      -np 1
+    checkEndpoint: /health
+    ttl: 0
+    concurrencyLimit: 2
+
+matrix:
+  vars:
+    wh: workhorse
+    co: coach
+    ch: chat
+    em: embed
+    go: gpt-oss-120b
+    gv: granite-vision-4-1-4b
+    tu: gemma4-tutor
+    tc: tutor-coach
+  sets:
+    # The always-on fleet + the on-demand granite-vision VLM. gv co-resides
+    # (fleet ~71 GB + gv ~26 GB ≈ 97 GB < ~115 GB ceiling) and unloads at its
+    # ttl 1800 when idle; being in `all` means a gv request never evicts a fleet
+    # member and the keepalive's fleet probes never evict gv.
+    all: "wh & co & ch & em & gv"
+    # Optional big-brain Player: gpt-oss-120b + coach, EXCLUSIVE. Requesting
+    # gpt-oss-120b evicts the fleet (chat + embed + the small workhorse). Pause
+    # the keepalive timer before a long run so it doesn't revive the fleet on
+    # top of the 120b -> OOM:  sudo systemctl stop llama-swap-keepalive.timer
+    big: "go & co"
+    # Tutoring window (2026-07-13): the study-tutor pair + light chat/embed.
+    # Requesting gemma4-tutor/tutor-coach evicts wh+co (~37 GB) so the pair
+    # (~33 GB) fits beside ComfyUI. Pause the keepalive timer for the window.
+    tutor: "tu & tc & ch & em"
+
+# Preload the always-on fleet at startup for a deterministic cold start.
+# This list MUST equal the keepalive allowlist (scripts/llama-swap-keepalive.sh
+# MODEL_PROBE_KIND) — llama-swap does not auto-revive crashed children, so the
+# keepalive timer must probe exactly the preloaded set.
+hooks:
+  on_startup:
+    preload:
+      - workhorse
+      - coach
+      - chat
+      - embed

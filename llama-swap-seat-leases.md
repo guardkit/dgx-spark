@@ -84,9 +84,26 @@ A second lane that runs step 2 against a seat you hold is refused loudly, naming
 
 The factory register (`ai-transition docs/factory-gap-analysis-2026-07-13.md`) carries the factory-side seat/reservation rows. This convention is the shared mechanism they point at — **coordinate, do not duplicate**: the lease-file layout and laws live here; factory rows describe how each factory surface consumes them.
 
-## Residue — Node B and the granite-vision cap (Rich-queue / attended)
+## Residue — the granite-vision cap decision (Rich-queue)
 
-The following are **out of this pass** and stay on Rich's attended queue:
+**Updated 2026-07-15, same day (coordinator follow-up):** the "ssh denied" was an environment
+artifact — headless shells lack the keyring agent socket; with
+`SSH_AUTH_SOCK=/run/user/1000/keyring/ssh` Node B opens read-only. The Node B legs were then
+done in this pass after all:
 
-- **Node B (`spark-fcf6`) legs — ssh denied.** This pass covered Node A (`promaxgb10-41b1`) only: the lease tool, convention, live `/opt/llama-swap/leases/` directory, and the config-of-record are Node A's. Node B needs its own lease directory drop and its **own topology capture** (its `config.yaml` is not yet tracked here); both require box access this session did not have.
-- **The granite-vision launch-script image-cap `1 → 6` change on Node B.** A lane mutated Node B's granite-vision launch script (image cap raised from 1 to 6) leaving a `.bak` on the box and **no ratify-or-revert record** — a re-provision silently reverts it (register MA-26; related recorded Node B granite-vision drift in [`DRIFT-granite-vision-seat-2026-07-11.md`](./DRIFT-granite-vision-seat-2026-07-11.md)). For reference, Node A's granite-vision launch script (`scripts/vllm-granite-vision.sh`) still ships the original `--limit-mm-per-prompt.image=1`. Committing that cap change as configuration-of-record (ratify or revert) needs Node B access and is Rich's call.
+- **Node B topology CAPTURED:** [`examples/llama-swap-config.spark-fcf6-live-2026-07-15.yaml`](./examples/llama-swap-config.spark-fcf6-live-2026-07-15.yaml)
+  (live `/opt/llama-swap/config/config.yaml`, leak-swept, provenance header, same sync law as
+  Node A's capture).
+- **Node B lease directory DROPPED:** `/opt/llama-swap/leases/` + README.txt exist on
+  `spark-fcf6` (mirroring Node A; no service touched).
+- **The image-cap change PINNED byte-precise** (no longer un-recorded):
+  `/opt/llama-swap/scripts/vllm-granite-vision.sh` line 88 —
+  `.bak-20260712-pre-image-limit` carries `--limit-mm-per-prompt.image=1`, the live script
+  carries `--limit-mm-per-prompt.image=6`. A re-provision can now be recovered from this
+  record either way.
+
+**What remains Rich's (the only open leg): the ratify-or-revert call on `image=1 → 6`.**
+Ratify = commit the live script's cap here as configuration-of-record (and delete the `.bak`);
+revert = restore the `.bak`. Context: register MA-26 + the recorded Node B drift in
+[`DRIFT-granite-vision-seat-2026-07-11.md`](./DRIFT-granite-vision-seat-2026-07-11.md). For
+reference, Node A's tracked `scripts/vllm-granite-vision.sh` still ships `image=1`.
