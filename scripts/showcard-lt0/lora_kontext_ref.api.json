@@ -1,0 +1,189 @@
+{
+  "91": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux1-kontext-dev.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "SC_CKPT"
+    }
+  },
+  "11": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "_meta": {
+      "title": "VAELoader"
+    }
+  },
+  "92": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": ["91", 0],
+      "lora_name": "rw0man_lt0.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "SC_LORA"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["11", 0],
+      "text": "rw0man person in a clean brightly lit modern studio"
+    },
+    "_meta": {
+      "title": "SC_PROMPT",
+      "text_field": "text"
+    }
+  },
+  "40": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "SC_SUBJECT_IMAGE",
+      "image_field": "image"
+    }
+  },
+  "41": {
+    "class_type": "FluxKontextImageScale",
+    "inputs": {
+      "image": ["40", 0]
+    },
+    "_meta": {
+      "title": "FluxKontextImageScale"
+    }
+  },
+  "42": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": ["41", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": {
+      "title": "VAEEncode_reference"
+    }
+  },
+  "43": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "latent": ["42", 0]
+    },
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "60": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "conditioning": ["43", 0],
+      "guidance": 2.5
+    },
+    "_meta": {
+      "title": "SC_GUIDANCE"
+    }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["92", 0],
+      "conditioning": ["60", 0]
+    },
+    "_meta": {
+      "title": "BasicGuider"
+    }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "17": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": ["92", 0],
+      "scheduler": "simple",
+      "steps": 48,
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "SC_STEPS"
+    }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    },
+    "_meta": {
+      "title": "SC_SEED",
+      "seed_field": "noise_seed"
+    }
+  },
+  "90": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "SC_SIZE"
+    }
+  },
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["17", 0],
+      "latent_image": ["90", 0]
+    },
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": {
+      "title": "VAEDecode"
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "lt0_b"
+    },
+    "_meta": {
+      "title": "SaveImage"
+    }
+  }
+}

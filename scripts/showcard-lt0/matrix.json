@@ -1,0 +1,64 @@
+{
+  "server": "http://127.0.0.1:8188",
+  "renders_dir": "/home/richardwoollcott/showcard-sessions/lt0-20260717/renders",
+  "renders": [
+    {
+      "name": "a-studio-42",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, professional studio portrait, deep indigo gradient backdrop with soft radial lighting fading to dark edges, shallow depth of field, chest-up framing, sharp focus on the face, cinematic, high detail photograph",
+      "seed": 42, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "a-studio-8675309",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, professional studio portrait, deep indigo gradient backdrop with soft radial lighting fading to dark edges, shallow depth of field, chest-up framing, sharp focus on the face, cinematic, high detail photograph",
+      "seed": 8675309, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "a-tech-42",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, energetic tech scene, sitting at a desk with visible computer hardware and glowing screens behind, dynamic warm lighting, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 42, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "a-tech-8675309",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, energetic tech scene, sitting at a desk with visible computer hardware and glowing screens behind, dynamic warm lighting, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 8675309, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "a-outdoor-42",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, natural-light outdoor casual portrait, soft daylight, green park foliage softly blurred in the background, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 42, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "a-outdoor-8675309",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_dev_plain.api.json",
+      "prompt": "rw0man person, natural-light outdoor casual portrait, soft daylight, green park foliage softly blurred in the background, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 8675309, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0, "subject": null
+    },
+    {
+      "name": "b-studio-42",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_kontext_ref.api.json",
+      "prompt": "rw0man person in a clean brightly lit modern studio, deep indigo gradient backdrop, soft radial lighting, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 42, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0,
+      "subject": "/home/richardwoollcott/showcard-sessions/lt0-20260717/work/refs/heldout_DSC00044.JPG"
+    },
+    {
+      "name": "b-tech-42",
+      "graph": "/home/richardwoollcott/Projects/appmilla_github/dgx-spark/scripts/showcard-lt0/lora_kontext_ref.api.json",
+      "prompt": "rw0man person at a desk with visible computer hardware and glowing screens behind, energetic tech scene, dynamic warm lighting, chest-up framing, sharp focus on the face, high detail photograph",
+      "seed": 42, "width": 1280, "height": 720, "steps": 48,
+      "lora": "rw0man_lt0.safetensors", "lora_strength": 1.0,
+      "subject": "/home/richardwoollcott/showcard-sessions/lt0-20260717/work/refs/heldout_DSC00044.JPG"
+    }
+  ]
+}

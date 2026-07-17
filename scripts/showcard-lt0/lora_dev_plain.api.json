@@ -1,0 +1,162 @@
+{
+  "91": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "flux1-dev.safetensors"
+    },
+    "_meta": {
+      "title": "SC_CKPT"
+    }
+  },
+  "11": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "_meta": {
+      "title": "VAELoader"
+    }
+  },
+  "92": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": ["91", 0],
+      "lora_name": "rw0man_lt0.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "SC_LORA"
+    }
+  },
+  "61": {
+    "class_type": "ModelSamplingFlux",
+    "inputs": {
+      "model": ["92", 0],
+      "max_shift": 1.15,
+      "base_shift": 0.5,
+      "width": 1280,
+      "height": 720
+    },
+    "_meta": {
+      "title": "ModelSamplingFlux"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["11", 0],
+      "text": "rw0man person"
+    },
+    "_meta": {
+      "title": "SC_PROMPT",
+      "text_field": "text"
+    }
+  },
+  "60": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "conditioning": ["6", 0],
+      "guidance": 3.5
+    },
+    "_meta": {
+      "title": "SC_GUIDANCE"
+    }
+  },
+  "22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": ["61", 0],
+      "conditioning": ["60", 0]
+    },
+    "_meta": {
+      "title": "BasicGuider"
+    }
+  },
+  "16": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "17": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": ["61", 0],
+      "scheduler": "simple",
+      "steps": 48,
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "SC_STEPS"
+    }
+  },
+  "25": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    },
+    "_meta": {
+      "title": "SC_SEED",
+      "seed_field": "noise_seed"
+    }
+  },
+  "90": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1280,
+      "height": 720,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "SC_SIZE"
+    }
+  },
+  "13": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": ["25", 0],
+      "guider": ["22", 0],
+      "sampler": ["16", 0],
+      "sigmas": ["17", 0],
+      "latent_image": ["90", 0]
+    },
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["13", 0],
+      "vae": ["10", 0]
+    },
+    "_meta": {
+      "title": "VAEDecode"
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["8", 0],
+      "filename_prefix": "lt0_a"
+    },
+    "_meta": {
+      "title": "SaveImage"
+    }
+  }
+}
