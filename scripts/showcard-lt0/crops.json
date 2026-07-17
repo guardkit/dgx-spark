@@ -1,0 +1,26 @@
+{
+  "_comment": "showcard LT-0 dataset crop boxes. Filenames + boxes only (NO image bytes). Boxes are [left, top, right, bottom] in EXIF-TRANSPOSED full-resolution pixel coords (all source frames are 7008x4672 after ImageOps.exif_transpose). dataset_prep.py applies exif_transpose FIRST, then this crop, then resizes longest side to 1024. Boxes authored after viewing every source photo; subject fills most of frame with generous headroom, face prominent.",
+  "_source_dims_post_transpose": [7008, 4672],
+  "crops": {
+    "DSC00039.JPG": [1822, 234, 5046, 4298],
+    "DSC00041.JPG": [1752, 234, 5606, 4438],
+    "DSC00042.JPG": [1752, 234, 5606, 4438],
+    "DSC00045.JPG": [1752, 234, 5606, 4438],
+    "DSC00047.JPG": [1752, 234, 5606, 4438],
+    "DSC00049.JPG": [1752, 234, 5606, 4438],
+    "DSC00051.JPG": [1752, 234, 5606, 4438],
+    "DSC00054.JPG": [1752, 234, 5606, 4438],
+    "DSC00055.JPG": [1752, 234, 5606, 4438],
+    "DSC00058.JPG": [1752, 234, 5606, 4438],
+    "DSC00060.JPG": [1752, 234, 5606, 4438],
+    "DSC00065.JPG": [1752, 234, 5606, 4438],
+    "DSC00069.JPG": [2383, 234, 6307, 4438],
+    "DSC00070.JPG": [2383, 234, 6307, 4438],
+    "DSC00072.JPG": [2383, 234, 6307, 4438],
+    "DSC00076.JPG": [1752, 234, 5606, 4438],
+    "DSC00078.JPG": [1752, 234, 5606, 4438],
+    "DSC00084.JPG": [1752, 234, 5606, 4438],
+    "DSC00087.JPG": [1752, 234, 5606, 4438],
+    "DSC00093.JPG": [1752, 234, 5606, 4438]
+  }
+}
