@@ -137,7 +137,7 @@ llama-swap seats:
 **Attempt 2 — exclusive box (13:29:53 → 19:29:01, completed).** 500/500 steps, exit
 0. Per-step rate **~42–53 s/it** (52.65 s/it warming at step 20, settling to
 ~42–46 s/it; final `500/500 [5:52:48<00:00, 42.34s/it]`). Checkpoints saved at
-steps 25/50/75 and the final adapter.
+epochs 25/50/75 and the final adapter.
 
 ### 2d. Wall-clock finding (contradicts the handoff's cited class)
 
