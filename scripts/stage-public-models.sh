@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# stage-public-models.sh — stage ALL FOUR public-config model GGUFs. Idempotent.
+# stage-public-models.sh — stage the THREE public-config model GGUFs. Idempotent.
 #
 # This is invoked BY the runbook as an execution step (RUNBOOK-single-spark-bring-up Phase 1.5) —
 # it is NOT a manual prerequisite. Run it directly only if you want to pre-warm the downloads.
 #
-# Downloads the four models the public config (examples/llama-swap-config.public.yaml) serves,
+# Downloads the three models the public config (examples/llama-swap-config.public.yaml) serves,
 # into the served dir, and makes each on-disk filename match the config's `--model` path
-# (Unsloth ships uppercase e.g. *-MXFP4.gguf — we symlink to the exact expected name).
-# Models already on disk are skipped (so on the reference box only chat+embed download).
+# (upstream filenames differ in case — we symlink to the exact expected name).
+# Models already on disk are skipped (so on the reference box only embed downloads).
 set -euo pipefail
 
 MODELS_DIR="${MODELS_DIR:-/opt/llama-swap/models}"
@@ -39,13 +39,12 @@ stage() {
 stage "unsloth/Qwen3.6-35B-A3B-GGUF"      "qwen36-35b"   "Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"       "*UD-Q4_K_XL*"
 # coach — stock Gemma-4-26B-A4B-it (~17 GB)
 stage "unsloth/gemma-4-26B-A4B-it-GGUF"   "gemma4-coach" "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"    "*UD-Q4_K_XL*"
-# chat — gpt-oss-20b NATIVE MXFP4 (~12 GB). Source is ggml-org, NOT unsloth: the
-# official ggml-org/gpt-oss-20b-GGUF ships the single native-MXFP4 file
-# gpt-oss-20b-mxfp4.gguf, whereas unsloth/gpt-oss-20b-GGUF has only re-quantised
-# variants (F16/Q4_K_M/UD-Q4_K_XL/…) with NO *mxfp4* file — so the old unsloth
-# glob matched nothing, produced no .gguf, and aborted staging under `set -e`
-# before embed ever ran (observed 2026-07-11). Keep gpt-oss native MXFP4.
-stage "ggml-org/gpt-oss-20b-GGUF"         "gpt-oss-20b"  "gpt-oss-20b-mxfp4.gguf"                "*mxfp4*" "*MXFP4*"
+# (gpt-oss-20b `chat` RETIRED from the lineup 2026-08-01 — redundant beside the two
+#  2026 MoEs. Its hard-won lesson STAYS: include-globs MUST match files the repo
+#  actually ships — a non-matching glob downloads nothing and aborts the whole
+#  staging under `set -e` before later models run (observed 2026-07-11: unsloth's
+#  gpt-oss repo had no *mxfp4* file). When adding a model, check the repo's file
+#  list against the glob first.)
 # embed — Qwen3-Embedding-0.6B (Q8_0, ~0.6 GB)
 stage "Qwen/Qwen3-Embedding-0.6B-GGUF"    "qwen3-embed"  "Qwen3-Embedding-0.6B-Q8_0.gguf"        "*Q8_0*" "*q8_0*"
 
@@ -55,11 +54,10 @@ ok=1
 for p in \
   "$MODELS_DIR/qwen36-35b/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf" \
   "$MODELS_DIR/gemma4-coach/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf" \
-  "$MODELS_DIR/gpt-oss-20b/gpt-oss-20b-mxfp4.gguf" \
   "$MODELS_DIR/qwen3-embed/Qwen3-Embedding-0.6B-Q8_0.gguf"; do
   if [ -e "$p" ]; then echo "   OK       $p"; else echo "   MISSING  $p"; ok=0; fi
 done
-[ "$ok" = 1 ] && echo "✅ all four public models staged." || { echo "❌ something missing — check the HF download output above"; exit 1; }
+[ "$ok" = 1 ] && echo "✅ all three public models staged." || { echo "❌ something missing — check the HF download output above"; exit 1; }
 
 # NOTE: if a workhorse/coach repo ever ships SHARDED (…00001-of-000NN.gguf), point the config
 # --model at the 00001 shard instead of symlinking a single name (llama.cpp auto-loads the rest).

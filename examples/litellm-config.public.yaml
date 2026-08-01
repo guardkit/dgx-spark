@@ -51,11 +51,6 @@ model_list:
       model: openai/coach              # Gemma-4-26B-A4B-it (stock; the open Coach base)
       api_base: http://localhost:9000/v1
       api_key: "none"
-  - model_name: chat
-    litellm_params:
-      model: openai/chat               # gpt-oss-20b (fast general chat / reasoner)
-      api_base: http://localhost:9000/v1
-      api_key: "none"
   - model_name: embed
     litellm_params:
       model: openai/embed              # Qwen3-Embedding-0.6B (1024-dim, RAG)

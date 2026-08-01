@@ -6,9 +6,10 @@
 # Designed to run from a systemd timer every ~5 minutes.
 #
 # MODEL_PROBE_KIND MUST equal hooks.on_startup.preload in
-# /opt/llama-swap/config/config.yaml. For the PUBLIC config that is the four
-# always-on models: workhorse, coach, chat, embed (NOT the operator's personal
-# qwen-graphiti/nomic-embed/coach-ft-v3 lineup — see repo scripts/ copy).
+# /opt/llama-swap/config/config.yaml. For the PUBLIC config that is the three
+# always-on models: workhorse, coach, embed (gpt-oss-20b `chat` was retired from
+# the lineup 2026-08-01; NOT the operator's personal qwen-graphiti/nomic-embed/
+# coach-ft-v3 lineup — see repo scripts/ copy).
 #
 # Exit codes: 0 all running (revived where needed) · 1 admin unreachable ·
 #   2 unexpected response shape · 3 one or more revival attempts failed
@@ -26,7 +27,6 @@ LOG_TAG="llama-swap-keepalive"
 declare -A MODEL_PROBE_KIND=(
     [workhorse]=chat
     [coach]=chat
-    [chat]=chat
     [embed]=embed
 )
 

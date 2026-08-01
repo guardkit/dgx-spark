@@ -10,13 +10,15 @@
 # safe ceiling ~115 GB). Served by a llama.cpp built for SM121 (121a-real).
 #
 # -----------------------------------------------------------------------------
-# Always-on fleet (preloaded) — ~65-71 GB resident, ~45 GB headroom:
+# Always-on fleet (preloaded) — ~53-59 GB resident, ~60 GB headroom:
 #   workhorse  Qwen3.6-35B-A3B-Instruct  (Player / agentic coder)
 #   coach      Gemma-4-26B-A4B-it  (stock — the open base of the GuardKit Coach)
-#   chat       gpt-oss-20b  (fast general chat / reasoner)
 #   embed      Qwen3-Embedding-0.6B  (RAG; 1024-dim)
-# On-demand (optional, exclusive — evicts the fleet while loaded):
-#   gpt-oss-120b  the "big-brain" Player you can swap in for hard runs
+# On-demand:
+#   gpt-oss-120b  the "big-brain" Player (EXCLUSIVE — evicts the fleet while loaded)
+# (gpt-oss-20b `chat` RETIRED 2026-08-01: over a year old and redundant beside the
+#  two 2026 MoEs — workhorse already covers fast general chat at ~41 tok/s / 131K
+#  ctx with tool-calling; coach covers the JSON-disciplined posture.)
 #
 # This pair (Qwen3.6-35B-A3B + Gemma-4-26B-A4B) is the community/NVIDIA-proven
 # single-GB10 lineup: Spark Arena ranks Qwen3.6-35B quants top of the leaderboard
@@ -30,7 +32,6 @@
 # Models to download (HuggingFace) into /opt/llama-swap/models/<dir>/ :
 #   unsloth/Qwen3.6-35B-A3B-GGUF          UD-Q4_K_XL  (~22 GB)  -> qwen36-35b/
 #   unsloth/gemma-4-26B-A4B-it-GGUF       UD-Q4_K_XL  (~17 GB)  -> gemma4-coach/
-#   ggml-org/gpt-oss-20b-GGUF            MXFP4       (~12 GB)  -> gpt-oss-20b/  (native gpt-oss-20b-mxfp4.gguf)
 #   Qwen/Qwen3-Embedding-0.6B-GGUF        Q8_0        (~0.6 GB) -> qwen3-embed/
 #   ggml-org/gpt-oss-120b-GGUF            MXFP4       (~63 GB)  -> gpt-oss-120b/  (optional)
 # Use HF_HUB_ENABLE_HF_TRANSFER=1; glob with -iname (files are lowercase on disk).
@@ -131,38 +132,6 @@ models:
       - "gemma4:26b"
 
   # ---------------------------------------------------------------------------
-  # CHAT — gpt-oss-20b (21B total / 3.6B active, native MXFP4), ~50 tok/s.
-  # Fast general chat / light reasoner so the box is a real local-AI box, not
-  # just an autobuild rig. gpt-oss uses the harmony format via --jinja;
-  # --reasoning auto controls effort. OpenAI's recommended sampling is temp 1.0.
-  # ---------------------------------------------------------------------------
-  "chat":
-    cmd: >
-      /usr/local/bin/llama-server
-      --port ${PORT}
-      --host 0.0.0.0
-      --model /opt/llama-swap/models/gpt-oss-20b/gpt-oss-20b-mxfp4.gguf
-      --alias chat
-      --ctx-size 32768
-      --batch-size 2048
-      --ubatch-size 2048
-      --threads 16
-      -ngl 999
-      --no-mmap
-      --flash-attn on
-      --jinja
-      --reasoning auto
-      --temp 1.0
-      --top-p 1.0
-      -np 1
-    checkEndpoint: /health
-    ttl: 0
-    concurrencyLimit: 2
-    aliases:
-      - "gpt-oss-20b"
-      - "openai/gpt-oss-20b"
-
-  # ---------------------------------------------------------------------------
   # EMBED — Qwen3-Embedding-0.6B (1024-dim). RAG embeddings. Last-token pooling
   # (a Qwen3-Embedding requirement). Negligible footprint; the model supports 32K.
   #
@@ -254,14 +223,13 @@ matrix:
   vars:
     wh: workhorse
     co: coach
-    ch: chat
     em: embed
     go: gpt-oss-120b
   sets:
-    # The always-on fleet — all four coexist (~65-71 GB).
-    all: "wh & co & ch & em"
+    # The always-on fleet — the three coexist (~53-59 GB).
+    all: "wh & co & em"
     # Optional big-brain Player: gpt-oss-120b + coach, EXCLUSIVE. Requesting
-    # gpt-oss-120b evicts the fleet (chat + embed + the small workhorse). Pause
+    # gpt-oss-120b evicts the fleet (workhorse + embed; coach stays co-resident). Pause
     # the keepalive timer before a long run so it doesn't revive the fleet on
     # top of the 120b -> OOM:  sudo systemctl stop llama-swap-keepalive.timer
     big: "go & co"
@@ -275,5 +243,4 @@ hooks:
     preload:
       - workhorse
       - coach
-      - chat
       - embed

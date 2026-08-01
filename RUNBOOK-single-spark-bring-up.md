@@ -9,8 +9,8 @@ clients (agents, Claude Code — OpenAI / Anthropic-compatible)
    │
    ▼
 llama-swap :9000          ← the endpoint / front door (all-llama.cpp; one process tree under a USER systemd unit)
-   └── always-on preload (~65 GB resident, ~50 GB headroom) — all open, downloadable:
-         workhorse (Qwen3.6-35B-A3B) · coach (Gemma-4-26B-A4B) · chat (gpt-oss-20b) · embed (Qwen3-Embedding-0.6B)
+   └── always-on preload (~53 GB resident, ~60 GB headroom) — all open, downloadable:
+         workhorse (Qwen3.6-35B-A3B) · coach (Gemma-4-26B-A4B) · embed (Qwen3-Embedding-0.6B)
    └── on-demand: gpt-oss-120b ("big-brain" Player; evicts the fleet)
    (vLLM-in-Docker vision models are out of scope — see below)
    (optional control plane in front: LiteLLM :4000 — RUNBOOK-litellm-front-door.md)
@@ -33,12 +33,14 @@ llama-swap :9000          ← the endpoint / front door (all-llama.cpp; one proc
 ## PINS (single source of truth — steps reference these, gates assert them, recon checks them)
 
 ```
-PINS (set 2026-06-21)
-  llama-swap            v219                         single-dash flags; matrix coexistence (v208+; reference box runs v219)
+PINS (set 2026-06-21 · amended 2026-08-01)
+  llama-swap            v245                         single-dash flags; matrix coexistence (v208+).
+                                                     PROMOTED v219→v245 2026-08-01 (draft PR — VALIDATE on the
+                                                     next run; the reference box runs v219 until that run is green)
   llama.cpp             SM121 build, 121a-real       PR #17570 (Anthropic Messages API); last-verified build b9430 (2026-05-30)
   workhorse  GGUF       Qwen3.6-35B-A3B-Instruct UD-Q4_K_XL   unsloth/Qwen3.6-35B-A3B-GGUF     (Player)
   coach      GGUF       Gemma-4-26B-A4B-it UD-Q4_K_XL         unsloth/gemma-4-26B-A4B-it-GGUF  (Coach; stock/open)
-  chat       GGUF       gpt-oss-20b MXFP4 (native)           ggml-org/gpt-oss-20b-GGUF        (general chat; ggml-org ships the native gpt-oss-20b-mxfp4.gguf — unsloth has no *mxfp4* file)
+  (retired 2026-08-01)  chat / gpt-oss-20b — REMOVED from the lineup (>1 yr old; redundant beside workhorse+coach)
   embed      GGUF       Qwen3-Embedding-0.6B Q8_0            Qwen/Qwen3-Embedding-0.6B-GGUF    (1024 dims)
   big (opt)  GGUF       gpt-oss-120b MXFP4                    ggml-org/gpt-oss-120b-GGUF       (on-demand Player)
   KV_CACHE_TYPE         q8_0                         on large-ctx models (workhorse / coach)
@@ -153,12 +155,12 @@ free -g                                    # confirm ~121 GB usable unified visi
 
 ```bash
 # Search BOTH the HF cache and the served model root (/opt/llama-swap/models is canonical).
-for pat in "qwen3.6*35*a3b" "gemma*4*26b*a4b*it" "gpt-oss-20b" "qwen3*embedding*0.6"; do
+for pat in "qwen3.6*35*a3b" "gemma*4*26b*a4b*it" "qwen3*embedding*0.6"; do
   f=$(find ~/.cache/huggingface /opt/llama-swap/models -iname "*${pat}*.gguf" 2>/dev/null | head -1)
   echo "${pat}: ${f:-NOT FOUND}"
 done
 ```
-**Pass (read-only check):** the find lists which of the four are already present — this phase has no side effects. Any missing model is staged by **Phase 1.5** (the agent's next step); there is no manual download. Glob with `-iname`, not `-name` (registry row, conventions §8); the served path is `/opt/llama-swap/models/` (the config `--model` paths point there).
+**Pass (read-only check):** the find lists which of the three are already present — this phase has no side effects. Any missing model is staged by **Phase 1.5** (the agent's next step); there is no manual download. Glob with `-iname`, not `-name` (registry row, conventions §8); the served path is `/opt/llama-swap/models/` (the config `--model` paths point there).
 
 ---
 
@@ -170,7 +172,7 @@ A **step the agent executes**, not a manual prerequisite. Idempotent — models 
 ./scripts/stage-public-models.sh
 ```
 
-Downloads the four public models — workhorse (Qwen3.6-35B-A3B), coach (stock Gemma-4-26B-A4B-it), chat (gpt-oss-20b), embed (Qwen3-Embedding-0.6B) — into `/opt/llama-swap/models/`, and makes each on-disk filename match the `--model` paths in [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) (Unsloth ships uppercase `MXFP4`, so the script symlinks to the expected name). ~35 GB on a fresh box — this is the long pull you edit out of the recording; a re-run skips what's present.
+Downloads the three public models — workhorse (Qwen3.6-35B-A3B), coach (stock Gemma-4-26B-A4B-it), embed (Qwen3-Embedding-0.6B) — into `/opt/llama-swap/models/`, and makes each on-disk filename match the `--model` paths in [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) (upstream filenames differ in case, so the script symlinks to the exact expected name). ~40 GB on a fresh box — this is the long pull you edit out of the recording; a re-run skips what's present.
 
 ---
 
@@ -212,23 +214,29 @@ awk -v u="$USED" 'BEGIN{exit !(u>0)}' \
 ### 3.1 Install llama-swap (pinned, not `latest`)
 
 ```bash
-# v219 releases ship per-platform TARBALLS (llama-swap_219_linux_<arch>.tar.gz), NOT a
+# THE PIN LIVES IN ONE PLACE BELOW: SWAP_VER mirrors the PINS block — a promotion PR
+# edits exactly those two lines; nothing downstream restates the number.
+SWAP_VER=245        # = PINS block (llama-swap). Promoted v219→v245 2026-08-01; this run validates it.
+# Releases ship per-platform TARBALLS (llama-swap_<N>_linux_<arch>.tar.gz), NOT a
 # bare `llama-swap-linux-<arch>` binary — the old bare-binary URL 404s (verified 2026-07-11).
-# The release TAG is `v219`; the asset uses the bare number `219`.
+# The release TAG is `v<N>`; the asset uses the bare number `<N>`.
 case "$(uname -m)" in
-  aarch64|arm64) ASSET=llama-swap_219_linux_arm64.tar.gz;;
-  x86_64|amd64)  ASSET=llama-swap_219_linux_amd64.tar.gz;;
+  aarch64|arm64) ASSET=llama-swap_${SWAP_VER}_linux_arm64.tar.gz;;
+  x86_64|amd64)  ASSET=llama-swap_${SWAP_VER}_linux_amd64.tar.gz;;
   *) echo "unsupported $(uname -m)"; exit 1;;
 esac
 TMP=$(mktemp -d)
 curl -fL -o "$TMP/llama-swap.tgz" \
-  "https://github.com/mostlygeek/llama-swap/releases/download/v219/$ASSET"   # PIN, per PINS block
+  "https://github.com/mostlygeek/llama-swap/releases/download/v${SWAP_VER}/$ASSET"
 tar -xzf "$TMP/llama-swap.tgz" -C "$TMP"
 sudo install -m755 "$TMP/llama-swap" /usr/local/bin/llama-swap
 rm -rf "$TMP"
 sudo mkdir -p /opt/llama-swap/{config,logs,models}; sudo chown -R $USER:$USER /opt/llama-swap
+llama-swap --version | grep -q "version: ${SWAP_VER}" \
+  && echo "GATE PASS: llama-swap v${SWAP_VER} installed" \
+  || echo "GATE FAIL: installed version != pinned v${SWAP_VER}. STOP."
 ```
-**Pass:** binary present (`llama-swap --version` → `version: 219`). (Pinning, not floating `latest`, is itself a convention — the release cadence is several versions/week. v219+ keeps the single-dash flag contract.)
+**Pass:** the version gate above (asserts the installed binary equals the pin — no restated number to drift). (Pinning, not floating `latest`, is itself a convention — the release cadence is several versions/week; the pin moves by PR, never at runtime. v208+ keeps the single-dash flag contract. Recon note 2026-08-01: v230 added `-config-dir` — per-model config files, enable/disable by moving them in/out — worth evaluating at the NEXT promotion, not adopted blind in this one.)
 
 ### 3.2 Deploy the config — gates baked into the structure
 
@@ -247,12 +255,12 @@ sudo install -D -m644 examples/llama-swap-config.public.yaml "$CFG"
 ```
 On a **fresh box** there is no existing config — the backup step is skipped and the install proceeds. On a **re-run** the backup is a no-op-equivalent (identical content). The ⚠️ line only fires when a *divergent* config is being replaced — your cue that this is not the box you meant to bring up fresh.
 
-It ships the four always-on open models (`workhorse` · `coach` · `chat` · `embed`) plus on-demand `gpt-oss-120b`, with the gotchas encoded as config (each maps to a registry row in conventions §8):
+It ships three always-on open models (`workhorse` · `coach` · `embed`) plus on-demand `gpt-oss-120b` (exclusive; `chat`/gpt-oss-20b was retired from the lineup 2026-08-01), with the gotchas encoded as config (each maps to a registry row in conventions §8):
 
 - `healthCheckTimeout: 600` — 120B-class cold load exceeds the default → 504.
 - `matrix.sets` declaring the fleet coexists — without it, llama-swap evicts on every cross-model request → load→kill→load thrash.
 - **Coexistence-set membership (the subtle one):** a model an always-on *service* depends on (e.g. the fleet-memory relay's RAG `embed`) must be a member of **every** coexistence set that runs concurrently with that service — not just `all`. If only `all` lists it, any *other* set requested by a different live service (a vision set, a tutor set) evicts it on a cross-set request, and the service eats an 85–181s cold-start on its next call. A *deliberately* exclusive set (the `big`/120B Player, which you pause for) may still evict it — that's fine. The public config has only `all` + the exclusive `big`, so nothing routine evicts `embed`; richer personal configs with several routine sets must replicate the dependency into each (FEAT-HARV; `TASK-LLSWAP-EMRESIDENT01`).
-- `hooks.on_startup.preload` for all four — deterministic cold-start.
+- `hooks.on_startup.preload` for the three always-on — deterministic cold-start.
 - Every `cmd`: `--no-mmap`, `--jinja`, `-ngl 999`; `--cache-type-k/v q8_0` on the large-ctx models (workhorse/coach). f16 KV degrades on SM121 / blows the ceiling at large ctx.
 
 **Adjust before starting:** the `--model` paths to where you staged the GGUFs (Phase 1.3) and the binary path (`/usr/local/bin/llama-server`, or the build tree per Phase 2.1).
@@ -313,7 +321,7 @@ echo "$CG" | grep -qE '/llama-swap\.service$' && ! echo "$CG" | grep -qE 'app-|c
 
 ### 4.3 Preload + **▶ GATES — under the 115 GB ceiling (TOTAL unified) + keep-alive firing**
 
-Trigger the four loads (one `curl` each, per RUNBOOK-v3 §5.4), wait for ready, then assert memory. The documented freeze (114 GB) is a **total unified-memory** event, not a compute-apps event — so check both, and gate on the total:
+Trigger the three preloads (one `curl` each, per RUNBOOK-v3 §5.4), wait for ready, then assert memory. The documented freeze (114 GB) is a **total unified-memory** event, not a compute-apps event — so check both, and gate on the total:
 
 ```bash
 # (1) compute-apps resident (GPU-held weights + KV) — informational
@@ -326,7 +334,7 @@ awk -v g="$TOTAL_USED_GB" 'BEGIN{exit !(g < 115)}' \
   && echo "GATE PASS: total unified ${TOTAL_USED_GB} GB < 115 GB ceiling" \
   || echo "GATE FAIL: total unified ${TOTAL_USED_GB} GB ≥ 115 GB — freeze risk (114 GB freeze on record). Trim ctx/-np or a model. STOP."
 ```
-**Expected:** ~65 GB resident for the four, ~50 GB headroom. Then install the keep-alive timer — **llama-swap does not auto-revive crashed children** (registry row) — **and assert it is actually firing** (enabled-but-stopped is the real failure state; `is-enabled` is not enough). Install the **PUBLIC-fleet** variant [`scripts/llama-swap-keepalive.public.sh`](./scripts/llama-swap-keepalive.public.sh): its `MODEL_PROBE_KIND` (workhorse/coach/chat/embed) equals this config's `hooks.on_startup.preload`. Do **not** install the repo's [`scripts/llama-swap-keepalive.sh`](./scripts/llama-swap-keepalive.sh)/`.service`/`.timer` here — those are the operator's personal lineup (`qwen-graphiti`/`nomic-embed`/`coach-ft-v3`, a guardkit `ExecStart` path) and would probe models the public config doesn't serve. These are **system** units (need `sudo`); the `.service` runs as `$USER`:
+**Expected:** ~53 GB resident for the three, ~60 GB headroom. Then install the keep-alive timer — **llama-swap does not auto-revive crashed children** (registry row) — **and assert it is actually firing** (enabled-but-stopped is the real failure state; `is-enabled` is not enough). Install the **PUBLIC-fleet** variant [`scripts/llama-swap-keepalive.public.sh`](./scripts/llama-swap-keepalive.public.sh): its `MODEL_PROBE_KIND` (workhorse/coach/embed) equals this config's `hooks.on_startup.preload`. Do **not** install the repo's [`scripts/llama-swap-keepalive.sh`](./scripts/llama-swap-keepalive.sh)/`.service`/`.timer` here — those are the operator's personal lineup (`qwen-graphiti`/`nomic-embed`/`coach-ft-v3`, a guardkit `ExecStart` path) and would probe models the public config doesn't serve. These are **system** units (need `sudo`); the `.service` runs as `$USER`:
 
 ```bash
 sudo install -m755 scripts/llama-swap-keepalive.public.sh /usr/local/bin/llama-swap-keepalive.sh
@@ -373,7 +381,7 @@ systemctl is-active --quiet llama-swap-keepalive.timer \
 ```bash
 curl -sf http://localhost:9000/v1/models | jq -r '.data[].id' | sort
 ```
-**Pass:** the four always-on aliases present (`workhorse`, `coach`, `chat`, `embed`). The on-demand `gpt-oss-120b` is also registered (it loads only on request). This is a subset/presence check — production configs legitimately register additional opt-in models.
+**Pass:** the three always-on aliases present (`workhorse`, `coach`, `embed`). The on-demand `gpt-oss-120b` is also registered (it loads only on request). This is a subset/presence check — production configs legitimately register additional opt-in models.
 
 ### 5.2 Workhorse tool-calling + throughput
 
@@ -408,7 +416,7 @@ DIM=$(curl -s http://localhost:9000/v1/embeddings -H "Content-Type: application/
 | P4.2 cgroup under a systemd llama-swap.service | | not Chromium/editor scope |
 | P4.3 total unified < 115 GB | | **record GB** |
 | P4.3 keepalive timer active | | not merely enabled |
-| P5.1 four always-on aliases listed | | workhorse · coach · chat · embed |
+| P5.1 three always-on aliases listed | | workhorse · coach · embed (+ big registered, on-demand) |
 | P5.2 workhorse tool-call + throughput | | **record tok/s** |
 | P5.3 embeddings dim == configured (1024) | | |
 
@@ -487,7 +495,7 @@ The author's own box runs a **diff** against the public config, not a separate p
 **Diff against `examples/llama-swap-config.public.yaml`:**
 
 - **`coach` → `coach-ft-v3`** — fine-tuned Gemma-4-26B-A4B MoE (Q4_K_M), `--reasoning off` (its trained non-thinking posture), `--ctx-size 98304`, q8_0 KV. Same ~26B-A4B footprint as the stock Coach → memory-neutral swap. The stock `coach` block may be kept as an on-demand fallback.
-- **Drop `chat` and `embed`** — the personal box runs "pure headroom": only `workhorse` + `coach-ft-v3` are always-on (~51 GB resident, ~64 GB free), maximising swap-in room for on-demand `gpt-oss-120b`.
+- **Drop `embed`** (`chat` is no longer in the public lineup — retired 2026-08-01) — the personal box runs "pure headroom": only `workhorse` + `coach-ft-v3` are always-on (~51 GB resident, ~64 GB free), maximising swap-in room for on-demand `gpt-oss-120b`.
 - **Preload set** = `[workhorse, coach-ft-v3]`; the `all` matrix.set = `wh & cfv3`.
 
   > **Migration reality (2026-06-27 — `TASK-LLSWAP-EMRESIDENT01`):** "drop `embed`" is the **post-decommission end state**. *During* the Graphiti→fleet-memory cutover the personal box does the opposite — it keeps `embed` (**Qwen3-Embedding-0.6B → 1024 dims**) always-on for the fleet-memory relay's RAG writes, alongside the still-live Graphiti models (`qwen-graphiti` Qwen2.5-14B + `nomic-embed`). Per the coexistence-set rule in §3.2, `embed` is a member of **every** routine set the relay must survive — `all`, `lpa`, `lpa_v3`, `tutor`, `arch` — so a finproxy/granite-vision, study-tutor or architect request can't evict it (the FEAT-HARV harvest stalled until this was fixed). Only the deliberately-exclusive heavy sets (`coach31`, `autobuild_go`, `coder_30b`) omit it — you pause the relay/keepalive for those. The "pure headroom" lineup arrives only once guardkit + forge/jarvis/specialist-agent/tutor are off Graphiti and `qwen-graphiti` is pulled (FEAT-MEM-08/09).
