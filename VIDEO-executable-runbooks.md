@@ -12,7 +12,7 @@
 
 ## The thing you're actually showing
 
-You point a coding agent at a markdown file. It brings a bare GB10 up to a working four-model inference fleet, on its own, and **checks its own work at every step** — not with vibes, but with assertions that stop the run if reality doesn't match.
+You point a coding agent at a markdown file. It brings a bare GB10 up to a working multi-model inference fleet (three always-on models plus an on-demand 120B), on its own, and **checks its own work at every step** — not with vibes, but with assertions that stop the run if reality doesn't match.
 
 First time filmed, on a fresh box (`spark-fcf6`, 2026-07-11):
 
@@ -24,6 +24,8 @@ First time filmed, on a fresh box (`spark-fcf6`, 2026-07-11):
 That last one is the bit that made me sit up. It didn't just do the job. **It told me my documentation was wrong.**
 
 Results are on the `spark-fcf6` branch: [`RESULTS-single-spark-bring-up-2026-07-11.md`](./RESULTS-single-spark-bring-up-2026-07-11.md) and the drift report next to it. Show them on screen — they're the receipts.
+
+*(Update 2026-08-01: that chat model has since been **retired from the lineup entirely** — a review asked "who actually calls it?" and the answer was nobody. The retirement is itself the method working: a reviewed commit, not a quiet edit, and the trap it taught — include-globs must match what the repo actually ships — stayed behind as a general rule in the staging script even though the model is gone. The cold-open recording stands as history; the runbook a viewer runs today brings up the leaner three-model lineup. Commands rot, models retire — the traps don't.)*
 
 ---
 
@@ -73,7 +75,7 @@ Worth showing on screen: the whole thing formed in about **35 hours** across the
 This is the part people actually want. Keep it concrete, show real files.
 
 **1. Pin everything, in one block at the top.**
-Every version, model, threshold, in one place. Not "install the latest" — "install `v219`, and here's the check that proves you got it."
+Every version, model, threshold, in one place. Not "install the latest" — "install `v245`, and here's the gate that proves you got it." And state the number **once**: a single `SWAP_VER` line mirrors the PINS block, and everything downstream — the download URL, the asset name, the version gate — derives from it, so the pin can't drift between where it's stated and where it's checked. When the pin moves (it just did: v219 → v245, twenty-six releases in nine weeks), that's a two-line reviewed edit, and the next run is its validation.
 
 **2. Turn your war stories into assertions.**
 This is the core move. You know that thing that cost you a day? Don't write *"watch out for X."* Write the check that stops the run when X happens.
@@ -166,4 +168,5 @@ If you want the full reading list, it's in the repo — [`RESEARCH-executable-ru
 - **Keep the prior art to 90 seconds.** Generous, credited, gone. It's insurance, not content.
 - **Don't oversell.** The honest register — *"this worked for me, it's not new, here's where it bites"* — is the whole reason anyone will trust the rest.
 - The `agentic-dataset-factory-runs` data is rsync'd output, not a gate ledger. Don't imply otherwise if it comes up.
+- **Fresh on-camera material (2026-08-01):** the v219→v245 pin promotion + its validation run is a live example for beat 6's pins point, and the maintenance segment in [`RUNBOOK-single-spark-video-capture.md`](./RUNBOOK-single-spark-video-capture.md) (M1–M6: backup-first · recon in update mode · the three-verdicts moment — update/defer/decline · first LiteLLM install) is a full arc of its own — borrow the promotion beat here; save the maintenance arc for its own video.
 - Verify the Netflix/Google quotes against the originals before they go on screen (see the research doc's caveats).
