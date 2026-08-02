@@ -70,6 +70,29 @@ AI-SDK streamed-tool-call path has a long issue trail against vLLM parsers; if t
 render as text instead of executing, that's the known failure — switch to pi or interpose
 the compat proxy.
 
+## Validating what it builds (the gates, not vibes)
+
+Correctness is mechanical, three tiers, in [`validate/`](./validate/):
+
+- **T1 static** — single file, HTTPS-only, no open-notify, approved CDNs only.
+- **T2 runtime** — headless Chromium against the `window.__orbitGlobe` testability contract
+  (required by AGENTS.md): catalog >1000 sats, boots at 1× real time, ISS actually moves,
+  ≥30fps, zero console errors, and a second run with CelesTrak *blocked* must show a
+  visible error state (never a blank globe).
+- **T3 the physics oracle — the part the builder can't game**: the validator independently
+  fetches fresh ISS elements and runs its **own** SGP4 propagation (tolerance 1.5°), then
+  cross-checks against the **live** wheretheiss.at position (tolerance 3°, skew-guarded).
+  The ISS is either where the sky says it is, or the gate fails.
+
+One-time setup on the MacBook: `cd validate && npm run setup` (installs Playwright's
+Chromium). Run: `npm run validate` — PASS/FAIL table, non-zero exit on any FAIL.
+
+Two-tier use in the demo: the **agent self-runs it and iterates to green** (that's the
+arc on camera), then the operator runs it once more as the independent close — same suite,
+but the T3 oracle answers to the sky, not to the code that was just written. Judgment
+calls the gates can't cover (does it *look* right, is the highlight legible in frame)
+stay human, on camera, deliberately.
+
 ## Recording notes
 
 - Route through the LiteLLM `:4000` strategist alias instead of `:8888` when you want the

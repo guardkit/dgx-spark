@@ -35,8 +35,29 @@ on any HTTPS page. This is the single most common failure in this genre.
 - Degrade gracefully: if the TLE fetch fails, say so visibly in the UI — never a blank globe.
 - Vanilla JS. Comment only what is non-obvious (frame stepping, coordinate conversions).
 
+## Testability contract (required — the validator depends on it)
+
+The app must expose a small machine-readable status object, updated **every frame**:
+
+```js
+window.__orbitGlobe = {
+  satCount: 0,          // satellites currently rendered (post-filtering)
+  simTime: Date.now(),  // current sim clock, ms epoch
+  timeWarp: 1,          // current warp factor (MUST boot at 1× real time, simTime = now)
+  iss: { lat: 0, lng: 0, altKm: 0 },   // degrees; the highlighted ISS position
+  errors: []            // human-readable strings for any fetch/parse failure shown in the UI
+};
+```
+
+This is part of the spec, not test scaffolding — it is also what drives your HUD, so build
+the HUD *from* this object and both stay honest together.
+
 ## Verifying your work
 
-Serve the file (`python3 -m http.server 8043`), open it, and check against the acceptance
-list in `TASK.md`. If a browser isn't available to you, at minimum lint the HTML structure,
-re-read the two skills' gotcha sections, and state plainly which checks you could not run.
+Mechanical first: `cd validate && npm run setup` (once) `&& npm run validate` — a
+three-tier gate suite (static checks · headless runtime checks against the contract above ·
+an independent SGP4 + live-API physics oracle for the ISS position). **Iterate until every
+gate is green**; the suite prints a PASS/FAIL table and exits non-zero on any FAIL.
+Then the human check: serve the file (`python3 -m http.server 8043`), open it, and walk the
+acceptance list in `TASK.md`. If you cannot run the validator, say so plainly — never claim
+gates you didn't run.

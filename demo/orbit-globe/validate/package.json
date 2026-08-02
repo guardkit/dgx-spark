@@ -1,0 +1,14 @@
+{
+  "name": "orbit-globe-validate",
+  "private": true,
+  "type": "module",
+  "description": "Mechanical gates for the orbit-globe artifact: static checks, headless runtime checks, and an independent SGP4 + live-API physics oracle.",
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0",
+    "satellite.js": "^5.0.0"
+  }
+}

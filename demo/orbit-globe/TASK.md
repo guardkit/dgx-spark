@@ -27,6 +27,10 @@ legible to anyone watching.
 6. Time-warp control (1× / 60× / 600×) works and the HUD shows sim time + satellite count.
 7. TLE-fetch failure shows a visible error state, not a blank globe.
 8. Zero console errors.
+9. The `window.__orbitGlobe` testability contract (AGENTS.md) is live and accurate, the
+   sim **boots at 1× real time**, and `validate/` reports **all gates green** — including
+   the physics oracle (your ISS position vs an independent SGP4 propagation and the live
+   wheretheiss.at API).
 
 ## Warm-up variant (optional first take)
 
