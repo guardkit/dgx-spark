@@ -54,6 +54,12 @@ PINS (set 2026-08-01)
   gpu_mem_util       0.78    (spec-decode buffers allocate LAZILY on first request — do not raise)
   B12X MoE backend   VLLM_USE_B12X_MOE=1   (the entire speed difference; =0 → ~29 tok/s silently)
   MTP_NUM_TOKENS     5       (recipe .env leftover =3 costs ~24% decode)
+  tool calling       --tool-call-parser deepseek_v4 · --reasoning-parser deepseek_v4 ·
+                     --enable-auto-tool-choice · --tokenizer-mode hf + chat_template.jinja
+                     mounted :ro  (the endorsed 0731 solution — forum t/372268 post 538;
+                     thinking via --default-chat-template-kwargs thinking_mode=thinking).
+                     REQUIRED for the coding-harness demo lane (demo/orbit-globe/) —
+                     the base NVFP4-KV recipe does NOT ship these.
   head/API           Node A :8888  ·  worker-first launch order (worker up before head)
   MEM_CEILING_GB     115 per node        (121 usable; freeze observed at 114)
   fabric (inherited) CX-7 FW ≥ 28.45.4028 · NCCL busbw ≥ 20 GB/s · transport NET/IB (never TCP)
@@ -195,6 +201,12 @@ grep -rq 'repetition_penalty' docker-compose.dspark.yml .env.dspark && echo "FAI
 # Patch 4 bind-mount present in the compose:
 grep -q 'dspark.patched.py:/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py:ro' \
   docker-compose.dspark.yml && echo PASS || echo "FAIL: Patch 4 not mounted"
+# Tool calling — the demo lane dies without these (and raw DSML leaks into content without the parsers):
+grep -q 'tool-call-parser deepseek_v4'  docker-compose.dspark.yml && echo PASS || echo "FAIL: tool-call parser"
+grep -q 'reasoning-parser deepseek_v4'  docker-compose.dspark.yml && echo PASS || echo "FAIL: reasoning parser"
+grep -q 'enable-auto-tool-choice'       docker-compose.dspark.yml && echo PASS || echo "FAIL: auto tool choice"
+grep -q 'tokenizer-mode hf'             docker-compose.dspark.yml && grep -q 'chat_template.jinja' docker-compose.dspark.yml \
+  && echo PASS || echo "FAIL: hf tokenizer-mode + mounted chat template (t/372268 post 538 — the 0731 fix)"
 # Container plumbing: network_mode host · ipc host · shm 64gb · /dev/infiniband · memlock unlimited
 ```
 
@@ -229,6 +241,16 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 # 5.5 Expectation table (do NOT false-fail on content class):
 #     structured 55-84 · code/JSON ~54-64 · narrative prose 31-35 tok/s single-stream
 #     mixed agent traffic ~88 tok/s aggregate at c=4 (~22/stream)
+# 5.6 TOOL-CALLING gate — run WITH speculative decoding ON (the draft-rejection trap):
+#     DSpark spec decode can shred the tool-call opener tag at draft-rejection boundaries,
+#     leaking calls into content as raw DSML (t/372268 post 296). Assert the parsed path:
+#     (a) template sanity: prompts at reasoning_effort low/high/max produce ~5/84/97
+#         template tokens respectively (post 538's verification) — record in RESULTS;
+#     (b) FIVE live requests with a simple tools=[...] schema, stream:false → every response
+#         carries choices[0].message.tool_calls as a PARSED array AND content holds zero raw
+#         DSML/tool markup. Any leak = the draft-rejection bug: interpose the
+#         opencode_compat_proxy shim (Appendix A) or reduce num_speculative_tokens and
+#         re-test — do NOT record the harness demo until 5/5 clean.
 ```
 
 ---
@@ -236,6 +258,8 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 ## Phase 6: Front door (optional lane) — strategist alias, no-cloud guard re-proven
 
 Add to the LiteLLM `:4000` config: `model_name: strategist` → `openai/deepseek-v4-flash-0731`, `api_base: http://<NODE_A>:8888/v1`. Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
+
+The coding-harness demo workspace for this endpoint lives at [`demo/orbit-globe/`](./demo/orbit-globe/) — harness wiring (pi primary, opencode backup), AGENTS.md + skills environment, and the task brief. It presumes Phase 5.6 green.
 
 ---
 
@@ -260,6 +284,7 @@ The 0731 checkpoint has <48 h of public field time; the recipe's 40-min soak was
 | 5.2 | Acceptance | ≥ 0.50 | |
 | 5.3 | Decode | ≥ 45 tok/s structured, stream:false | |
 | 5.4 | Prefill | ≥ 1,000 tok/s @8k | |
+| 5.6 | Tool calls (spec decode ON) | 5/5 parsed `tool_calls`, zero DSML leaks | |
 | 6 | No-cloud guard | anchored greps PASS | |
 | 7 | Mini-soak | 0 errors, 0 empty, mem stable | |
 | 9 | **Fleet revived** | preload ready both, probes answer | |
@@ -296,6 +321,8 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 | Cold-start ~30% perf penalty | expected | Phase 5.1 warm-up |
 | gpu_mem_util > 0.78 + lazy spec buffers → OOM on first request | design | PINS |
 | Fabric validated by recipe author on a RoCE **switch**; ours is the direct link | our variance | Phase 1.1 NCCL gate |
+| DSpark draft-rejection shreds tool-call opener → raw DSML leaks (t/372268 post 296) | open; parser not spec-aware | Phase 5.6 gate; fallback = 0rand `opencode_compat_proxy` shim (90/100 hardmode after) |
+| Harness 400s on `developer` role / `reasoning_effort` (typical vLLM) | expected | harness compat flags — see `demo/orbit-globe/README.md` |
 
 ## Appendix B — Rollback + RESULTS template
 
