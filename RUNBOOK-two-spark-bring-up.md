@@ -161,7 +161,18 @@ ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan
 
 **Hot-plug notes (post-Jan-2026 DGX OS — the card is off the bus until the cable wakes it):**
 - On cable insertion the hotplug driver re-attaches the NIC and the netdevs appear. If they don't within ~30 s: force it (`sudo /opt/nvidia/dgx-spark-mlnx-hotplug/mtk-hotplug-handler.sh plug-in`), then re-check; a reboot with the cable in also works.
-- **QSFP56 cable caveat:** a June-2026 forum report (same FW 28.45.4028) saw a third-party **QSFP56** DAC trigger FALSE "Cable removal" events — NICs vanish ~20 s after boot *with the cable inserted*. NVIDIA's approved list is **QSFP112** DACs (Amphenol NJAAKK-N911/0006, Luxshare LMTQF022-SD-R). A 200G QSFP56 DAC is electrically fine for the link; only the hotplug *presence detection* may be picky. **If the link flaps: disable hot-plug** (`/etc/nvidia/cx7-hotplug-enabled` — remove/rename the flag, reboot; costs ~18 W idle) and it will hold. Check the cable's label before recording day so this is a planned beat, not a mystery.
+- **QSFP56 cable caveat:** a June-2026 forum report (same FW 28.45.4028) saw a third-party **QSFP56** DAC trigger FALSE "Cable removal" events — NICs vanish ~20 s after boot *with the cable inserted*. NVIDIA's approved list is **QSFP112** DACs (Amphenol NJAAKK-N911/0006, Luxshare LMTQF022-SD-R). A 200G QSFP56 DAC is electrically fine for the link; only the hotplug *presence detection* may be picky. **If the link flaps: disable hot-plug** (`/etc/nvidia/cx7-hotplug-enabled` — remove/rename the flag, reboot; costs ~18 W idle) and it will hold.
+- **THE ESTATE'S CABLE (identified 2026-08-02): FS.COM 0.5 m 200G QSFP56 passive DAC, P/N `QSFP-200G-PC005`, NV/ME-coded — the same vendor/form-factor/length class as the June report's suspect part.** Decision rule, pre-made so recording day never stalls:
+  ```
+  Cable in → netdevs appear → ▶ STABILITY MINI-GATE: watch 2 minutes
+    (journalctl -kf | grep -E 'mlx5|cx7-pcie-hotplug' — no removal events, iface stays Up)
+  HOLDS  → proceed to Phase 4; hotplug stays enabled. Done.
+  FLAPS  (~20 s vanish, "Cable removal" with cable seated) →
+    sudo mv /etc/nvidia/cx7-hotplug-enabled /etc/nvidia/cx7-hotplug-enabled.off
+    reboot BOTH nodes with the cable in → re-run this phase (link will hold; ~18 W idle cost;
+    restore the flag after the session if wanted). Order an approved QSFP112 DAC only if
+    living hotplug-disabled long-term is unwanted — the session itself never blocks on it.
+  ```
 
 ---
 
