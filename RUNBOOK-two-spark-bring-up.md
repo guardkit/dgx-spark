@@ -125,6 +125,15 @@ uname -m   # aarch64 on both
 
 The Apr-2026 firmware introduced aggressive NIC power-saving that **halved** `all_gather_perf` (19 W→1 W on the NIC). The fix is CX-7 FW **28.45.4028+** (UEFI 1.107.26). Update OS + firmware on **both** nodes *before* cabling.
 
+> **✅ VERIFIED 2026-08-02 (both estate boxes, from boot logs): FW = 28.45.4028 on every port — the gate floor exactly. No flash required; this phase is a pure verification pass here.**
+> **The card is deliberately ABSENT from `lspci` while uncabled** — since DGX OS Jan-2026, `dgx-spark-mlnx-hotplug` power-gates the idle CX-7 clean off the PCIe bus (~18 W saved; flag file `/etc/nvidia/cx7-hotplug-enabled`). So with no cable in, `mstflint` cannot see the device — **read the firmware from the boot log instead**:
+> ```bash
+> journalctl -k -b --no-pager | grep 'mlx5_core.*firmware version'   # expect 28.45.4028+
+> # healthy-but-gated signature: mlx5_core probe + "Port module event: Cable unplugged"
+> # + a cx7-pcie-hotplug removal ~20s after boot. NO mlx5/MTKP lines at all since boot
+> # = real fault territory (cold boot, then fieldiag/RMA path).
+> ```
+
 ```bash
 # Preferred: DGX Dashboard GUI updater on each node. CLI path:
 sudo fwupdmgr refresh && sudo fwupdmgr get-updates    # review, then: sudo fwupdmgr update
@@ -149,6 +158,10 @@ ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan
 ```
 **Pass:** one CX-7 iface `(Up)` (use the `enp1...` name; ignore the `enP2p...` duplicate — the NIC surfaces 4 names for 2 ports because it's wired as two PCIe Gen5 x4 paths).
 **⚠️ WARN:** do **not** cable *both* CX-7 ports unless you IP all four interfaces — the link silently halves to 100 GbE (~10 GB/s busbw).
+
+**Hot-plug notes (post-Jan-2026 DGX OS — the card is off the bus until the cable wakes it):**
+- On cable insertion the hotplug driver re-attaches the NIC and the netdevs appear. If they don't within ~30 s: force it (`sudo /opt/nvidia/dgx-spark-mlnx-hotplug/mtk-hotplug-handler.sh plug-in`), then re-check; a reboot with the cable in also works.
+- **QSFP56 cable caveat:** a June-2026 forum report (same FW 28.45.4028) saw a third-party **QSFP56** DAC trigger FALSE "Cable removal" events — NICs vanish ~20 s after boot *with the cable inserted*. NVIDIA's approved list is **QSFP112** DACs (Amphenol NJAAKK-N911/0006, Luxshare LMTQF022-SD-R). A 200G QSFP56 DAC is electrically fine for the link; only the hotplug *presence detection* may be picky. **If the link flaps: disable hot-plug** (`/etc/nvidia/cx7-hotplug-enabled` — remove/rename the flag, reboot; costs ~18 W idle) and it will hold. Check the cable's label before recording day so this is a planned beat, not a mystery.
 
 ---
 
