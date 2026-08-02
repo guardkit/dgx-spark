@@ -1,5 +1,8 @@
 # Orbit Globe — demo workspace for the two-Spark DeepSeek-V4-Flash-0731 strategist
 
+> Recording this as a video? The capture spine — beats, say-lines, failure triage — is
+> [`RUNBOOK-orbit-globe-demo-capture.md`](../../RUNBOOK-orbit-globe-demo-capture.md).
+
 A standalone agent workspace (no relation to any other project's tooling): `AGENTS.md`
 conventions + two `SKILL.md`-standard skills + a task brief. Point a coding harness on the
 MacBook at the Sparks' endpoint, open this folder, give the one-line prompt in `TASK.md`.
