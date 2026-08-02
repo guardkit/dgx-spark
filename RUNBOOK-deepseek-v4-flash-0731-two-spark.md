@@ -1,10 +1,10 @@
-# Runbook: DeepSeek-V4-Flash-0731 Strategist — 2× Spark, Native Weights, 1M Context
+# Runbook: DeepSeek-V4-Flash-0731 — Two Sparks, Native Weights, 1M Context
 
-**Purpose:** serve DeepSeek-V4-Flash-0731 (284B/13B-active MoE, MIT) across the two-Spark pair at native quality — FP4-QAT experts + FP8 attention, NVFP4 applied to the **KV cache only** — with DSpark speculative decoding, as an on-demand **strategist/teacher seat**. The fleet is drained for the session and provably revived at the end; both acts are gated phases of this runbook.
+**Purpose:** serve DeepSeek-V4-Flash-0731 (284B/13B-active MoE, MIT) across the two-Spark pair at native quality — FP4-QAT experts + FP8 attention, NVFP4 applied to the **KV cache only** — with DSpark speculative decoding, as an on-demand **planning/teaching seat**. The fleet is drained for the session and provably revived at the end; both acts are gated phases of this runbook.
 **Machine:** both nodes (Node A = head, Node B = worker).
-**Predecessor:** [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) Phases 2–7 (firmware, cable, NCCL fabric, mesh SSH, front-door guard). This overlay **supersedes that runbook's Phase 8** (the jasl FP8 strategist), which remains the pinned **fallback lane**.
+**Predecessor:** [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) Phases 2–7 (firmware, cable, NCCL fabric, mesh SSH, front-door guard). This overlay **supersedes that runbook's Phase 8** (the jasl FP8 DeepSeek), which remains the pinned **fallback lane**.
 **Execution-results:** `RESULTS-deepseek-v4-flash-0731-first-run.md` (create on first run; template in Appendix B).
-**Expected wall-clock:** first run ~2–3 h (runtime image builds ~30–60 min/node dominate — edit out of any recording; weights must be pre-staged, see Phase 1.3). Re-run on a built box: ~25 min including the mini-soak. Strategist cold-start alone: ~6–8 min.
+**Expected wall-clock:** first run ~2–3 h (runtime image builds ~30–60 min/node dominate — edit out of any recording; weights must be pre-staged, see Phase 1.3). Re-run on a built box: ~25 min including the mini-soak. DeepSeek cold-start alone: ~6–8 min.
 
 **Target architecture**
 
@@ -17,13 +17,13 @@
  │ NVFP4 MLA KV (~10 GiB/1M)│ NET/IB   │ NVFP4 MLA KV             │
  └──────────────────────────┘          └──────────────────────────┘
    llama-swap :9000 STOPPED               llama-swap :9000 STOPPED
-   (drained Phase 1.6, revived Phase 9 — the pool XOR strategist rule)
+   (drained Phase 1.6, revived Phase 9 — the pool XOR DeepSeek rule)
 ```
 
 **Execution modes**
 
 ```
-  fresh    — run top to bottom (first bring-up of the 0731 strategist)
+  fresh    — run top to bottom (first bring-up of the 0731 seat)
   re-run   — same file on a built pair; idempotent phases no-op, gates re-verify
   update   — Phase 0 recon reports drift; re-run affected phases; record new baselines in RESULTS
 ```
@@ -144,7 +144,7 @@ S=$(stat -c%s /lib/aarch64-linux-gnu/libcuda.so.1 2>/dev/null || echo 0); [ "$S"
   && echo PASS || echo "FAIL: host libcuda.so.1 missing/truncated — do not launch containers"
 ```
 
-### 1.5 Snapshot the fleet, then drain — **▶ GATE: pool XOR strategist, asserted not assumed**
+### 1.5 Snapshot the fleet, then drain — **▶ GATE: pool XOR DeepSeek, asserted not assumed**
 ```bash
 # On BOTH nodes, record the pre-drain state (Phase 9 revives against this snapshot):
 curl -s localhost:9000/running > /tmp/predrain-$(hostname).json && cat /tmp/predrain-$(hostname).json
@@ -255,9 +255,9 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 
 ---
 
-## Phase 6: Front door (optional lane) — strategist alias, no-cloud guard re-proven
+## Phase 6: Front door (optional lane) — `deepseek` alias, no-cloud guard re-proven
 
-Add to the LiteLLM `:4000` config: `model_name: strategist` → `openai/deepseek-v4-flash-0731`, `api_base: http://<NODE_A>:8888/v1`. Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
+Add to the LiteLLM `:4000` config: `model_name: deepseek` → `openai/deepseek-v4-flash-0731`, `api_base: http://<NODE_A>:8888/v1`. Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
 
 The coding-harness demo workspace for this endpoint lives at [`demo/orbit-globe/`](./demo/orbit-globe/) — harness wiring (pi primary, opencode backup), AGENTS.md + skills environment, and the task brief. It presumes Phase 5.6 green.
 
@@ -294,7 +294,7 @@ The 0731 checkpoint has <48 h of public field time; the recipe's 40-min soak was
 ## Phase 9: Teardown + fleet revival — the runbook ends fleet-green, provably
 
 ```bash
-# Stop the strategist (both nodes):
+# Stop the DeepSeek seat (both nodes):
 cd ~/dspark-recipe && docker compose -f docker-compose.dspark.yml down
 # Revive (both nodes):
 systemctl --user start llama-swap && systemctl --user start llama-swap-keepalive.timer

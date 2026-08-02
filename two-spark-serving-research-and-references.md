@@ -32,11 +32,11 @@
 
 Rendered SVGs live in `diagrams/` (clean-line renderings of the architecture; an editable `.excalidraw` source sits beside each one).
 
-**Two-Spark fleet serving architecture** — the layered topology: clients hit one LiteLLM front door, which fans out to the llama-swap pool (plus always-on nomic) on Node A and a vLLM TP=2 strategist spanning both nodes; Postgres + pgvector lives on the NAS.
+**Two-Spark fleet serving architecture** — the layered topology: clients hit one LiteLLM front door, which fans out to the llama-swap pool (plus always-on nomic) on Node A and a vLLM TP=2 DeepSeek spanning both nodes; Postgres + pgvector lives on the NAS.
 
 ![Two-Spark fleet serving architecture](diagrams/two-spark-fleet-serving-architecture.svg)
 
-**Request routing — two paths, one front door** — Path A swaps a fleet model in on a single node; Path B brings up the cross-node TP strategist. Same proxy instance, different backend.
+**Request routing — two paths, one front door** — Path A swaps a fleet model in on a single node; Path B brings up the cross-node two-box DeepSeek. Same proxy instance, different backend.
 
 ![Request routing - two paths, one front door](diagrams/two-spark-request-routing.svg)
 
@@ -123,7 +123,7 @@ Evaluated as a candidate to absorb parts of the hand-rolled two-Spark bring-up (
 
 **Dependency-cost note:** sparkrun bundles LiteLLM, a fast-release CLI (uv-installed, 40+ releases), and git-based community recipe registries by default — more third-party surface, in exchange for automating the lower-risk half of the bring-up while the higher-risk half (the gates above) still has to be hand-written on top. Same supply-chain caution already applied to LiteLLM itself applies here; net complexity doesn't obviously drop if the gates still have to run regardless of what did the launching.
 
-**Where it's a genuinely good idea, not yet built:** sparkrun's `runtime` layer is a Python-entry-point plugin system — `vllm-distributed`, `vllm`/Ray, `sglang`, `llama-cpp`, `trt-llm`/MPI, and an `eugr`-delegating runtime all coexist as plugins today. A **`llama-swap` runtime** — rendering a recipe into a `matrix.sets` entry in a shared `config.yaml` and triggering `-watch-config`, instead of launching a standalone container — is architecturally native to that system, not a fork. It would combine sparkrun's recipe registry / VRAM pre-flight / CX-7 distribution with llama-swap's actual differentiator: memory-aware coexistence across a fixed always-on fleet. Scope note: only helps the single-node fleet host (Node A) — doesn't touch the cross-node TP strategist story, which stays sparkrun's (or our Phase 8's) territory either way. **Not scheduled** — logged here as a backlog idea, and a plausible future video hook in its own right ("the gap in the DGX Spark tooling ecosystem").
+**Where it's a genuinely good idea, not yet built:** sparkrun's `runtime` layer is a Python-entry-point plugin system — `vllm-distributed`, `vllm`/Ray, `sglang`, `llama-cpp`, `trt-llm`/MPI, and an `eugr`-delegating runtime all coexist as plugins today. A **`llama-swap` runtime** — rendering a recipe into a `matrix.sets` entry in a shared `config.yaml` and triggering `-watch-config`, instead of launching a standalone container — is architecturally native to that system, not a fork. It would combine sparkrun's recipe registry / VRAM pre-flight / CX-7 distribution with llama-swap's actual differentiator: memory-aware coexistence across a fixed always-on fleet. Scope note: only helps the single-node fleet host (Node A) — doesn't touch the cross-node two-box DeepSeek story, which stays sparkrun's (or our Phase 8's) territory either way. **Not scheduled** — logged here as a backlog idea, and a plausible future video hook in its own right ("the gap in the DGX Spark tooling ecosystem").
 
 ## Related local docs
 

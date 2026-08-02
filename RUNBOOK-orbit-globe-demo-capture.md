@@ -5,7 +5,7 @@
 **What this films:** the payoff segment for the two-Spark/DeepSeek material (or a standalone short). A coding agent on the MacBook, brained by DeepSeek-V4-Flash-0731 on the Spark pair, one-shots the [`demo/orbit-globe/`](./demo/orbit-globe/) task and iterates the gate suite to green; the operator closes with an independent validation run.
 
 **Predecessors (must be green before recording):**
-1. [`RUNBOOK-deepseek-v4-flash-0731-strategist.md`](./RUNBOOK-deepseek-v4-flash-0731-strategist.md) fully green — **including Phase 5.6 (tool-calling gate)**. A coding harness is nothing but tool calls; if 5.6 isn't green, there is no demo.
+1. [`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`](./RUNBOOK-deepseek-v4-flash-0731-two-spark.md) fully green — **including Phase 5.6 (tool-calling gate)**. A coding harness is nothing but tool calls; if 5.6 isn't green, there is no demo.
 2. The demo workspace pulled on the MacBook (`git pull` in the dgx-spark clone).
 3. The pre-flight below done **once, off camera**, ending with the warm-up-variant dry run.
 
@@ -39,7 +39,7 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent   # pi >= 0.83.0
 # paste the models.json block from demo/orbit-globe/README.md into ~/.pi/agent/models.json
 cd <clone>/dgx-spark/demo/orbit-globe/validate && npm run setup   # installs Playwright Chromium
 
-# Sparks — strategist up + warm (runbook Phases 4-5 green incl. 5.6), then from the Mac:
+# Sparks — DeepSeek up + warm (runbook Phases 4-5 green incl. 5.6), then from the Mac:
 curl -s http://promaxgb10-41b1:8888/v1/models    # answers with DeepSeek-V4-Flash-0731
 
 # Dry run (NOT recorded): the warm-up variant from TASK.md — classic single-ISS tracker.
@@ -70,7 +70,7 @@ curl -s http://promaxgb10-41b1:8888/v1/models    # answers with DeepSeek-V4-Flas
 | Symptom | Meaning | Move |
 |---|---|---|
 | pi 400s immediately | `developer` role / `reasoning_effort` rejected | compat flags in `~/.pi/agent/models.json` (README block) — fix on camera, it's a 10-second beat |
-| Tool calls appear as raw `<…DSML…>` text in responses | The spec-decode draft-rejection bug (runbook Appendix A) | Strategist Phase 5.6 wasn't green — stop, interpose the compat proxy or reduce spec tokens; re-record later |
+| Tool calls appear as raw `<…DSML…>` text in responses | The spec-decode draft-rejection bug (runbook Appendix A) | DeepSeek Phase 5.6 wasn't green — stop, interpose the compat proxy or reduce spec tokens; re-record later |
 | Validator T3.live-oracle fails but T3.sgp4 passes | Sim drifted from real time or wheretheiss.at hiccup | Reload artifact (boots at 1×), re-run; if persistent, say so and lean on the SGP4 oracle — honestly, on camera |
 | Agent claims green but D5 fails | The exact failure act 2 exists for | **Keep it in.** That moment is worth more than a clean take |
 | Globe renders black / no textures | CORS on a non-approved texture URL | The agent violated AGENTS.md — point at the rule, let it fix; good teaching beat |

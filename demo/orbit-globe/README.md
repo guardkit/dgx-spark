@@ -1,4 +1,4 @@
-# Orbit Globe — demo workspace for the two-Spark DeepSeek-V4-Flash-0731 strategist
+# Orbit Globe — demo workspace for the two-Spark DeepSeek-V4-Flash-0731 seat
 
 > Recording this as a video? The capture spine — beats, say-lines, failure triage — is
 > [`RUNBOOK-orbit-globe-demo-capture.md`](../../RUNBOOK-orbit-globe-demo-capture.md).
@@ -14,8 +14,8 @@ it** (pi also reads `.pi/skills/`; opencode also reads `.opencode/skills/` and
 ## Prerequisite: the endpoint must serve TOOL CALLS
 
 A coding harness lives on function calling. The base NVFP4-KV recipe does **not** enable
-vLLM's tool-call machinery — the strategist runbook's tool-calling phase
-(`RUNBOOK-deepseek-v4-flash-0731-strategist.md`, Phase 3/5) adds the forum-endorsed 0731
+vLLM's tool-call machinery — the two-Spark runbook's tool-calling phase
+(`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`, Phase 3/5) adds the forum-endorsed 0731
 flags (`--tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4
 --enable-auto-tool-choice --tokenizer-mode hf` + mounted chat template) and gates that a
 live `tools=` request returns a parsed `tool_calls` array — **with speculative decoding
@@ -98,7 +98,7 @@ stay human, on camera, deliberately.
 
 ## Recording notes
 
-- Route through the LiteLLM `:4000` strategist alias instead of `:8888` when you want the
+- Route through the LiteLLM `:4000` `deepseek` alias instead of `:8888` when you want the
   no-cloud-gate story in frame; LiteLLM stays up during the DeepSeek window (it's a router).
 - Expect ~55–67 tok/s decode; narrative prose ~34 — the constellation app is mostly code,
   which runs at the fast end. Warm the server (5 long generations) before the take.

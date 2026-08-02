@@ -33,7 +33,7 @@ Personal operations guide for **my** two-GB10 deployment. **This is not a public
 **The one adaptation:** the two-Spark Phase 7 LiteLLM `model_list` is written for the *public* aliases. Edit it to the Dell's **real** aliases before deploying:
 - `model_name: workhorse` → `model: openai/qwen36-workhorse`
 - add `model_name: coach` → `model: openai/coach-ft-v3`
-- `embed` matches as-is; `strategist` and `claude-opus` rows unchanged.
+- `embed` matches as-is; `deepseek` and `claude-opus` rows unchanged.
 - Confirm the live aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`.
 
 (Applying the front door restarts the Dell's llama-swap once to pick up the CPU-affinity drop-in → a one-time ~81 GB fleet bounce. Schedule it.)
@@ -47,7 +47,7 @@ The **~115 GB safe ceiling per box** is the constraint that makes these *modes*,
 ### Mode 1 — Day-to-day fleet (default)
 Dell (Node A) serves my personal fleet to agents via `:9000` / LiteLLM `:4000`. New Spark (Node B) runs its own fleet or sits idle. No TP, no cabling exercised — two independent single-Spark boxes.
 
-### Mode 2 — Cross-node strategist: DeepSeek-V4-Flash (on demand)
+### Mode 2 — Cross-node DeepSeek: DeepSeek-V4-Flash (on demand)
 A model too big for one box (~150–158 GB → ~75–80 GB **per node**, sharded TP=2 — see the two-Spark PINS). The shard **cannot co-reside with a full fleet** (~79 GB shard + my ~81 GB Dell fleet ≫ 115 GB), so this is **time-shared with Mode 1, never concurrent**: pause day-to-day serving → run the big model → resume.
 
 ```bash
@@ -55,8 +55,8 @@ A model too big for one box (~150–158 GB → ~75–80 GB **per node**, sharded
 sudo systemctl stop llama-swap-keepalive.timer     # system timer — on each box
 systemctl --user stop llama-swap                   # fleet goes dormant (start to revive)
 # (2) Launch DeepSeek-V4-Flash --tp 2 across the pair  → two-Spark Phase 8
-#     ... use the strategist via LiteLLM :4000 (model_name: strategist) ...
-# (3) Tear down the strategist, then revive BOTH fleets:
+#     ... use the DeepSeek seat via LiteLLM :4000 (model_name: deepseek) ...
+# (3) Tear down the DeepSeek seat, then revive BOTH fleets:
 systemctl --user start llama-swap
 sudo systemctl start llama-swap-keepalive.timer
 ```
@@ -102,7 +102,7 @@ So your intuition is right: **the aggregate fits; TP's forced 50/50 is what make
 
 **A simplifier worth knowing:** the factory's Player and Coach run **sequentially** — the Coach grades *after* the Player generates (`gb10-model-requirements-matrix.md` R5/R6, marked never-concurrent). They never compute at the same instant. In row 1 they even **co-fit resident** (~80 GB on one box), so the Coach grades between Player batches with no swap thrash and the Dell untouched.
 
-**Recommendation:** default to **row 1** — one-box `gpt-oss-120b` Player + Coach (the repo's already-documented Mode 3). Only go cross-node if **DeepSeek-class teacher quality is the actual factory bottleneck**; if so, prefer **PP over TP**, and first run two tests on the pinned `jasl/vllm dda4668b`: (a) whether uneven PP partitioning is configurable at all, and (b) the PP-vs-TP throughput on *your* hardware — falling back to **SGLang** (explicit `SGLANG_PP_LAYER_PARTITION`) or **even PP=2 with the Coach placed off the strategist boxes** if vLLM won't take an uneven partition. Either way, a DeepSeek cross-node Player takes the Dell's day-to-day fleet **down for the whole run** (Mode 2 territory).
+**Recommendation:** default to **row 1** — one-box `gpt-oss-120b` Player + Coach (the repo's already-documented Mode 3). Only go cross-node if **DeepSeek-class teacher quality is the actual factory bottleneck**; if so, prefer **PP over TP**, and first run two tests on the pinned `jasl/vllm dda4668b`: (a) whether uneven PP partitioning is configurable at all, and (b) the PP-vs-TP throughput on *your* hardware — falling back to **SGLang** (explicit `SGLANG_PP_LAYER_PARTITION`) or **even PP=2 with the Coach placed off the DeepSeek seat boxes** if vLLM won't take an uneven partition. Either way, a DeepSeek cross-node Player takes the Dell's day-to-day fleet **down for the whole run** (Mode 2 territory).
 
 **Swap cost & batching (why "sequential" doesn't mean "reload each time").** Player and Coach running sequentially does **not** imply unloading one to run the other:
 
