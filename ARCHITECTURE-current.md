@@ -129,7 +129,7 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 - [mostlygeek/llama-swap](https://github.com/mostlygeek/llama-swap) — model lifecycle manager (the unified front door on :9000)
 - [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) — inference engine for everything except the vLLM-served vision models
 - [llama.cpp Anthropic Messages API PR #17570](https://github.com/ggml-org/llama.cpp/pull/17570) — the change that made llama.cpp a drop-in for the Claude Agent SDK
-- [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker) — the vLLM Docker images the granite-docling / granite-vision scripts depend on
+- [eugr/spark-vllm-docker](https://github.com/eugr/spark-vllm-docker) — dual-Spark vLLM installer/recipes. Not on the current serving path: the granite vision scripts now run the upstream `vllm/vllm-openai:v0.22.0-aarch64-cu129-ubuntu2404` image directly (see `scripts/vllm-granite-vision.sh`). Clone at `~/Projects/spark-vllm-docker` (checked out `ed32612`, 2026-04-02; fetched 2026-08-02) with locally built `vllm-node` / `vllm-node-tf5` images — dormant; pinned @ `f7d6e3b5` as the default installer for the DeepSeek FP8 fallback lane (`RUNBOOK-two-spark-bring-up.md` Phase 8)
 - [martinB78's full-stack repo](https://github.com/mARTin-B78/dgx-spark_lite-llm_llama-swap_vllm_llama-cpp_ollama) — reference implementation for LiteLLM + llama-swap + vLLM + llama.cpp on GB10
 - [AEON-7 DFlash deployment](https://github.com/AEON-7/Qwen3.6-NVFP4-DFlash) — reference for future DFlash integration
 - [LiteLLM](https://docs.litellm.ai/) — unified API proxy; the optional `:4000` front door stood up by the additive overlay `RUNBOOK-litellm-front-door.md` (DECISION-DF-005)

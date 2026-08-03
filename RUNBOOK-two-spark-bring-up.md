@@ -36,7 +36,7 @@ PINS (set 2026-06-22)
   DGX OS / driver   7.5.0 / 580.159.03 / CUDA 13.0.2 / UEFI 1.108.20   (both nodes, matched)
   nccl-tests        v2.28.9-1   built make MPI=1, NVCC_GENCODE sm_121
   BUSBW_PASS_GBPS   20          healthy single-cable ~22.1; 25 = theoretical ceiling, NOT the bar; ~15.5 = fw-degraded; ~10.25 = both-ports-miswired
-  vLLM              jasl/vllm commit dda4668b   (PINNED DEFAULT for the V4-Flash TP build; GB10 validation is commit-specific. Alt installer: eugr/spark-vllm-docker — Phase 8)
+  vLLM              eugr/spark-vllm-docker @ f7d6e3b5   (PINNED DEFAULT for the V4-Flash TP build — Docker, recipe deepseek-v4-flash, --no-ray --port 8080; pinned 2026-08-02. Reference build for A/B: jasl/vllm @ dda4668b + torch 2.9.1 — the canonical thread's validated commit — Phase 8)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
   DeepSeek          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
   litellm           litellm[proxy] (latest)   front door :4000; NO cloud fallback (fallbacks: [] AND context_window_fallbacks: []); floated not frozen (CONVENTIONS §3); validated at 1.89.4 on GB10
@@ -89,7 +89,7 @@ echo "=== Phase 0.1: two-spark deterministic checks ==="
 mstflint -d $(ibdev2netdev | awk '{print $1; exit}') q 2>/dev/null | grep -i 'FW Version' || echo "[recon] mstflint unavailable — check FW via DGX Dashboard"   # DGX OS ships mstflint, not legacy flint
 # torch + vLLM commit pins (on the node that will host vLLM)
 python3 -c "import torch; print('[info] torch', torch.__version__)" 2>/dev/null || echo "[info] torch not yet installed"
-echo "[pin] vLLM commit dda4668b (jasl/vllm); torch 2.9.1; nccl-tests v2.28.9-1"
+echo "[pin] eugr/spark-vllm-docker f7d6e3b5 (recipe deepseek-v4-flash); reference build jasl/vllm dda4668b + torch 2.9.1; nccl-tests v2.28.9-1"
 ```
 
 ### 0.2 Source scan (fixed list, LLM judgment)
@@ -314,15 +314,21 @@ echo "$RESP" | jq -e '.choices[0].message.content' >/dev/null \
 The ~158 GB DeepSeek shards to ~75–80 GB/node + KV — it claims the large majority of **both** boxes. It and a full swap pool **do not co-reside**. So: **evict the swap pool on EVERY participating node before launching the DeepSeek seat** (Node A always; Node B too if it ran single-Spark — stop, don't uninstall).
 
 ```bash
-# 0. One-time, ON BOTH NODES: install the pinned vLLM (agent step — heavy build, edit out the wait).
-#    PINNED DEFAULT = jasl/vllm @ dda4668b + torch 2.9.1 — the GB10-validated, commit-specific build for the
-#    V4-Flash two-box DeepSeek (torch 2.10 breaks CUDA graphs). Install into a venv:
+# 0. One-time: stand up the pinned vLLM runtime (agent step — heavy build, edit out the wait).
+#    PINNED DEFAULT = eugr/spark-vllm-docker @ f7d6e3b5 (pinned 2026-08-02) — the community-standard Docker
+#    harness (~1.9k★; --no-ray, fastsafetensors, GB-based gpu-mem-util, DeepGEMM nv_dev baked in).
+#    Clone at the pin, build + distribute the vllm-node image from the head:
+#      git clone https://github.com/eugr/spark-vllm-docker ~/spark-vllm-docker \
+#        && git -C ~/spark-vllm-docker checkout f7d6e3b5db44ba19e1129d03793223692458929d
+#      cd ~/spark-vllm-docker && ./build-and-copy.sh   # then assert BOTH nodes: docker image inspect vllm-node
+#    (a dev clone may already exist at ~/Projects/spark-vllm-docker — fetch + checkout the pin there instead.
+#     eugr tracks its own vLLM version — record the image's embedded vLLM commit in RESULTS on first build.)
+#    REFERENCE BUILD (A/B escape hatch, venv not Docker) = jasl/vllm @ dda4668b + torch 2.9.1 — the exact
+#    commit the canonical thread's 42–44 tok/s numbers validate against (torch 2.10 breaks CUDA graphs):
 #      python3 -m venv ~/vllm-tp && ~/vllm-tp/bin/pip install -U pip torch==2.9.1 \
 #        && ~/vllm-tp/bin/pip install 'vllm @ git+https://github.com/jasl/vllm@dda4668b'
-#    ALTERNATIVE = eugr/spark-vllm-docker (the recipe's Docker installer — --no-ray, fastsafetensors, the
-#    -lgc power-off mitigation baked in). Use it if you prefer containers, but the jasl PIN above is the
-#    commit THIS runbook validates against; eugr's image tracks its own vLLM version, so re-check Phase 0 if you take it.
-#    (Separately, eugr still supplies the granite-vision vLLM images and the 121a-real llama.cpp build flag — unchanged.)
+#    (Separately, eugr is still credited for the 121a-real llama.cpp build flag. The granite-vision seat no
+#     longer uses eugr images — it runs upstream vllm/vllm-openai:v0.22.0-aarch64-cu129-ubuntu2404 directly.)
 # 0b. The DeepSeek weights (~158 GB) load LOCALLY PER NODE for mp/no-ray TP — vLLM pulls them to EACH
 #     node's HF cache on first launch (so it downloads on BOTH A and B). Pre-stage to avoid inline waits:
 #     hf download deepseek-ai/DeepSeek-V4-Flash   (run on each node)  — or point --model at a shared NFS dir.
@@ -330,8 +336,12 @@ The ~158 GB DeepSeek shards to ~75–80 GB/node + KV — it claims the large maj
 #    On Node A always (and Node B too, if it ran single-Spark): stop the keepalive timer + the fleet.
 sudo systemctl stop llama-swap-keepalive.timer        # (system unit, per the single-Spark runbook)
 systemctl --user stop llama-swap                      # fleet goes dormant during TP; `start` to revive after
-# 2. Launch vLLM --tp 2 across both nodes (mp backend; no Ray at 2 nodes):
-#    TP-layer env (distinct from the Phase-4 fabric vars): add the RoCE HCAs explicitly.
+# 2. Launch TP=2 across both nodes — DEFAULT (eugr recipe: MTP k=2, fp8 KV, deepseek_v4 tool parsers included):
+cd ~/spark-vllm-docker && ./run-recipe.sh deepseek-v4-flash --no-ray --port 8080
+#    --no-ray is MANDATORY (the recipe yaml defaults to the ray backend; mp/no-ray is the 2-node way);
+#    --port 8080 holds the estate port contract (recipe default is 8000). The harness autodiscovers the
+#    NCCL env — ASSERT it picked the direct link (NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1), never trust it blind.
+#    REFERENCE LANE (jasl venv, manual launch — only when A/B-ing against the validated reference build):
 export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
        GLOO_SOCKET_IFNAME=enp1s0f1np1 TP_SOCKET_IFNAME=enp1s0f1np1
 ~/vllm-tp/bin/vllm serve deepseek-ai/DeepSeek-V4-Flash \
@@ -339,8 +349,9 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
   --kv-cache-dtype fp8 --enable-expert-parallel --no-ray \
   --speculative-config '{"method":"deepseek_mtp","num_speculative_tokens":2}' \
   --max-num-seqs 2 --port 8080
-#    (pin jasl/vllm dda4668b + torch 2.9.1; choose a cudagraph mode that AVOIDS vLLM #40969
-#     — FULL_AND_PIECEWISE + chunked prefill silently hangs after ~6–7 requests on GB10.)
+#    (reference lane: jasl/vllm dda4668b + torch 2.9.1; choose a cudagraph mode that AVOIDS vLLM #40969
+#     — FULL_AND_PIECEWISE + chunked prefill silently hangs after ~6–7 requests on GB10. The eugr recipe
+#     ships VLLM_USE_BREAKABLE_CUDAGRAPH=0 in its env — confirm the hang doesn't reproduce during Phase 9.)
 ```
 **▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the DeepSeek seat. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
 **Treat the seat as single-stream:** concurrency=2 collapses decode to ~1 tok/s at 65 K. `--max-num-seqs 2` is a KV-budget cap, not a throughput target.
@@ -352,7 +363,8 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 
 ```bash
 # Same model, both ways — the numbers, not the README, decide whether TP earns its place.
-#  (a) DeepSeek TP=2 decode tok/s + cold-start time (expect ~44 tok/s warm WITH MTP; ~5 without)
+#  (a) DeepSeek TP=2 decode tok/s + cold-start time (expect ~44 tok/s warm WITH MTP; ~5 without —
+#      expectation from the jasl reference build; the first eugr-lane run RE-BASELINES it here)
 #  (b) a fleet model single-node on Node A for contrast
 #  (c) PP=2 vs TP=2 for the DeepSeek seat — PP wins under concurrency (~555 vs ~252 @batch128),
 #      TP wins at batch=1 single-stream (the DeepSeek seat's actual regime). Record both.

@@ -15,13 +15,15 @@ it** (pi also reads `.pi/skills/`; opencode also reads `.opencode/skills/` and
 
 A coding harness lives on function calling. The base NVFP4-KV recipe does **not** enable
 vLLM's tool-call machinery — the two-Spark runbook's tool-calling phase
-(`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`, Phase 3/5) adds the forum-endorsed 0731
-flags (`--tool-call-parser deepseek_v4 --reasoning-parser deepseek_v4
---enable-auto-tool-choice --tokenizer-mode hf` + mounted chat template) and gates that a
-live `tools=` request returns a parsed `tool_calls` array — **with speculative decoding
-on** (DSpark has a documented draft-rejection bug that can shred tool-call opener tags;
-the gate exists to catch it, and 0rand's `opencode_compat_proxy` is the fallback shim).
-Run that phase green before pointing any harness at the box.
+(`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`, Phase 3/5) adds the **native** path
+(`--tokenizer-mode deepseek_v4 --tool-call-parser deepseek_v4 --reasoning-parser
+deepseek_v4 --enable-auto-tool-choice` + the model card's official encoding package via
+`DSPARK_ENCODING_FILE`; the earlier hf-tokenizer + mounted-Jinja approach is **superseded**
+— it broke tool JSON at high effort and destroyed prefix caching) and gates that live
+`tools=` requests return parsed `tool_calls` arrays with non-empty follow-ups — **with
+speculative decoding on** (DSpark has a documented draft-rejection bug that can shred
+tool-call opener tags; the gate exists to catch it, and 0rand's `opencode_compat_proxy`
+is the fallback shim). Run that phase green before pointing any harness at the box.
 
 ## Harness A (primary): pi
 

@@ -2,7 +2,7 @@
 
 **Purpose:** serve DeepSeek-V4-Flash-0731 (284B/13B-active MoE, MIT) across the two-Spark pair at native quality — FP4-QAT experts + FP8 attention, NVFP4 applied to the **KV cache only** — with DSpark speculative decoding, as an on-demand **planning/teaching seat**. The fleet is drained for the session and provably revived at the end; both acts are gated phases of this runbook.
 **Machine:** both nodes (Node A = head, Node B = worker).
-**Predecessor:** [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) Phases 2–7 (firmware, cable, NCCL fabric, mesh SSH, front-door guard). This overlay **supersedes that runbook's Phase 8** (the jasl FP8 DeepSeek), which remains the pinned **fallback lane**.
+**Predecessor:** [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) Phases 2–7 (firmware, cable, NCCL fabric, mesh SSH, front-door guard). This overlay **supersedes that runbook's Phase 8** (the plain-FP8 DeepSeek — eugr Docker default, jasl reference build), which remains the pinned **fallback lane**.
 **Execution-results:** `RESULTS-deepseek-v4-flash-0731-first-run.md` (create on first run; template in Appendix B).
 **Expected wall-clock:** first run ~2–3 h (runtime image builds ~30–60 min/node dominate — edit out of any recording; weights must be pre-staged, see Phase 1.3). Re-run on a built box: ~25 min including the mini-soak. DeepSeek cold-start alone: ~6–8 min.
 
@@ -54,18 +54,39 @@ PINS (set 2026-08-01)
   gpu_mem_util       0.78    (spec-decode buffers allocate LAZILY on first request — do not raise)
   B12X MoE backend   VLLM_USE_B12X_MOE=1   (the entire speed difference; =0 → ~29 tok/s silently)
   MTP_NUM_TOKENS     5       (recipe .env leftover =3 costs ~24% decode)
-  tool calling       --tool-call-parser deepseek_v4 · --reasoning-parser deepseek_v4 ·
-                     --enable-auto-tool-choice · --tokenizer-mode hf + chat_template.jinja
-                     mounted :ro  (the endorsed 0731 solution — forum t/372268 post 538;
-                     thinking via --default-chat-template-kwargs thinking_mode=thinking).
-                     REQUIRED for the coding-harness demo lane (demo/orbit-globe/) —
-                     the base NVFP4-KV recipe does NOT ship these.
+  tool calling       --tokenizer-mode deepseek_v4 · --tool-call-parser deepseek_v4 ·
+                     --reasoning-parser deepseek_v4 · --enable-auto-tool-choice
+                     + the model card's OFFICIAL ENCODING PACKAGE (encoding_dsv4.py via
+                     DSPARK_ENCODING_FILE — the model card ships NO Jinja template; the
+                     MiaAI-Lab compose auto-installs it on both nodes).
+                     ⚠️ SUPERSEDES t/372268 post 538 (--tokenizer-mode hf + mounted
+                     chat_template.jinja): four adverse reports 08-02/03 INCLUDING ITS OWN
+                     AUTHOR (#540 · #544 invalid JSON at high/max · #554 jinja re-renders
+                     destroy prefix cache · #558 tool calls return empty) and an explicit
+                     recommendation against (#560). Native deepseek_v4 tokenizer is
+                     deterministic and cache-friendly. REQUIRED for the demo lane.
+  crash knobs        VLLM_DSPARK_GPU_REJECTED_CONTEXT_MASK=1 (Patch-2 ragged-path
+                     requirement) · NO repetition_penalty anywhere (illegal-memory crash;
+                     if one appears anyway, remove it before any other diagnosis)
+  socket ifnames     GLOO_SOCKET_IFNAME + TP_SOCKET_IFNAME = same value as
+                     NCCL_SOCKET_IFNAME (PR #13: TP init FAILED on a non-author Spark
+                     pair without them; zero cost if redundant)
+  KV fallback        fp8_ds_mla if nvfp4_ds_mla misbehaves (the author's firmware is
+                     stated NOWHERE — nvfp4_ds_mla on our FW 28.45.4028 is unproven
+                     until our smoke; PR #13 anticipated this with a KV_CACHE_DTYPE env)
+  LANE fallback #2   MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark — prebuilt
+                     ghcr.io/anemll/dspark-vllm-gx10:0.1.1 (Patch-4-equivalent BAKED, same
+                     nvfp4_ds_mla/1M/TP=2, no manual mount; one named forum reproducer)
+  A/B candidate      eugr B12X 0731 stack — archived at vendor/eugr-0731-ab/ (fp8 KV;
+                     runs as a measured A/B in a LATER session, never this bring-up)
   head/API           Node A :8888  ·  worker-first launch order (worker up before head)
   MEM_CEILING_GB     115 per node        (121 usable; freeze observed at 114)
   fabric (inherited) CX-7 FW ≥ 28.45.4028 · NCCL busbw ≥ 20 GB/s · transport NET/IB (never TCP)
-  FALLBACK lane      jasl/vllm @ dda4668b + torch 2.9.1 · FP8 TP=2 · MTP k=2 · ~42–44 tok/s
-                     (= two-spark runbook Phase 8, kept as the escape hatch; 0731 is architecture-
-                     identical to the April checkpoint so that recipe carries over)
+  FALLBACK lane      eugr/spark-vllm-docker @ f7d6e3b5 · recipe deepseek-v4-flash · FP8 TP=2 · MTP k=2
+                     · Docker, --no-ray --port 8080   (= two-spark runbook Phase 8, the escape hatch;
+                     0731 is architecture-identical to the April checkpoint so the recipe carries over.
+                     The ~42–44 tok/s expectation is from the jasl/vllm @ dda4668b + torch 2.9.1
+                     reference build, kept for A/B — re-baseline the eugr lane on first exercise)
 ```
 
 ---
@@ -95,8 +116,11 @@ docker image inspect vllm-dspark-runtime:dspark-nvfp4-stage-c >/dev/null 2>&1 \
 
 ```
 RECON SOURCES (fixed)
-  - recipe repo commits + issues        (esp. anything superseding Patch 4, image rebuilds)
+  - recipe repo commits + issues        (esp. anything superseding Patch 4, image rebuilds;
+                                         PR #13 portability merge state · Issue #16 think-token)
   - NVIDIA forum thread 378824          (the recipe's companion thread — new field reports)
+  - NVIDIA forum thread 372268 tail     (tool-calling/parser consensus moves here first)
+  - MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark  (the baked-image fallback lane — image tags)
   - vLLM PR #41834 (SM12x enablement)   (if MERGED into a release: upstream may retire this fork path)
   - HF deepseek-ai/DeepSeek-V4-Flash-0731 discussions (checkpoint issues, template/parser bugs)
 RECON TASK
@@ -169,6 +193,7 @@ docker image inspect vllm-dspark-runtime:dspark-nvfp4-stage-c >/dev/null && echo
 ```
 
 **Patch 4 (mandatory for 0731 — the image does NOT contain it):** stage the patched `dspark.py` per the recipe README ("two lines, no rebuild — bind-mount it read-only" over the image's `/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py`).
+**⚠️ TWO files in the recipe are named `dspark.py` — this is the root of the forum's filepath confusion. Patch 4's target is `recipe/overlay/vllm/v1/spec_decode/dspark.py`** (the proposer's `_STACKED_PARAM_NAME_MAPPING`, lines 15–18; the patch header reads `--- a/vllm/v1/spec_decode/dspark.py`). It is **NOT** `recipe/overlay/vllm/models/deepseek_v4/nvidia/dspark.py` (the draft weight loader — already baked into stage-c; never mount that one).
 **▶ GATE — version-match:** the patched file must come from **this image's** vLLM tree (a `dspark.py` lifted from another vLLM version crashes with `propose() got an unexpected keyword argument`). Extract the image's own copy, apply the two-line w1/w3→`gate_up_proj` mapping to *that*, and diff to confirm only those lines changed:
 
 ```bash
@@ -202,11 +227,18 @@ grep -rq 'repetition_penalty' docker-compose.dspark.yml .env.dspark && echo "FAI
 grep -q 'dspark.patched.py:/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py:ro' \
   docker-compose.dspark.yml && echo PASS || echo "FAIL: Patch 4 not mounted"
 # Tool calling — the demo lane dies without these (and raw DSML leaks into content without the parsers):
+grep -q 'tokenizer-mode deepseek_v4'    docker-compose.dspark.yml && echo PASS || echo "FAIL: NATIVE deepseek_v4 tokenizer-mode (the hf+jinja path is SUPERSEDED — see PINS)"
 grep -q 'tool-call-parser deepseek_v4'  docker-compose.dspark.yml && echo PASS || echo "FAIL: tool-call parser"
 grep -q 'reasoning-parser deepseek_v4'  docker-compose.dspark.yml && echo PASS || echo "FAIL: reasoning parser"
 grep -q 'enable-auto-tool-choice'       docker-compose.dspark.yml && echo PASS || echo "FAIL: auto tool choice"
-grep -q 'tokenizer-mode hf'             docker-compose.dspark.yml && grep -q 'chat_template.jinja' docker-compose.dspark.yml \
-  && echo PASS || echo "FAIL: hf tokenizer-mode + mounted chat template (t/372268 post 538 — the 0731 fix)"
+grep -q 'chat_template.jinja' docker-compose.dspark.yml \
+  && echo "FAIL: mounted Jinja template present — the post-538 path is KNOWN-BAD (#540/#544/#554/#558/#560); remove it" || echo "PASS: no jinja mount"
+grep -qE 'DSPARK_ENCODING_FILE|encoding_dsv4' .env.dspark docker-compose.dspark.yml \
+  && echo PASS || echo "FAIL: official encoding package not wired (encoding_dsv4.py via DSPARK_ENCODING_FILE)"
+grep -q 'VLLM_DSPARK_GPU_REJECTED_CONTEXT_MASK=1' .env.dspark && echo PASS || echo "FAIL: Patch-2 ragged-path mask"
+# Socket ifnames — TP init failed on a non-author Spark pair without these (PR #13):
+grep -qE '^GLOO_SOCKET_IFNAME=' .env.dspark && grep -qE '^TP_SOCKET_IFNAME=' .env.dspark \
+  && echo PASS || echo "FAIL: set GLOO_SOCKET_IFNAME + TP_SOCKET_IFNAME = NCCL_SOCKET_IFNAME's value"
 # Container plumbing: network_mode host · ipc host · shm 64gb · /dev/infiniband · memlock unlimited
 ```
 
@@ -235,6 +267,14 @@ Under speculative decoding vLLM emits at most one SSE chunk per decode *step* �
 # 5.1 Warm-up: FIVE long generations (~1k tokens each) — cold-start costs ~30%; do not gate on them.
 # 5.2 Acceptance gate (the Patch 4 functional proof):
 curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥ 0.50 (post-fix 0.602; unpatched 0.257)
+# BANKED FAILURE SIGNATURES (diagnose by shape, not guesswork):
+#   Signature A — drafting healthy but acceptance ~26%: Patch 4 mount not in effect. A WRONG
+#     mapping raises KeyError loudly (DSPARK-SHARED-EXPERT-FIX.md), so clean boot + low
+#     acceptance = the mount is MISSING, not wrong.
+#   Signature B — ~12 tok/s, acceptance 1.5-4.5%, mean accept length ~1.1: the mixed-quant
+#     drafter corruption seen ONLY on the quantized -NVFP4 checkpoint (t/378824 #11-12).
+#     If you see this, you are serving the WRONG WEIGHTS — assert --model points at the
+#     official deepseek-ai/DeepSeek-V4-Flash-0731 snapshot, not a -NVFP4 variant.
 # 5.3 Decode gate: structured/counting prompt, single stream, stream:false
 #     assert ≥ 45 tok/s   (expected 55-67 mean, 84 peak; ~30 = the unpatched signature → HALT, recheck Phase 2)
 # 5.4 Prefill sanity: ≥ 1,000 tok/s at 8k-token prompt (expected ~1,500 @8k, ~2,600 @100k)
@@ -243,14 +283,20 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 #     mixed agent traffic ~88 tok/s aggregate at c=4 (~22/stream)
 # 5.6 TOOL-CALLING gate — run WITH speculative decoding ON (the draft-rejection trap):
 #     DSpark spec decode can shred the tool-call opener tag at draft-rejection boundaries,
-#     leaking calls into content as raw DSML (t/372268 post 296). Assert the parsed path:
-#     (a) template sanity: prompts at reasoning_effort low/high/max produce ~5/84/97
-#         template tokens respectively (post 538's verification) — record in RESULTS;
-#     (b) FIVE live requests with a simple tools=[...] schema, stream:false → every response
-#         carries choices[0].message.tool_calls as a PARSED array AND content holds zero raw
-#         DSML/tool markup. Any leak = the draft-rejection bug: interpose the
-#         opencode_compat_proxy shim (Appendix A) or reduce num_speculative_tokens and
-#         re-test — do NOT record the harness demo until 5/5 clean.
+#     leaking calls into content as raw DSML (t/372268 post 296). Four blocking sub-checks
+#     (each maps to a reported 08-02/03 failure mode on the retired hf+jinja path):
+#     (a) FIVE live requests with a simple tools=[...] schema, stream:false → every response
+#         carries choices[0].message.tool_calls as a PARSED array, content holds zero raw
+#         DSML markup, AND the follow-up turn returns NON-EMPTY content (t/372268 #558:
+#         calls fired but answers came back empty);
+#     (b) reasoning separation: <think>/reasoning lands in reasoning_content, never in
+#         content (recipe Issue #16, open — watch it);
+#     (c) tool-JSON validity at reasoning_effort HIGH and MAX (t/372268 #544: invalid JSON
+#         appeared only at high/max);
+#     (d) a 3-turn session keeps the prefix cache warm (TTFT turn-3 ≪ turn-1 — the #554
+#         regression class the jinja path caused).
+#     Any failure: interpose the opencode_compat_proxy shim (Appendix A) or reduce
+#     num_speculative_tokens and re-test — do NOT record the harness demo until all clean.
 ```
 
 ---
@@ -323,9 +369,13 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 | Fabric validated by recipe author on a RoCE **switch**; ours is the direct link | our variance | Phase 1.1 NCCL gate |
 | DSpark draft-rejection shreds tool-call opener → raw DSML leaks (t/372268 post 296) | open; parser not spec-aware | Phase 5.6 gate; fallback = 0rand `opencode_compat_proxy` shim (90/100 hardmode after) |
 | Harness 400s on `developer` role / `reasoning_effort` (typical vLLM) | expected | harness compat flags — see `demo/orbit-globe/README.md` |
+| The t/372268 post-538 tool path (`--tokenizer-mode hf` + jinja mount) | **SUPERSEDED 08-03** — 4 adverse reports incl. its author (#540/#544/#554/#558/#560) | PINS pin the native `deepseek_v4` tokenizer + encoding package; Phase 3 grep FAILS if a jinja mount reappears |
+| Missing `<think>` token in reasoning content (recipe Issue #16, opened 08-02) | open | Phase 5.6(b); recon watches the issue |
+| GB10 UMA accounting: available KV capacity varies 4.22–5.34 GiB across boots (vLLM #48140) | open | clean reboot before the demo session; record the boot's KV line in RESULTS |
+| Concurrent-agent fairness: `--max-num-batched-tokens 8192` starves decode under concurrent prefill | single-source (t/378890, published harness) | OPTIONAL: 2048 for multi-agent sessions (p95 gap 6.1s→1.6s); not for the single-stream demo |
 
 ## Appendix B — Rollback + RESULTS template
 
-**Rollback:** Phase 9 teardown + revival *is* the rollback — the fleet returns regardless of gate outcomes (run it even after a mid-run HALT). The staged weights and image persist for the next attempt (~230 GB disk; reclaim with `docker rmi` + HF cache delete only on an explicit abandon decision). **Fallback serving lane:** two-spark runbook Phase 8 (jasl FP8, ~42–44 tok/s) — architecture-identical checkpoint, config carries over.
+**Rollback:** Phase 9 teardown + revival *is* the rollback — the fleet returns regardless of gate outcomes (run it even after a mid-run HALT). The staged weights and image persist for the next attempt (~230 GB disk; reclaim with `docker rmi` + HF cache delete only on an explicit abandon decision). **Fallback serving lane:** two-spark runbook Phase 8 (eugr Docker FP8; ~42–44 tok/s = the jasl reference-build number) — architecture-identical checkpoint, config carries over.
 
 **RESULTS records:** recipe commit · image digest · weights revision · per-node resident GB at idle/launch/soak · KV pool tokens+GiB · acceptance · decode (structured/code/narrative) · prefill @8k/@100k · soak table · revive diff vs snapshot · deviations.
