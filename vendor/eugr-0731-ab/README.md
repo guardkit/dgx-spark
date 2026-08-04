@@ -13,3 +13,12 @@ independent reproducer, fp8 KV (half nvfp4_ds_mla's density — 1M ctx unverifie
 published acceptance/decode numbers. Verdict: the tonyd2wild pin stays the lane of record
 (three independent reproductions); this stack runs as a **measured A/B in a later session**.
 Its bar to displace the pin: match ~60% draft acceptance AND verify 1M ctx at fp8 KV.
+
+**Update 2026-08-04 recon:** maturing fast — thread grew to 31 posts: a published b12x
+benchmark (pp2048 prefill 1,832 t/s, tg32 37.6 t/s peak 38.8), bernisse reporting 55+ tok/s
+at 2–4 concurrent contexts and **tool-bench 93/100**, a `--load-format safetensors
+--safetensors-load-strategy lazy` flag pair that frees KV headroom (candidate for any A/B),
+and eugr_nv stating b12x is merged to main with a TP=3 path (2.8M-token KV across three
+Sparks). Caveat: eugr/spark-vllm-docker's commit log shows only README-level b12x support —
+no visible merge commit or nightly-CI workflow yet, so verify the repo state before ever
+re-basing on "main". A/B priority: raised, still later-session.

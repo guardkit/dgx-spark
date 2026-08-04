@@ -65,6 +65,13 @@ PINS (set 2026-08-01)
                      destroy prefix cache · #558 tool calls return empty) and an explicit
                      recommendation against (#560). Native deepseek_v4 tokenizer is
                      deterministic and cache-friendly. REQUIRED for the demo lane.
+  reasoning effort   NEVER "high" — a SILENT NO-OP on 0731 (injects only ~5-6 template
+                     tokens vs max's ~84-85; t/372268 #590-#593, independently corroborated
+                     by the MiaAI-Lab fallback flipping DEFAULT_THINKING low→max the same
+                     day, commit a4ce87a). Use "max" for agentic work (draft acceptance
+                     65-71% reported at max) or deliberate off/low; max-vs-normal remains
+                     an OPEN A/B (max can overthink/loop — #589). VERIFY via POST
+                     /tokenize: "max" must inject the ~84-token effort prefix.
   crash knobs        VLLM_DSPARK_GPU_REJECTED_CONTEXT_MASK=1 (Patch-2 ragged-path
                      requirement) · NO repetition_penalty anywhere (illegal-memory crash;
                      if one appears anyway, remove it before any other diagnosis)
@@ -76,7 +83,9 @@ PINS (set 2026-08-01)
                      until our smoke; PR #13 anticipated this with a KV_CACHE_DTYPE env)
   LANE fallback #2   MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark — prebuilt
                      ghcr.io/anemll/dspark-vllm-gx10:0.1.1 (Patch-4-equivalent BAKED, same
-                     nvfp4_ds_mla/1M/TP=2, no manual mount; one named forum reproducer)
+                     nvfp4_ds_mla/1M/TP=2, no manual mount; one named forum reproducer).
+                     ⚠️ If used: PIN the recipe revision or set DEFAULT_THINKING explicitly
+                     — its default flipped low→max in a4ce87a (08-04; image tag still 0.1.1)
   A/B candidate      eugr B12X 0731 stack — archived at vendor/eugr-0731-ab/ (fp8 KV;
                      runs as a measured A/B in a LATER session, never this bring-up)
   head/API           Node A :8888  ·  worker-first launch order (worker up before head)
@@ -117,7 +126,9 @@ docker image inspect vllm-dspark-runtime:dspark-nvfp4-stage-c >/dev/null 2>&1 \
 ```
 RECON SOURCES (fixed)
   - recipe repo commits + issues        (esp. anything superseding Patch 4, image rebuilds;
-                                         PR #13 portability merge state · Issue #16 think-token)
+                                         PR #13 portability · Issue #16 think-token · PR #17 —
+                                         bakes encoding+tool parser INTO the overlay: if MERGED
+                                         it supersedes our DSPARK_ENCODING_FILE wiring)
   - NVIDIA forum thread 378824          (the recipe's companion thread — new field reports)
   - NVIDIA forum thread 372268 tail     (tool-calling/parser consensus moves here first)
   - MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark  (the baked-image fallback lane — image tags)
@@ -291,10 +302,15 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 #         calls fired but answers came back empty);
 #     (b) reasoning separation: <think>/reasoning lands in reasoning_content, never in
 #         content (recipe Issue #16, open — watch it);
-#     (c) tool-JSON validity at reasoning_effort HIGH and MAX (t/372268 #544: invalid JSON
-#         appeared only at high/max);
+#     (c) tool-JSON validity at reasoning_effort MAX and LOW — never test "high": it is a
+#         SILENT NO-OP on 0731 (see PINS). First verify via POST /tokenize that "max"
+#         injects the ~84-token effort prefix (~5-6 tokens = the broken/no-op shape);
 #     (d) a 3-turn session keeps the prefix cache warm (TTFT turn-3 ≪ turn-1 — the #554
-#         regression class the jinja path caused).
+#         regression class the jinja path caused);
+#     (e) a STREAMING tools request never emits empty `tool_calls: []` deltas — they break
+#         clients that check `if (delta.tool_calls)` (t/372268 #573, verified on Spark;
+#         fix = the #573 one-line patch to deepseekv32_tool_parser.py omitting the empty
+#         field). The demo harness streams, so this one is load-bearing.
 #     Any failure: interpose the opencode_compat_proxy shim (Appendix A) or reduce
 #     num_speculative_tokens and re-test — do NOT record the harness demo until all clean.
 ```
@@ -370,7 +386,10 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 | DSpark draft-rejection shreds tool-call opener → raw DSML leaks (t/372268 post 296) | open; parser not spec-aware | Phase 5.6 gate; fallback = 0rand `opencode_compat_proxy` shim (90/100 hardmode after) |
 | Harness 400s on `developer` role / `reasoning_effort` (typical vLLM) | expected | harness compat flags — see `demo/orbit-globe/README.md` |
 | The t/372268 post-538 tool path (`--tokenizer-mode hf` + jinja mount) | **SUPERSEDED 08-03** — 4 adverse reports incl. its author (#540/#544/#554/#558/#560) | PINS pin the native `deepseek_v4` tokenizer + encoding package; Phase 3 grep FAILS if a jinja mount reappears |
-| Missing `<think>` token in reasoning content (recipe Issue #16, opened 08-02) | open | Phase 5.6(b); recon watches the issue |
+| Missing `<think>` token in reasoning content (recipe Issue #16) | open — **MULTI-CONFIRMED 08-04** (doongkc + roady001): reasoning streams as visible content, only the closing `</think>` is emitted | Phase 5.6(b); any chat-UI consumer inherits visible reasoning spill until fixed |
+| Streaming parser emits empty `tool_calls: []` deltas (t/372268 #573) | reported + patched in-thread | Phase 5.6(e); the #573 one-line parser patch |
+| reasoning_effort "high" = silent no-op on 0731 | multi-corroborated 08-04 | PINS; /tokenize prefix-count check in 5.6(c) |
+| vLLM-from-source path (only if ever leaving the recipe image) | PR #41834 still unmerged; preview tag `sm120-pr-41834-stable-preview-20260804` = first head validated on SM121 | leave `VLLM_DEEPSEEK_V4_EAGER_SCRATCH_POOL` unset — the eager scratch pool had a cross-layer reuse race corrupting output under concurrency (default OFF since 08-04) |
 | GB10 UMA accounting: available KV capacity varies 4.22–5.34 GiB across boots (vLLM #48140) | open | clean reboot before the demo session; record the boot's KV line in RESULTS |
 | Concurrent-agent fairness: `--max-num-batched-tokens 8192` starves decode under concurrent prefill | single-source (t/378890, published harness) | OPTIONAL: 2048 for multi-agent sessions (p95 gap 6.1s→1.6s); not for the single-stream demo |
 
