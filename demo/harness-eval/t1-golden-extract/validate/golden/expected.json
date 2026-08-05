@@ -1,0 +1,9 @@
+[
+  { "ts": "2026-07-14T09:12:05Z", "service": "llama-swap", "level": "ERROR", "message": "model \"coach-ft-v3\" failed health check after 600s" },
+  { "ts": "2026-07-14T09:12:07Z", "service": "fleet-memory", "level": "ERROR", "message": "connection refused by postgres", "ip": "192.168.1.44" },
+  { "ts": "2026-07-14T09:12:12Z", "service": "relay-worker", "level": "ERROR", "message": "failed to flush batch" },
+  { "ts": "2026-07-14T09:12:15Z", "service": "vllm", "level": "FATAL", "message": "CUDA out of memory on rank 1" },
+  { "ts": "2026-07-14T09:12:18Z", "service": "embed-relay", "level": "ERROR", "message": "timeout waiting for :9000", "ip": "2001:db8::7a31" },
+  { "ts": "2026-07-14T09:12:26Z", "service": "vllm", "level": "ERROR", "message": "NCCL watchdog timeout on rank 1" },
+  { "ts": "2026-07-14T09:12:29Z", "service": "api-gateway", "level": "ERROR", "message": "502 from upstream after 3 retries" }
+]

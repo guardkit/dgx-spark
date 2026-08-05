@@ -1,0 +1,10 @@
+[
+  { "id": "startpos", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "note": "opening position", "expectStatus": "ongoing" },
+  { "id": "kiwipete", "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", "note": "castling both sides, pins, ep candidates" },
+  { "id": "en-passant", "fen": "rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3", "note": "ep capture exf6 available" },
+  { "id": "promotion", "fen": "8/P6k/8/8/8/8/7K w - - 0 1", "note": "a7a8 must enumerate q/r/b/n" },
+  { "id": "pin", "fen": "4k3/8/8/8/8/4r3/4P3/4K1N1 w - - 0 1", "note": "e2 pawn pinned on the e-file; knight free" },
+  { "id": "check", "fen": "rnbqkbnr/ppp1pppp/8/1B1p4/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", "note": "Bb5+ — restricted replies", "expectStatus": "check" },
+  { "id": "checkmate", "fen": "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3", "note": "fool's mate", "expectStatus": "checkmate" },
+  { "id": "stalemate", "fen": "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", "note": "classic Q+K stalemate", "expectStatus": "stalemate" }
+]

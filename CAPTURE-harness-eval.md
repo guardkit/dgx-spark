@@ -8,7 +8,7 @@
 
 **Predecessors (must be green before recording):**
 1. [`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`](./RUNBOOK-deepseek-v4-flash-0731-two-spark.md) fully green — **including the tool-calling gate (Phase 5.6)**. H2/H3 are nothing but tool calls.
-2. The five task workspaces exist and their validators dry-run green (see the task table — T4 is built; T1–T3/T5 are to-build under `demo/harness-eval/`).
+2. The five task workspaces are **built** under [`demo/harness-eval/`](./demo/harness-eval/) — **its README is the operating manual** (pi-from-zero primer, `cell.sh`/`score.sh` per-cell commands, one-time setup incl. the T1/T5 validator selftests and the T2/T3/T4 `npm run setup`).
 3. Pre-flight below done once, off camera.
 
 **How to use this:** a capture spine, not a script. Prompts to say, not lines. Don't hide failures — a FAIL cell is a *data point*, not a blooper.
@@ -39,11 +39,11 @@
 
 | ID | Task | The gate asks… | Oracle | Status |
 |---|---|---|---|---|
-| **T1** | **Golden extraction** — messy real input (a raw boot log / gnarly CSV) → strict JSON | …does the output byte-match the fixtures? | Golden files | to build |
-| **T2** | **Chess board** — single-file playable board | …does its move generator agree with Stockfish across N positions (legality + mate-in-2)? | A real engine | to build |
-| **T3** | **Next-bus board** — live departure board for a configurable UK stop | …do the shown departures match an independent fetch, within tolerance? | Live transit API (+ the human close: stand at the stop) | to build |
+| **T1** | **Golden extraction** — mixed-format server log → strict normalized JSON ([`t1`](./demo/harness-eval/t1-golden-extract/)) | …does the output canonically match the golden fixture? | Golden files | **built** (selftested) |
+| **T2** | **Chess board** — single-file, fully self-contained, real rules ([`t2`](./demo/harness-eval/t2-chess-stockfish/)) | …does its move generator agree with Stockfish perft-1 across 8 positions (castling, pins, ep, promotion, mate/stalemate)? | A real engine | **built** |
+| **T3** | **Next-bus board** — live TfL departure board, configurable stop ([`t3`](./demo/harness-eval/t3-next-bus/)) | …do the shown rows match an independent fetch (≥60% within 2 min), and does a blocked API produce an honest visible state? | Live transit API (+ the human close: stand at the stop) | **built** |
 | **T4** | **Constellation globe** — whole-sky live satellite cloud, ISS highlighted ([`demo/orbit-globe/`](./demo/orbit-globe/)) | …is the ISS *actually there*? | Independent SGP4 + live wheretheiss.at | **built** |
-| **T5** | **Tool-effects** — reorganize a directory per spec + write a manifest | …is the filesystem actually in the specified state? Nothing the model *says* counts. | Re-scan of reality (Phase 5.6 generalized) | to build |
+| **T5** | **Tool-effects** — reorganize a file tree per dated/categorized rules + manifest ([`t5`](./demo/harness-eval/t5-tool-effects/)) | …is the filesystem actually in the specified state (hashes, placements, mtime decoys not taken)? Nothing the model *says* counts. | Re-scan of reality (Phase 5.6 generalized) | **built** (selftested) |
 
 Design rule for new tasks: every gate must consult something **outside the generated code** — fixtures, an engine, a live API, the filesystem, the sky. Self-consistent-but-wrong must be catchable.
 
@@ -68,8 +68,10 @@ curl -s http://promaxgb10-41b1:8888/v1/models          # DeepSeek-V4-Flash-0731 
 # Wiring dry run (NOT recorded): the T4 warm-up variant (classic single-ISS tracker) under H3
 # — proves tool calls, skills loading, and the validator on this exact stack. Then delete its
 # index.html. (On camera the classic tracker appears ONLY as the E1 foil.)
-# Smoke-test every task validator against its reference fixture; T3: confirm the transit API
-# answers for the chosen stop TODAY — it's the one oracle with opening hours.
+# Full setup + per-cell commands + the pi primer: demo/harness-eval/README.md
+#   (cell.sh prepares each cell per tier; score.sh is the operator's scoring run;
+#    T1/T5 validator selftests are instant; T2/T3/T4 need `npm run setup` once.)
+# T3: confirm the transit API answers for the chosen stop TODAY — the one oracle with opening hours.
 ```
 
 - OBS scenes: (a) MacBook terminal, font ≥ 18pt; (b) browser for artifacts; (c) the grid graphic (a markdown table filling up is fine); (d) LiteLLM spend dashboard for E6.

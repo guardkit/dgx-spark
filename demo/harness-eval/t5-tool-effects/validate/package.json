@@ -1,0 +1,11 @@
+{
+  "name": "t5-tool-effects-validate",
+  "private": true,
+  "type": "module",
+  "description": "T5 gates: filesystem end-state only — structure, nothing-lost hashing, rule-derived placement, manifest accuracy. No dependencies.",
+  "scripts": {
+    "reset": "node setup.mjs",
+    "validate": "node validate.mjs",
+    "selftest": "node selftest.mjs"
+  }
+}

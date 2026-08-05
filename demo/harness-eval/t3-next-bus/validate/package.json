@@ -1,0 +1,13 @@
+{
+  "name": "t3-next-bus-validate",
+  "private": true,
+  "type": "module",
+  "description": "T3 gates: departure board cross-checked against an independent fetch of the live TfL Arrivals API, plus a blocked-API honesty phase.",
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
