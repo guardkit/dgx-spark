@@ -1,88 +1,66 @@
-# Orbit-Globe Demo — Video Capture Spine
+# Orbit Globe, Two Ways — Video Capture Spine
 
-> **Status: SUPERSEDED (2026-08-05)** by [`CAPTURE-harness-eval.md`](./CAPTURE-harness-eval.md) — the one-artifact demo video is an occupied genre (the "Best Open Model You Can Actually Run" video one-shot the same ISS tracker on the same 2×GB10). The globe lives on as that eval's **task T4** (its visual centerpiece), and this spine's D1–D6 arc remains the long-form detail for filming T4's full-environment cell. Kept for reference; not the video plan.
+**Spine:** *Same model, same task, asked twice — once like a demo, once like an engineer. The difference was never the model.*
 
-**Spine:** *a frontier-class open model running on two desk boxes does real agentic work — a MacBook harness drives it to build a live satellite globe, it checks its own work against mechanical gates, and then I check it against the sky.*
+**Status:** the video plan (rewritten 2026-08-06). This absorbs the original single-demo arc *and* replaces a heavier "harness eval" experiment that was scrapped for complexity — git history keeps that experiment at `acb4323` if it's ever wanted.
 
-**What this films:** the payoff segment for the two-Spark/DeepSeek material (or a standalone short). A coding agent on the MacBook, brained by DeepSeek-V4-Flash-0731 on the Spark pair, one-shots the [`demo/orbit-globe/`](./demo/orbit-globe/) task and iterates the gate suite to green; the operator closes with an independent validation run.
+**What this films:** the payoff for the two-Spark/DeepSeek material (teed at the two-Spark video's P5; also stands alone). One task — the whole-sky satellite globe in [`demo/orbit-globe/`](./demo/orbit-globe/) — attempted twice by the same local DeepSeek, with the same mechanical checker run on both attempts. Red, then green. One command carries the whole video: `npm run validate`.
 
-**Predecessors (must be green before recording):**
-1. [`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`](./RUNBOOK-deepseek-v4-flash-0731-two-spark.md) fully green — **including Phase 5.6 (tool-calling gate)**. A coding harness is nothing but tool calls; if 5.6 isn't green, there is no demo.
-2. The demo workspace pulled on the MacBook (`git pull` in the dgx-spark clone).
-3. The pre-flight below done **once, off camera**, ending with the warm-up-variant dry run.
+**The context (one beat, said warmly):** the "Best Open Model You Can Actually Run" video one-shot an ISS tracker on this same hardware — genuinely impressive, and its ISS was visibly in the wrong place, waved off with "we can tweak the API call." Not a dunk: *nobody* in the demo genre checks. This video is the check.
+
+**Before recording (all off camera):**
+1. [`RUNBOOK-deepseek-v4-flash-0731-two-spark.md`](./RUNBOOK-deepseek-v4-flash-0731-two-spark.md) green **including its tool-calling gate** — a coding agent is nothing but tool calls; without it there is no Take 2.
+2. MacBook: pi installed + pointed at the Sparks — the exact steps are in [`demo/orbit-globe/README.md`](./demo/orbit-globe/README.md).
+3. One full dry run of Take 2, then delete the built `index.html` so the recorded take starts clean.
 
 **How to use this:** a capture spine, not a script. Prompts to say, not lines. Don't hide failures — the fail→fix loop is the content.
 
 ---
 
-## The mental model (say a version of this on camera — it's what viewers get wrong)
+## Take 1 — the demo everyone makes (~4 min of film)
 
-Everything happens **on the MacBook, in one folder**. Four actors:
-
-| Actor | Where | Role |
+| Step | On screen | Say (prompts, not lines) |
 |---|---|---|
-| **You** | MacBook keyboard | One prompt at the start; one independent `npm run validate` at the end |
-| **pi** (the harness) | A process on the MacBook | Hands + loop only: sends context to the model, executes the tool calls that come back — every file write and shell command happens on the Mac |
-| **DeepSeek-V4-Flash-0731** | The two Sparks, `:8888` over the LAN | The brain: every decision, every line of code, every "now run the validator" originates here |
-| **`validate.mjs`** | The workspace | A dumb script: PASS/FAIL table, exit 0/1 — identical behaviour whoever invokes it |
+| 1 | `mkdir ~/one-shot && cd ~/one-shot`, launch `pi`, paste the big prompt (committed at [`demo/orbit-globe/foil-prompt.txt`](./demo/orbit-globe/foil-prompt.txt) — `pbcopy < …` before the take) | "This is the move you've seen in every local-model video — the whole ask in one giant prompt. Including my favourite line: *'make sure the ISS placement is accurate.'* Said to a model, that's a wish." |
+| 2 | A globe appears. Admire it | Be honest: "…and look at it. This is why the genre exists. The model deserves the hype." |
+| 3 | The check: `cp index.html <clone>/demo/orbit-globe/`, then `cd <clone>/demo/orbit-globe/validate && npm run validate` | "Now the question nobody asks: is any of it *true*? This checker doesn't read the code's opinion of itself — it does its own orbital math and asks the live tracking API where the ISS actually is." |
+| 4 | Red FAIL lines land | "There's the difference between a demo and engineering: **who checks.**" Delete the foil's `index.html` on camera. |
 
-**Act 1 — the agent's loop (you watch):** pi reads `AGENTS.md` + `TASK.md` + the two skills, writes `index.html`, then — because AGENTS.md instructs it to — runs `npm run validate` *itself* through its bash tool, reads the FAIL lines as feedback, edits, re-runs, until green. That loop is the watchable part.
+## Take 2 — the same brain, asked like an engineer (~8 min of film)
 
-**Act 2 — your close (you type):** in a **separate terminal, not pi**, run the same `npm run validate` yourself. The line to say: *"an agent's 'all green' is a claim in its own transcript — the receipt is me re-running the gates. And the physics oracle doesn't consult the code it just wrote: it asks the sky. The ISS is either where CelesTrak and wheretheiss.at say it is right now, or the gate fails."*
+| Step | On screen | Say |
+|---|---|---|
+| 1 | `cd <clone>/demo/orbit-globe`, `ls`, open `AGENTS.md` and a skill briefly | "Same model, same task — the brief is word-for-word what Take 1 got. What's different is the *folder*: conventions, two pages of domain notes, and that same checker sitting right there. No mega-prompt — the environment is the engineering." |
+| 2 | Launch `pi`, type one sentence: `Build the constellation globe described in TASK.md — follow the workspace conventions.` | "One sentence, because everything else is already here." |
+| 3 | Watch it work — reading the notes, building, then **running the checker itself** and fixing its own red lines | Narrate lightly. If gates fail then pass, **leave it in — the fix loop is the film**. If it's green first try, say so plainly ("the loop was armed; it didn't need it — that happens"). |
+| 4 | The close, in a second terminal — **you** type `npm run validate` | "Its 'all green' is a claim in its own transcript. This one is mine. And the physics gate still answers to the sky, not to the code it just wrote." Green lands. |
+| 5 | Hero shot: the constellation, time-warp, click a satellite for its orbit, the ISS readout | "The gates prove it's *correct*. Whether it's *beautiful* stays a human call — deliberately." |
 
----
-
-## Pre-flight (once, off camera) &nbsp;·&nbsp; **Gate: the warm-up variant passes end-to-end**
-
-```bash
-# MacBook — one-time
-node --version                                   # need >= 22.19
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent   # pi >= 0.83.0
-# paste the models.json block from demo/orbit-globe/README.md into ~/.pi/agent/models.json
-cd <clone>/dgx-spark/demo/orbit-globe/validate && npm run setup   # installs Playwright Chromium
-
-# Sparks — DeepSeek up + warm (runbook Phases 4-5 green incl. 5.6), then from the Mac:
-curl -s http://promaxgb10-41b1:8888/v1/models    # answers with DeepSeek-V4-Flash-0731
-
-# Dry run (NOT recorded): the warm-up variant from TASK.md — classic single-ISS tracker.
-# Proves harness wiring, tool calls, and validator on this exact stack. Then DELETE the
-# generated index.html so the recorded take starts clean.
-```
-
-- OBS scenes: (a) MacBook terminal running pi, font ≥ 18pt; (b) browser full-screen for the artifact; (c) optional second terminal for the independent close.
-- Terminal history cleared; workspace contains only the committed files (no index.html).
+**The closing line of the video:** *"Same model. Same task. Same checker. Red, then green — and the only thing that changed was how I asked. The difference was never the model."*
 
 ---
 
-## Capture phases
-
-| # | On screen | Say (prompts, not lines) | Gate (pass/fail) |
-|---|-----------|--------------------------|------------------|
-| **D1 The environment** | `ls` the workspace; open `AGENTS.md` + a skill briefly | "No mega-prompt. The environment *is* the prompt engineering: conventions in AGENTS.md, domain knowledge in two skills, the task in TASK.md — and a gate suite the agent is told to satisfy. The one-line prompt works because everything else is already here." | Workspace shown; the four actors named (the mental-model table) |
-| **D2 The prompt** | Type into pi: `Build the constellation globe described in TASK.md — follow the workspace conventions.` | Say the chain out loud: "pi is just hands on this Mac — every decision is DeepSeek on those two boxes, over my LAN, no cloud anywhere." | Prompt sent; endpoint named on camera |
-| **D3 The build** | Code streaming in the TUI | Narrate lightly; let it move. Honest numbers if asked-by-camera: ~55–65 tok/s on code, prose slower. Point out when it *reads the skills* — that's the environment paying off. | Agent visibly consults AGENTS.md/skills; index.html written |
-| **D4 The agent's own gates** | pi runs `npm run validate` via its bash tool | "Now it checks its own work — same recon→gate→fix arc as the runbooks. A FAIL line isn't an error message to me; it's feedback to *it*." If gates fail: **leave it in** — the fix loop is the money shot. If first-pass green: say so honestly ("the loop was armed; it didn't need it — that happens"). | Validator run BY THE AGENT on camera; iterate-to-green (or honest first-pass green) captured |
-| **D5 The independent close** | Second terminal, you type `npm run validate` | The act-2 line from the mental model above — self-report vs receipt, and the sky as the oracle. Show the PASS table land. | Operator-run gates green on camera |
-| **D6 The artifact** | Browser full screen | Hero shot: the constellation, time-warp 60×/600×, click a satellite for its orbit, the ISS highlighted with live readout. Judgment call stated plainly: "the gates prove it's *correct* — whether it's *beautiful* is mine to judge, and that stays human." | Artifact shown doing its thing; correctness-vs-taste line said |
-
----
-
-## Failure triage (during recording — keep rolling)
+## If things go wrong on camera (keep rolling)
 
 | Symptom | Meaning | Move |
 |---|---|---|
-| pi 400s immediately | `developer` role / `reasoning_effort` rejected | compat flags in `~/.pi/agent/models.json` (README block) — fix on camera, it's a 10-second beat |
-| Tool calls appear as raw `<…DSML…>` text in responses | The spec-decode draft-rejection bug (runbook Appendix A) | DeepSeek Phase 5.6 wasn't green — stop, interpose the compat proxy or reduce spec tokens; re-record later |
-| Validator T3.live-oracle fails but T3.sgp4 passes | Sim drifted from real time or wheretheiss.at hiccup | Reload artifact (boots at 1×), re-run; if persistent, say so and lean on the SGP4 oracle — honestly, on camera |
-| Agent claims green but D5 fails | The exact failure act 2 exists for | **Keep it in.** That moment is worth more than a clean take |
-| Globe renders black / no textures | CORS on a non-approved texture URL | The agent violated AGENTS.md — point at the rule, let it fix; good teaching beat |
-| Everything works first try, no drama | It happens | Don't fake a failure. The dry-run footage of the warm-up variant can illustrate the loop if needed |
-
----
+| pi 400s immediately | vLLM rejecting `developer` role / `reasoning_effort` | the two compat flags in `~/.pi/agent/models.json` (workspace README) — a 10-second on-camera fix |
+| Tool calls appear as raw `<…DSML…>` text | the endpoint's tool-call phase isn't green | stop; re-run the DeepSeek runbook's tool-calling phase — don't film |
+| Physics gate fails but the SGP4 gate passes | live-API hiccup or sim drift | reload (it boots at 1× real time), re-run; if persistent, lean on the SGP4 oracle and say so |
+| **The one-shot passes everything** | it happens — a good day | film Take 2 anyway and say the truth: "this one landed — but I only *know* that because the checker exists. One lucky demo doesn't make checking optional." |
+| Agent claims green, your close run fails | the exact moment the independent close exists for | **keep it in** — worth more than any clean take |
+| Everything green everywhere, no drama | also happens | don't fake a failure; the dry-run footage can illustrate the loop if needed |
 
 ## Production notes
 
-- **Edit out**: installs, the Playwright download, long silent generation stretches (jump-cut with tok/s overlay).
-- **Do NOT quote leaderboard comparisons** — same rule as the other capture docs. The story is *capability doing work*, not benchmarks.
-- **Relationship to the other videos**: this is the payoff after the two-Spark bring-up material; it also stands alone. The runbook-method video ([`VIDEO-executable-runbooks.md`](./VIDEO-executable-runbooks.md)) owns the gates philosophy — here you get to *show* it applied to a freshly generated artifact: the agent iterating against assertions it can't talk its way past, then the operator holding the receipt.
-- Evidence for the description/pinned comment: the validator's final PASS table (both runs), the one-line prompt, and the repo path `demo/orbit-globe/`.
+- **Fairness is the credibility of the whole video**: Take 1's pasted prompt carries the same brief Take 2's workspace does (task, rules, status-object contract, approved endpoints) — say so on camera. The variable is the *asking*, never the information.
+- **Edit out**: installs, long silent generation (jump-cut + tok/s overlay). Warm the endpoint (a few long generations) before either take; expect ~55–67 tok/s on code, prose slower.
+- **No leaderboard comparisons** — the only evidence in this video is produced on screen.
+- **Stay generous to the demo genre** — it's the audience, not the villain.
+- **Evidence for the description/pinned comment**: both validator outputs, both prompts, the repo path `demo/orbit-globe/`.
+
+## Relationship to the other artifacts
+
+- [`CAPTURE-two-spark-video.md`](./CAPTURE-two-spark-video.md) — the preceding video (capacity, not speed worth stacking for); its P5 tees this one.
+- [`VIDEO-executable-runbooks.md`](./VIDEO-executable-runbooks.md) — owns the gates philosophy this video applies to a freshly generated artifact.
+- [`demo/orbit-globe/README.md`](./demo/orbit-globe/README.md) — the workspace: pi setup, the validator's three tiers, and `foil-prompt.txt` (Take 1's pasted brief).

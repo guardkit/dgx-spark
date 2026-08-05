@@ -1,9 +1,9 @@
 # Orbit Globe — demo workspace for the two-Spark DeepSeek-V4-Flash-0731 seat
 
-> Recording this as a video? This workspace is now **task T4** of the harness eval — the
-> capture spine is [`CAPTURE-harness-eval.md`](../../CAPTURE-harness-eval.md)
-> (the superseded single-demo spine, kept for T4 long-form detail:
-> [`CAPTURE-orbit-globe-demo.md`](../../CAPTURE-orbit-globe-demo.md)).
+> Recording this as a video? The capture spine — the two-take story, say-lines, failure
+> triage — is [`CAPTURE-orbit-globe-demo.md`](../../CAPTURE-orbit-globe-demo.md).
+> `foil-prompt.txt` in this folder is Take 1's pasted one-shot brief (same information as
+> this workspace carries — the fairness beat).
 
 A standalone agent workspace (no relation to any other project's tooling): `AGENTS.md`
 conventions + two `SKILL.md`-standard skills + a task brief. Point a coding harness on the
