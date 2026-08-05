@@ -27,7 +27,7 @@ So: copy → update internal cross-references to the new repo → prove the new 
 | `README.md` (current operational state) | `ARCHITECTURE-current.md` | current | The live model lineup / matrix sets / routing recipes. This repo's `README.md` is the new front page; the old one becomes the steady-state architecture doc. |
 | `AUTOBUILD-ON-LLAMA-SWAP-findings.md` | **stays in guardkit** | internal record | Chronological engineering log with deep guardkit-internal / lpa-platform-poc refs. Kept in guardkit (its `../` links resolve there); referenced from this repo by URL, **not copied**. |
 | `RUNBOOK-v3-production-deployment.md` | **stays in guardkit** | internal record | The internal v3 deployment runbook (`TASK-RUN-D6F4` / `RESULTS-v3 Gap` / `findings §` cross-refs); superseded for public use by `RUNBOOK-single-spark-bring-up.md`. Referenced by URL, **not copied**. |
-| `RUNBOOK-two-spark-video-capture.md` | same name | current | Capture spine for the two-Spark talk. |
+| `CAPTURE-two-spark-video.md` | same name | current | Capture spine for the two-Spark talk. |
 | `RESULTS-v3-production-deployment.md` | **stays in guardkit** | internal record | v3 results (65 GB VRAM, 41.32 tok/s) with internal `tasks/completed/` refs. Referenced by URL, **not copied**. |
 | `gb10-memory-budget-and-macbook-offload.md` | same name | current | Where the 121 GB goes. |
 | `gb10-model-requirements-matrix.md` | same name | current-ish | Role mapping valid; speed expectations superseded. |

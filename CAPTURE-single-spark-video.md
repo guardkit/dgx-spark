@@ -1,4 +1,4 @@
-# Single-Spark Bring-Up — Video Capture Runbook
+# Single-Spark Bring-Up — Video Capture Spine
 
 **Spine:** *One box runs my whole local-AI loop — build the dataset, fine-tune the model, host it, then point my agents at it to ship features. Here's how I get that box set up so it just works.*
 
@@ -123,4 +123,4 @@ The rest of the video is the honest part: **how I get this box reliable enough t
   - ✅ **Both runbooks exist and are filmable:** the LiteLLM front-door phase + its gates (no-cloud-fallback; CPU-pin LiteLLM disjoint from llama-swap) live in [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) (extracted from the single-Spark runbook per `DECISION-DF-005`). Film act one to standing fleet, then act two for the front door + the no-cloud gate. Do the operator's end-to-end dry-run of both before recording so the live demo matches the narrative.
 
 ---
-*Companion to `TALK`/`SLIDES-got-a-spark-now-what.md` and the Software Factory deck. The two-Spark payoff has its own spine: `RUNBOOK-two-spark-video-capture.md` — teed at the close as capacity, not speed.*
+*Companion to `TALK`/`SLIDES-got-a-spark-now-what.md` and the Software Factory deck. The two-Spark payoff has its own spine: `CAPTURE-two-spark-video.md` — teed at the close as capacity, not speed.*

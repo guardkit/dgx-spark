@@ -76,4 +76,4 @@ If a beat doesn't land live, a second take is fine — but keep it real (the got
 
 ## Series
 
-This is the **foundation** talk. The **payoff** is the second one: *"I stacked two DGX Sparks — it wasn't faster, and here's why"* — the capacity-not-speed reframe, where the two-node multi-model intersection is genuinely empty prior-art territory. Sequence them foundation → reframe. Capture spine for the second talk already exists: `RUNBOOK-two-spark-video-capture.md`.
+This is the **foundation** talk. The **payoff** is the second one: *"I stacked two DGX Sparks — it wasn't faster, and here's why"* — the capacity-not-speed reframe, where the two-node multi-model intersection is genuinely empty prior-art territory. Sequence them foundation → reframe. Capture spine for the second talk already exists: `CAPTURE-two-spark-video.md`.

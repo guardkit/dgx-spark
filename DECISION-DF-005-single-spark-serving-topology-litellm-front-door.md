@@ -68,7 +68,7 @@ The LiteLLM phase was added to `RUNBOOK-single-spark-bring-up.md` (Phase 5.4) 20
 - [x] **▶ GATE — front door answers + routes:** a smoke request to `:4000` returns from a known local model; a `claude-*` request returns a local completion (asserts `.choices[0].message.content` on the OpenAI chat surface). No-outbound-cloud is **structural** — the public config names no cloud model, so there is no target to reach. Overlay Phase 4.3.
 - [x] **Decision Gate table:** the three gates above are rows in the overlay's **Phase 5** Decision-Gate table.
 - [x] **Keep the direct `:9000` path documented** as the LiteLLM-down fallback (the overlay's topology note + its Phase 7 failure modes).
-- [x] **Align the narrative docs:** `README.md` "Current stack" (LiteLLM is the optional front door over the base fleet); `SLIDES-got-a-spark-now-what.md` + `TALK-ddd-southwest-got-a-spark-now-what.md` + `RUNBOOK-single-spark-video-capture.md` re-framed 2026-06-29 to the **two-act** flow (act one = the base fleet; act two = the optional front-door overlay).
+- [x] **Align the narrative docs:** `README.md` "Current stack" (LiteLLM is the optional front door over the base fleet); `SLIDES-got-a-spark-now-what.md` + `TALK-ddd-southwest-got-a-spark-now-what.md` + `CAPTURE-single-spark-video.md` re-framed 2026-06-29 to the **two-act** flow (act one = the base fleet; act two = the optional front-door overlay).
 - [ ] **Dry-run end-to-end** before recording so the live demo matches the script. *(Operator step — the one item still open.)*
 
 ---

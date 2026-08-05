@@ -1,8 +1,8 @@
-# Harness Eval — Video Capture Runbook
+# Harness Eval — Video Capture Spine
 
 **Spine:** *"The harness can 3× the model" is a claim everyone repeats and nobody measures. So we measure it: same local DeepSeek, five gated tasks, three harness tiers, one pass-rate table — on my desk.*
 
-**What this films:** the successor to the orbit-globe demo capture (now [superseded](./RUNBOOK-orbit-globe-demo-capture.md); the globe survives as eval task **T4**). Instead of demoing one artifact — a genre the field has now thoroughly filmed — this video runs a **private eval**: the same DeepSeek-V4-Flash-0731 on the Spark pair, driven through the same tasks under three escalating harnesses, scored by the same mechanical validators, ending in a number.
+**What this films:** the successor to the orbit-globe demo capture (now [superseded](./CAPTURE-orbit-globe-demo.md); the globe survives as eval task **T4**). Instead of demoing one artifact — a genre the field has now thoroughly filmed — this video runs a **private eval**: the same DeepSeek-V4-Flash-0731 on the Spark pair, driven through the same tasks under three escalating harnesses, scored by the same mechanical validators, ending in a number.
 
 **The claim under test (the genre supplies it):** the "Best Open Model You Can Actually Run" video ([youtube](https://www.youtube.com/watch?v=_Ae4osPymXY) · local transcript/insights doc) states it plainly — DeepSweep jumped 7%→54% *under DeepSeek's own harness*; OpenAI's ARC-AGI harness study went 13%→40% on the same model; *"it's not just about the model, it's all about the harness around it."* It also — generously, this is not a dunk — ends on the genre's tell: a beautiful one-shot ISS tracker with the ISS **visibly in the wrong place** and a shrug ("I don't think that's right… we can tweak the API call"). Stated, never measured; rendered, never checked. This video does the measuring and the checking.
 

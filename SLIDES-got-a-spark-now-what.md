@@ -3,7 +3,7 @@
 **Purpose:** the slide-by-slide source for the deck (hand this to Claude Cowork / PowerPoint to generate slides). We iterate on *content* here; Cowork does layout.
 **Pairs with:** [`TALK-ddd-southwest-got-a-spark-now-what.md`](./TALK-ddd-southwest-got-a-spark-now-what.md) (abstract + 7-beat spine) — this expands that spine into slides.
 **Serves both:** the **DDD South West talk** (~30–45 min) *and* the **single-Spark YouTube video** (the live demo = a screen recording of the runbook executing). Slides tagged `[video]` are the framing slides the video reuses; the rest are talk-only.
-**Scope:** this is the **foundation** deck (single Spark, the runbook method). The two-Spark *capacity-not-speed* payoff is a **separate deck** (outline in the appendix; spine = `RUNBOOK-two-spark-video-capture.md`).
+**Scope:** this is the **foundation** deck (single Spark, the runbook method). The two-Spark *capacity-not-speed* payoff is a **separate deck** (outline in the appendix; spine = `CAPTURE-two-spark-video.md`).
 
 **Design system (notes for Cowork):** dark technical theme; monospace for commands/gates; one idea per slide; terminal screenshots > bullet walls. Recurring visual motif: **"watch-out → I-lost-a-day → a gate that STOPS"** (the three-ways-to-encode-a-gotcha). Accent colour for `GATE PASS`/`GATE FAIL`. Keep the live-demo slides minimal (the recording carries them).
 
@@ -226,7 +226,7 @@ clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
 
 ## Appendix — the two-Spark payoff deck (separate, outline only)
 
-*Spine: `RUNBOOK-two-spark-video-capture.md` + `DECISION-DF-004`. Build this deck after the foundation one.*
+*Spine: `CAPTURE-two-spark-video.md` + `DECISION-DF-004`. Build this deck after the foundation one.*
 
 - **The intuition:** "two boxes, twice the tokens, right?"
 - **The reality:** stacking buys **capacity and parallelism, not single-stream speed worth stacking for.** A fitting model gains only ~1.3–1.5× single-stream from TP=2 — at 2× the hardware with both boxes claimed, a per-box regression; the near-2× leaderboard rows are concurrency throughput (Spark Arena tests at c=5/c=10). (Any throughput figures are community numbers, to be re-confirmed on our own hardware — DF-004. Lead with the shape, not a tok/s claim.)

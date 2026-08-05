@@ -21,7 +21,7 @@ llama-swap :9000               ← the fleet (UNCHANGED — this overlay never t
 **Expected wall-clock:** ~10 min (image pull + LiteLLM's first DB start — prisma engine download + schema push — dominate; needs network once).
 **Outputs:** `RESULTS-litellm-dashboard-<YYYY-MM-DD>.md`, committed `DRIFT-litellm-dashboard-<YYYY-MM-DD>.md`, the live `/opt/litellm/config.yaml` (dashboard variant), and `/opt/litellm/litellm.env` (**never committed**).
 
-> **⚠ Demo-box coupling (video capture):** [`RUNBOOK-single-spark-video-capture.md`](./RUNBOOK-single-spark-video-capture.md) has an on-camera beat that *depends on the box being DB-less* ("this install is DB-less, so there is no `/ui` spend dashboard — that's the documented opt-in"). **Do not apply this overlay to the capture box before filming** unless you are deliberately re-scripting that beat (and the M5 gate curls, which are keyless).
+> **⚠ Demo-box coupling (video capture):** [`CAPTURE-single-spark-video.md`](./CAPTURE-single-spark-video.md) has an on-camera beat that *depends on the box being DB-less* ("this install is DB-less, so there is no `/ui` spend dashboard — that's the documented opt-in"). **Do not apply this overlay to the capture box before filming** unless you are deliberately re-scripting that beat (and the M5 gate curls, which are keyless).
 
 ---
 
@@ -465,5 +465,5 @@ docker rm -f litellm-postgres && docker volume rm litellm-pgdata && rm -f /opt/l
 - [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) — the overlay underneath: install, unit, CPU pins, routing, no-cloud gate. Its keyless gate 4.3 is **superseded by 5.3 here** once this overlay is applied.
 - [`examples/litellm-config.dashboard.yaml`](./examples/litellm-config.dashboard.yaml) — the config this overlay deploys (public + `general_settings`; twin-config gate 1d).
 - [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml) — the DB-less baseline config (and the rollback target).
-- [`RUNBOOK-single-spark-video-capture.md`](./RUNBOOK-single-spark-video-capture.md) — scripts the **DB-less** box on camera; see the demo-box coupling warning at the top of this file.
+- [`CAPTURE-single-spark-video.md`](./CAPTURE-single-spark-video.md) — scripts the **DB-less** box on camera; see the demo-box coupling warning at the top of this file.
 - [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) · [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)

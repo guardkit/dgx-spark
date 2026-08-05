@@ -1,6 +1,6 @@
-# Orbit-Globe Demo — Video Capture Runbook
+# Orbit-Globe Demo — Video Capture Spine
 
-> **Status: SUPERSEDED (2026-08-05)** by [`RUNBOOK-harness-eval-capture.md`](./RUNBOOK-harness-eval-capture.md) — the one-artifact demo video is an occupied genre (the "Best Open Model You Can Actually Run" video one-shot the same ISS tracker on the same 2×GB10). The globe lives on as that eval's **task T4** (its visual centerpiece), and this spine's D1–D6 arc remains the long-form detail for filming T4's full-environment cell. Kept for reference; not the video plan.
+> **Status: SUPERSEDED (2026-08-05)** by [`CAPTURE-harness-eval.md`](./CAPTURE-harness-eval.md) — the one-artifact demo video is an occupied genre (the "Best Open Model You Can Actually Run" video one-shot the same ISS tracker on the same 2×GB10). The globe lives on as that eval's **task T4** (its visual centerpiece), and this spine's D1–D6 arc remains the long-form detail for filming T4's full-environment cell. Kept for reference; not the video plan.
 
 **Spine:** *a frontier-class open model running on two desk boxes does real agentic work — a MacBook harness drives it to build a live satellite globe, it checks its own work against mechanical gates, and then I check it against the sky.*
 
