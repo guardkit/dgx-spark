@@ -11,6 +11,7 @@
 - Two nodes do not fuse into one 256 GB GPU. Tensor parallelism splits each layer's matrices across the boxes; activations cross the QSFP link every forward pass. What you gain is the ability to load a model whose weights + KV exceed one node. (corti)
 - The ConnectX-7 on GB10 is wired as two PCIe Gen5 x4 links, not one x8; full 200 Gb needs both x4 paths aggregated. Each physical port shows two Linux interface names (four total for two ports) — use the `enp1...` names. (corti; NVIDIA Sync docs)
 - A ~120B model that fits on one node: ~35–50 tok/s single-stream on one box, ~55–75 stacked, gains mostly under concurrency. (corti)
+- **Leaderboard caveat:** Spark Arena is concurrency-first (tests at c=5/c=10) — its near-2× two-node gpt-oss-120b rows are aggregate throughput, not batch-1 decode (a dendro-logic recipe beat it +46%/+54% at exactly c=5/c=10 just by adding those CUDA-graph capture sizes). Batch-1 all-reduces are KB-scale, so the fitting-model single-stream gain is capped ~1.3–1.5× by per-layer sync *latency* + the unsharded remainder — not by the link's ~25 GB/s, which binds at prefill/concurrency. (added 2026-08-05)
 - DeepSeek-V4-Flash (official FP8, ~149 GB, TP=2): ~40 tok/s decode warm single-stream; ~6 min cold start; long-context cold prefill weak (~53s TTFT @32K, ~250s @128K); decode collapses under concurrency + depth. (forum recipe thread)
 
 **The two field patterns are separate.**

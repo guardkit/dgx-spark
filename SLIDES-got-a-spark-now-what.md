@@ -229,7 +229,7 @@ clients (Claude Code · DeepAgents · any OpenAI/Anthropic SDK)
 *Spine: `RUNBOOK-two-spark-video-capture.md` + `DECISION-DF-004`. Build this deck after the foundation one.*
 
 - **The intuition:** "two boxes, twice the tokens, right?"
-- **The reality:** stacking buys **capacity and parallelism, not single-stream speed.** A model that already fits on one node is *faster* on one node — the interconnect is a ceiling, not an accelerator. (Any throughput figures are community numbers, to be re-confirmed on our own hardware — DF-004. Lead with the shape, not a tok/s claim.)
+- **The reality:** stacking buys **capacity and parallelism, not single-stream speed worth stacking for.** A fitting model gains only ~1.3–1.5× single-stream from TP=2 — at 2× the hardware with both boxes claimed, a per-box regression; the near-2× leaderboard rows are concurrency throughput (Spark Arena tests at c=5/c=10). (Any throughput figures are community numbers, to be re-confirmed on our own hardware — DF-004. Lead with the shape, not a tok/s claim.)
 - **The reframe:** you stack to **run a model too big for one 128 GB node**, and to **run different models in parallel** — then **time-share** the boxes. Never for single-stream speed.
 - **The example:** a heavyweight local **DeepSeek** seat — DeepSeek-V4-Flash class (~149 GB FP8) — runs across both nodes via vLLM `--tp 2`, and *only* while deliberately launched. It can't co-reside with the swap pool; memory is budgeted per session, not per pipeline.
 - **The architecture:** one LiteLLM `:4000` front door → llama-swap pool (Node A) **XOR** the cross-node two-box DeepSeek (memory budget per session). [diagram: `diagrams/two-spark-fleet-serving-architecture.svg`]

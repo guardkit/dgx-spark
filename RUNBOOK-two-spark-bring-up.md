@@ -4,7 +4,7 @@
 
 **Purpose:** Take an **already-working single Spark** (Node A, stood up by [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md)) and **add a second GB10 (Node B)** over a 200 G ConnectX-7 link, to serve a model **too large for one node** behind a unified front door — *without* disturbing the single-node fleet. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon reports upstream drift first. **This is purely additive: Node A is unchanged.**
 
-> **The one idea (DECISION-DF-004):** *a second node buys **capacity and parallelism, not single-stream speed**.* The 200 G link (~22 GB/s healthy) is the ceiling; a model that fits one node is **faster** on one node. The second node earns its place by running models that **don't fit** (the cross-node two-box DeepSeek), time-shared with the swap pool.
+> **The one idea (DECISION-DF-004):** *a second node buys **capacity and parallelism, not single-stream speed worth stacking for**.* A model that fits one node gains only ~1.3–1.5× from TP=2 — per-layer sync latency + the unsharded remainder eat the rest (the 200 G link's ~22 GB/s healthy busbw binds at prefill/concurrency, not batch-1 decode) — at 2× the hardware with both fleets drained; leaderboard near-2× rows are concurrency throughput. The second node earns its place by running models that **don't fit** (the cross-node two-box DeepSeek), time-shared with the swap pool.
 
 ```
 clients (agents, Claude Code — OpenAI / Anthropic-compatible)

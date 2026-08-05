@@ -60,7 +60,7 @@ systemctl --user stop llama-swap                   # fleet goes dormant (start t
 systemctl --user start llama-swap
 sudo systemctl start llama-swap-keepalive.timer
 ```
-(DF-004: a second box buys **capacity, not single-stream speed** — you stack to run a model that doesn't fit one node, time-shared.)
+(DF-004: a second box buys **capacity, not single-stream speed worth stacking for** — a fitting model gains only ~1.3–1.5× at 2× the hardware; you stack to run a model that doesn't fit one node, time-shared.)
 
 ### Mode 3 — Standalone long-run on Node B: the agentic dataset factory (50+ hrs)
 Run the dataset factory on the **new Spark alone**. **Not** a two-Spark/TP scenario — no cabling, no NCCL, no draining the Dell. The Dell is untouched and keeps serving day-to-day the whole time.
