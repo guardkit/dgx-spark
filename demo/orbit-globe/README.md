@@ -1,9 +1,9 @@
 # Orbit Globe — demo workspace for the two-Spark DeepSeek-V4-Flash-0731 seat
 
-> Recording this as a video? The capture spine — the two-take story, say-lines, failure
-> triage — is [`CAPTURE-orbit-globe-demo.md`](../../CAPTURE-orbit-globe-demo.md).
-> `foil-prompt.txt` in this folder is Take 1's pasted one-shot brief (same information as
-> this workspace carries — the fairness beat).
+> **Repo bonus content** — a complete, self-contained agent-workspace example (conventions
+> + skills + a gated task with a physics oracle). No globe video is planned; if this
+> appears on camera it's as b-roll ([`CAPTURE-orbit-globe-demo.md`](../../CAPTURE-orbit-globe-demo.md)
+> records the parked staged-demo approach).
 
 A standalone agent workspace (no relation to any other project's tooling): `AGENTS.md`
 conventions + two `SKILL.md`-standard skills + a task brief. Point a coding harness on the

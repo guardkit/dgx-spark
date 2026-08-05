@@ -2,7 +2,7 @@
 
 **Spine:** *Same model, same task, asked twice — once like a demo, once like an engineer. The difference was never the model.*
 
-**Status:** the video plan (rewritten 2026-08-06). This absorbs the original single-demo arc *and* replaces a heavier "harness eval" experiment that was scrapped for complexity — git history keeps that experiment at `acb4323` if it's ever wanted.
+**Status: PARKED (2026-08-06) — no globe video is planned.** Every cut of this — the single demo, the harness-eval experiment (git history: `acb4323`), the two-take A/B below — ends up *a demo that looks like the genre's existing demos* (the operator's verdict). The [`demo/orbit-globe/`](./demo/orbit-globe/) workspace stays as repo bonus content and possible b-roll for the two-Spark video. The actual third video is **deliberately unplanned**: it should come from the seat doing real work, not from a staged artifact. This file is kept only as the record of the staged-demo approach.
 
 **What this films:** the payoff for the two-Spark/DeepSeek material (teed at the two-Spark video's P5; also stands alone). One task — the whole-sky satellite globe in [`demo/orbit-globe/`](./demo/orbit-globe/) — attempted twice by the same local DeepSeek, with the same mechanical checker run on both attempts. Red, then green. One command carries the whole video: `npm run validate`.
 
