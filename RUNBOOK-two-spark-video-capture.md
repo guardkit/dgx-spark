@@ -24,6 +24,7 @@ Audience: AI engineers. Target: ~12–18 min build-log + architecture explainer.
 
 - OBS scenes: (a) desk/hardware cam, (b) full-screen terminal, (c) diagram/browser. Terminal font ≥ 18pt.
 - Both Sparks powered; CX-7 cable in hand for the cold open; single clean shell, history cleared.
+- **Spectator terminals (optional, but they're the shots):** a split A|B terminal scene. Both nodes running `journalctl -kf | grep -E 'mlx5|cx7'` during the P2 cable insert — the power-gated NIC *appearing on camera* (or a ~20 s flap) is the visual for that gotcha. Node B running `watch -n 2 nvidia-smi` during the P3 cold start — fills ~6–8 min of otherwise dead air, and if the box hard powers off under TP (the P2 money gotcha) that pane dying is the fastest tell. The run needs none of these — the agent executes every gate; these are for eyes and camera. (Also in [`OPERATOR-two-box-setup.md`](./OPERATOR-two-box-setup.md) → spectator windows.)
 
 ## Capture phases
 

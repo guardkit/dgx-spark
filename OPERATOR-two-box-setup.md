@@ -38,6 +38,14 @@ Personal operations guide for **my** two-GB10 deployment. **This is not a public
 
 (Applying the front door restarts the Dell's llama-swap once to pick up the CPU-affinity drop-in → a one-time ~81 GB fleet bounce. Schedule it.)
 
+**Spectator windows (optional — the run needs none of them).** The agent executes every step and gate itself, Node B's included (over SSH); these are for **your eyes** during the long or physical moments of the pair bring-up:
+
+| When | Where | Watch | What it tells you |
+|---|---|---|---|
+| Cable insert (two-Spark Phase 3) | **both** boxes | `journalctl -kf \| grep -E 'mlx5\|cx7'` | the power-gated NIC waking on insertion, live; a flap ("Cable removal" ~20 s in, cable seated) on **B's** side is invisible from A until the agent reports it |
+| DeepSeek cold start (Phase 8, ~6 min silence) | Node B | `watch -n 2 nvidia-smi` | memory filling = loading, not hung |
+| First sustained TP load (the Phase 6 power-off risk) | Node B | any live shell | the shell dying instantly is the fastest tell the box hard powered off — from A you only see SSH calls start failing |
+
 ---
 
 ## Operating modes (time-shared — the DF-004 memory rule)
