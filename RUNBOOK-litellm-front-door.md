@@ -57,7 +57,7 @@ Because the base (frozen SM121 build / GGUF pins) and this overlay (weekly-float
 
 - **The llama-swap fleet itself.** That is [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) (the base) — already green; not re-run here.
 - **vLLM backends / cross-node TP behind LiteLLM.** That is the two-Spark runbook ([`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md)) — DF-005 (single node) is the precursor to DF-004 (two nodes).
-- **Persisted virtual keys + the spend dashboard (`:4000/ui`).** Opt-in; needs Postgres (`DATABASE_URL` + `master_key`) — see the bottom of [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml). DB-less (the default here) still routes, still enforces the no-cloud guard, and still returns per-request cost in the `x-litellm-response-cost` header.
+- **Persisted virtual keys + the spend dashboard (`:4000/ui`).** Opt-in; needs Postgres (`DATABASE_URL` + `master_key`) — now its own overlay over this one: [`RUNBOOK-litellm-dashboard.md`](./RUNBOOK-litellm-dashboard.md). DB-less (the default here) still routes, still enforces the no-cloud guard, and still returns per-request cost in the `x-litellm-response-cost` header. NOTE: once that overlay is applied, `:4000` requires a key — this file's keyless gate 4.3 is superseded by its keyed gate 5.3.
 - **Cloud-LLM escalation.** Zero cloud on the critical path (DF-001) — enforced by the Phase 4 no-cloud gate. The public config names **no** cloud model at all.
 
 ---
@@ -218,6 +218,8 @@ PY
 
 ### 4.3 **▶ GATE — front door answers + `claude-*` routes to a local model**
 
+> **Dashboard overlay applied?** If [`RUNBOOK-litellm-dashboard.md`](./RUNBOOK-litellm-dashboard.md) has been run on this box, `:4000` requires a key and these keyless curls `401` **by design** — run that overlay's gate 5.3 instead (this gate is superseded there). A keyless `401` here on a dashboard box is not a routing failure.
+
 ```bash
 # (a) the front door lists the fleet via :4000
 curl -sf http://localhost:4000/v1/models | jq -r '.data[].id' | sort
@@ -278,6 +280,7 @@ Then write `RESULTS-litellm-front-door-<YYYY-MM-DD>.md`:
 | `claude-*` request errors / not routed | the `claude-*` wildcard isn't matched in your LiteLLM version | Phase 4.3 — add explicit `claude-sonnet-4-6` / `claude-opus-4-7` → `openai/workhorse` rows |
 | `claude-*` reaches a cloud API | a cloud model was added to the config / a fallback chain | Phase 4.1 no-cloud gate; the public config names NO cloud model (DF-001) |
 | llama-swap lost its CPU affinity after a base re-run | a base-runbook restart dropped the drop-in | re-run this overlay (Phase 3 re-applies the `10-cpu-affinity.conf` drop-in — self-healing) |
+| every `:4000` request `401`s (including gate 4.3) | the dashboard overlay is applied — auth is on, by design | use a key ([`RUNBOOK-litellm-dashboard.md`](./RUNBOOK-litellm-dashboard.md) Phase 6); NOTE: re-running THIS overlay overwrites the config back to DB-less/keyless — heal by re-running the dashboard overlay |
 
 ---
 
@@ -288,3 +291,4 @@ Then write `RESULTS-litellm-front-door-<YYYY-MM-DD>.md`:
 - [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) — §2.1 (overlay = precondition gate), §3 (float-with-baseline), §8 (the two LiteLLM gate rows cited here).
 - [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md) — why LiteLLM `:4000` is the single-Spark front door (single-node precursor to DF-004).
 - [`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) — the two-node superset; its Phase 7 reuses this overlay's install/unit/CPU-pin mechanism.
+- [`RUNBOOK-litellm-dashboard.md`](./RUNBOOK-litellm-dashboard.md) — the **next overlay up**: master-key auth, virtual keys, and the `:4000/ui` spend dashboard (containerized Postgres) on top of this front door.
