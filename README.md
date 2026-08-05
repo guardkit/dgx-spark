@@ -53,6 +53,26 @@ sudo visudo -cf /etc/sudoers.d/90-spark-agent      # must print "parsed OK"
 - **Revoke** when you're done filming: `sudo rm /etc/sudoers.d/90-spark-agent`.
 - `NOPASSWD:ALL` is fine for a **dedicated** Spark. On a shared box, scope it to just the commands the runbooks invoke (`apt-get, apt, apt-mark, install, cp, mkdir, chown, systemctl, tee, fwupdmgr, nvidia-smi, visudo`) — tighter, at the cost of brittleness if one is missed.
 
+### One-time pair setup: LAN SSH from Node A → Node B (two-Spark only)
+
+[`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md) runs entirely from **Node A** — the agent executes every Node B step over SSH. Its Phase 5 builds the *link-local mesh* (over the CX-7 cable, both directions), but Phases 0–2 run **before any cable exists**, so the agent needs a working **LAN/Tailscale** path A → B first. Like sudo, the agent can't grant this to itself (installing the key needs Node B's password). Run **once on Node A** (you enter Node B's password this one time):
+
+```bash
+NODE_B=<node-b-hostname-or-ip>                    # Node B on the LAN / Tailscale
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/gb10_to_nodeb_ed25519   # skip if the key already exists
+ssh-copy-id -i ~/.ssh/gb10_to_nodeb_ed25519.pub "$NODE_B"     # the one password prompt
+cat >> ~/.ssh/config <<EOF
+Host $NODE_B
+    User $USER
+    IdentityFile ~/.ssh/gb10_to_nodeb_ed25519
+EOF
+chmod 600 ~/.ssh/config
+# Verify BOTH prerequisites in one shot — must pass before starting the two-spark runbook:
+ssh -o BatchMode=yes "$NODE_B" 'echo "SSH OK: $(hostname)"; sudo -n true && echo "sudo OK"'
+```
+
+The verify line proves key-based SSH (no password prompt) *and* passwordless sudo on Node B (the sudoers step above, run on B) in one round-trip. `BatchMode=yes` is the honest test — it fails loudly instead of falling back to a password prompt.
+
 The only other non-agent inputs are **physical** and **two-Spark-only**: plugging in the ConnectX-7 cable, and any firmware reboot. Everything else is a step the agent runs.
 
 ---
