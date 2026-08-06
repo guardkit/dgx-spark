@@ -132,7 +132,7 @@ Evaluated as a candidate to absorb parts of the hand-rolled two-Spark bring-up (
 - `../../decisions/DECISION-DF-001-local-first-inference-on-dark-factory-critical-path.md` — the single-node front-door decision DF-004 evolves
 - `dark-factory-economics-and-model-serving.md` — single-node baseline + the April cost analysis
 - `llama-swap-config.yaml`, `llama-swap-setup.md` — single-node config + setup guide
-- `gb10-memory-budget-and-macbook-offload.md`, `gb10-model-requirements-matrix.md` — memory budgeting + model footprints
+- [`gb10-memory-budget-and-macbook-offload.md`](https://github.com/guardkit/youtube-channel/blob/main/archive/dgx-spark-estate/gb10-memory-budget-and-macbook-offload.md), [`gb10-model-requirements-matrix.md`](https://github.com/guardkit/youtube-channel/blob/main/archive/dgx-spark-estate/gb10-model-requirements-matrix.md) — memory budgeting + model footprints (archived; superseded by the live lineup in `ARCHITECTURE-current.md`)
 - `AUTOBUILD-ON-LLAMA-SWAP-findings.md` — the §9.5–9.8 consolidation findings referenced by fleet-memory
 
 ---
