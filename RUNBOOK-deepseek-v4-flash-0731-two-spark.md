@@ -37,7 +37,9 @@
 ```
 PINS (set 2026-08-01)
   recipe repo        github.com/tonyd2wild/DeepSeek-v4-Flash-0731-DSpark-1M-NVFP4-KV-2x-DGX-Spark
-                     @ d728faee9f5a8d5ebafe7bc44bca6c5d8d0d192f          (HEAD at pin date)
+                     @ cd366d5e20a00426f3c6fce1f08a179acd936262          (promoted 2026-08-06 from
+                     d728faee; delta is docs/tooling only — sparkrun recipe #14, docs k=3→5
+                     correction that MATCHES our MTP_NUM_TOKENS=5 pin, runtime-tag note)
   runtime image      vllm-dspark-runtime:dspark-nvfp4-stage-c            (built per node from the recipe;
                      Patches 2b+3 baked IN — Patch 4 is NOT, see next pin)
   PATCH 4            manual read-only bind-mount of the patched dspark.py (recipe README, 2026-07-31)
@@ -134,6 +136,15 @@ RECON SOURCES (fixed)
   - MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark  (the baked-image fallback lane — image tags)
   - vLLM PR #41834 (SM12x enablement)   (if MERGED into a release: upstream may retire this fork path)
   - HF deepseek-ai/DeepSeek-V4-Flash-0731 discussions (checkpoint issues, template/parser bugs)
+  - unsloth/DeepSeek-V4-Flash-0731-GGUF + llama.cpp DSpark (PR 25784) + forum thread 379129
+                                        (the 1x-Spark GGUF lane. As of 2026-08-06: 19.7 tok/s
+                                         single-stream at UD-IQ2_M on one Spark, but llama.cpp
+                                         DSpark is UNPROVEN on GB10 — the only field attempt hit
+                                         0% accept via a pre-mainline fork. If mainline DSpark
+                                         proves out on GB10 (~1.5-1.9x claimed), a single-node
+                                         quantized seat with NO fleet drain on the other node
+                                         becomes a real alternative — that would be its own
+                                         runbook, not a lane of this one)
 RECON TASK
   "Report only items newer than the PINS date affecting a pinned component or a known
    gotcha (Appendix A). Emit a drift report. Do NOT propose edited steps. Do NOT change any pin."
