@@ -1,6 +1,6 @@
 # Runbook: Two-Spark Bring-Up — Add Node B → a Networked GB10 Pair (capacity, not speed)
 
-**Status:** Draft (executable companion to the capture spine; conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md)). Execute once to verify before the second video; the [capture spine](./CAPTURE-two-spark-video.md) *films* this arc.
+**Status:** Draft (conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md)). Execute once to verify.
 
 **Purpose:** Take an **already-working single Spark** (Node A, stood up by [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md)) and **add a second GB10 (Node B)** over a 200 G ConnectX-7 link, to serve a model **too large for one node** behind a unified front door — *without* disturbing the single-node fleet. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon reports upstream drift first. **This is purely additive: Node A is unchanged.**
 
@@ -22,7 +22,7 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 **Prereq (hard):** Node A is **GREEN** on `RUNBOOK-single-spark-bring-up.md` (llama-swap on `:9000`, gates passed). This runbook does nothing to the Node A config.
 **One-time box setup:** passwordless sudo on **both** nodes (run the agent as that user, not root) **+ LAN SSH Node A → Node B** (the agent drives every Node B step over SSH from Node A; Phases 0–2 run pre-cable, so this is the ordinary LAN/Tailscale path — the CX-7 link-local mesh is Phase 5's job) — see [README → One-time box setup](./README.md#one-time-box-setup-passwordless-sudo). The only physically-manual inputs are the CX-7 cable + any firmware reboot.
 **Prior art (re-checked in Phase 0):** [NVIDIA connect-two-sparks playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/README.md) · [NVIDIA NCCL playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/nccl/README.md) · the [DeepSeek-V4-Flash 2× Spark recipe thread](https://forums.developer.nvidia.com/t/deepseek-v4-flash-official-fp8-running-across-2x-dgx-spark-tp-2-mtp-200k-ctx-recipe-numbers/370309) · [corti "Two Sparks, One Cluster"](https://corti.com/two-sparks-one-cluster-why-stacking-nvidia-dgx-spark-units-unlocks-local-frontier-scale-inference/) · eugr/spark-vllm-docker.
-**Source material:** [`CAPTURE-two-spark-video.md`](./CAPTURE-two-spark-video.md) + [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
+**Source material:** [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
 **Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the DeepSeek seat cold-start alone is ~6 min.
 **Outputs:** `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md`, committed `DRIFT-two-spark-bring-up-<YYYY-MM-DD>.md`, the live `/opt/litellm/config.yaml` + the vLLM launch command.
 
@@ -162,7 +162,7 @@ ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan
 **Hot-plug notes (post-Jan-2026 DGX OS — the card is off the bus until the cable wakes it):**
 - On cable insertion the hotplug driver re-attaches the NIC and the netdevs appear. If they don't within ~30 s: force it (`sudo /opt/nvidia/dgx-spark-mlnx-hotplug/mtk-hotplug-handler.sh plug-in`), then re-check; a reboot with the cable in also works.
 - **QSFP56 cable caveat:** a June-2026 forum report (same FW 28.45.4028) saw a third-party **QSFP56** DAC trigger FALSE "Cable removal" events — NICs vanish ~20 s after boot *with the cable inserted*. NVIDIA's approved list is **QSFP112** DACs (Amphenol NJAAKK-N911/0006, Luxshare LMTQF022-SD-R). A 200G QSFP56 DAC is electrically fine for the link; only the hotplug *presence detection* may be picky. **If the link flaps: disable hot-plug** (`/etc/nvidia/cx7-hotplug-enabled` — remove/rename the flag, reboot; costs ~18 W idle) and it will hold.
-- **THE ESTATE'S CABLE (identified 2026-08-02): FS.COM 0.5 m 200G QSFP56 passive DAC, P/N `QSFP-200G-PC005`, NV/ME-coded — the same vendor/form-factor/length class as the June report's suspect part.** Decision rule, pre-made so recording day never stalls:
+- **THE ESTATE'S CABLE (identified 2026-08-02): FS.COM 0.5 m 200G QSFP56 passive DAC, P/N `QSFP-200G-PC005`, NV/ME-coded — the same vendor/form-factor/length class as the June report's suspect part.** Decision rule, pre-made so cable day never stalls:
   ```
   Cable in → netdevs appear → ▶ STABILITY MINI-GATE: watch 2 minutes
     (journalctl -kf | grep -E 'mlx5|cx7-pcie-hotplug' — no removal events, iface stays Up)
@@ -229,7 +229,7 @@ ssh ${N2} hostname && ssh -o BatchMode=yes ${N2} 'ssh -o BatchMode=yes '"${N1}"'
 
 ## Phase 6: Power-off mitigation &nbsp;·&nbsp; **▶ GATE before any --tp launch**
 
-A GB10 firmware bug **hard powers-off under sustained GPU load** (reproduces in ~60 s of vLLM load; **still open Jun 2026**, not in NVIDIA's Known Issues). TP loads **both** boxes hard — this is the single highest-likelihood failure here and on camera.
+A GB10 firmware bug **hard powers-off under sustained GPU load** (reproduces in ~60 s of vLLM load; **still open Jun 2026**, not in NVIDIA's Known Issues). TP loads **both** boxes hard — this is the single highest-likelihood failure here.
 
 ```bash
 # Stopgap clock clamp on BOTH nodes — LABELLED UNVERIFIED (posted only as a planned test; never confirmed to stop the shutdown):
@@ -359,7 +359,7 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 
 ---
 
-## Phase 9: Benchmark + record (the capture-spine P3 "number") &nbsp;·&nbsp; **▶ GATE: numbers captured**
+## Phase 9: Benchmark + record &nbsp;·&nbsp; **▶ GATE: numbers captured**
 
 ```bash
 # Same model, both ways — the numbers, not the README, decide whether TP earns its place.
@@ -414,6 +414,5 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 ## Appendix: relationship to the other artifacts
 
 - **`RUNBOOK-single-spark-bring-up.md`** — Node A baseline. This runbook is additive on top; it never edits the Node A config.
-- **[`CAPTURE-two-spark-video.md`](./CAPTURE-two-spark-video.md)** (capture spine, in this repo) — the filming notes; it *films* this executable arc (P2 bring-up war-story = Phases 2–6; P3 number = Phase 9).
 - **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
 - **[`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)** (this repo) — the **single-node precursor**: the same LiteLLM `:4000` front door + no-cloud-fallback gate + disjoint-`CPUAffinity` gate, on one Spark. This two-node fabric is its **superset**; the LiteLLM Phase here re-uses the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md)'s install/unit/gates (same mechanism, divergent config — this adds the cross-node `deepseek` backend + the attended `claude-opus` DF-003 row).

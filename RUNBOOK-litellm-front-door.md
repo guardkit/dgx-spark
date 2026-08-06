@@ -187,7 +187,7 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 # `sed 's/#.*//'` strips comments FIRST — the in-file note "…escalates to claude-opus on overflow"
 # is prose, not a route, and must not false-FAIL the gate. The check is on YAML values only.
 ```
-**FAIL → halt.** This is the on-camera "the one community feature I deliberately disable" beat. Cloud models may be *named* only for the attended DF-003 path (the public box names none at all).
+**FAIL → halt.** Cloud models may be *named* only for the attended DF-003 path (the public box names none at all).
 
 ### 4.2 **▶ GATE — CPU-pin LiteLLM disjoint from llama-swap (WARN, not STOP)** &nbsp;·&nbsp; (registry: CONVENTIONS §8 "LiteLLM ↔ llama-swap CPU contention")
 

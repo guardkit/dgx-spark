@@ -59,7 +59,6 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 - **The LiteLLM `:4000` front door.** This runbook stands up the llama-swap `:9000` fleet only. The optional OpenAI/Anthropic control plane in front (per-agent keys, spend, `claude-*` wildcard routing, the no-cloud-fallback gate) is the **additive overlay** [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md), run after this is green (DECISION-DF-005).
 - **vLLM backends / cross-node TP.** Adding vLLM backends, or a tensor-parallel model split across two Sparks, is the **two-Spark** runbook ([`RUNBOOK-two-spark-bring-up.md`](./RUNBOOK-two-spark-bring-up.md)) — DF-005 (single node) is the precursor to DF-004 (two nodes).
 - **The operator's personal fine-tuned Coach (`coach-ft-v3`) + the post-Graphiti lineup.** That is **Appendix B** — a diff against the public config, not the public demo.
-- **Two-Spark / tensor-parallel.** That's the second talk; capture spine in `CAPTURE-two-spark-video.md`.
 - **Fine-tuning / dataset work.** Out of scope.
 - **Cloud-LLM escalation.** Zero cloud on the critical path (DECISION-DF-001). If a step needs the network it's *additive* and degrades gracefully.
 
