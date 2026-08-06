@@ -24,6 +24,7 @@ So: copy → update internal cross-references to the new repo → prove the new 
 
 | Source file | → Destination | Status | Notes |
 |---|---|---|---|
+| *(2026-08-06)* | | | **Scope cut:** this repo is now runbooks + what they directly use, only. Video/talk content, the showcard lane, and personal-estate extras (audio/voice vendoring, live config snapshots, grammars, seat-lease/healthcheck/infra scripts) moved to [`youtube-channel`](https://github.com/guardkit/youtube-channel) (`video-plans/dgx-spark/` · `talks/` · `showcard/` · `archive/dgx-spark-estate/`). Rows below are the original guardkit→dgx-spark migration record. |
 | `README.md` (current operational state) | `ARCHITECTURE-current.md` | current | The live model lineup / matrix sets / routing recipes. This repo's `README.md` is the new front page; the old one becomes the steady-state architecture doc. |
 | `AUTOBUILD-ON-LLAMA-SWAP-findings.md` | **stays in guardkit** | internal record | Chronological engineering log with deep guardkit-internal / lpa-platform-poc refs. Kept in guardkit (its `../` links resolve there); referenced from this repo by URL, **not copied**. |
 | `RUNBOOK-v3-production-deployment.md` | **stays in guardkit** | internal record | The internal v3 deployment runbook (`TASK-RUN-D6F4` / `RESULTS-v3 Gap` / `findings §` cross-refs); superseded for public use by `RUNBOOK-single-spark-bring-up.md`. Referenced by URL, **not copied**. |

@@ -108,12 +108,10 @@ Flat + prefixed, matching the established house convention:
 | `RUNBOOK-*.md` | Executable runbooks (the deliverables an agent runs). |
 | `RESULTS-*.md` / `VALIDATION-*.md` | Execution records / gate outcomes for a given runbook. |
 | `DECISION-*.md` | ADRs (or pointers to the canonical ones in `guardkit/docs/decisions/`). |
-| `TALK-*.md` | Conference / meetup talk abstracts and session spines. |
 | `RUNBOOK-CONVENTIONS.md` | **The method.** Runbook anatomy + the recon→drift→gates pattern. |
 | `MIGRATION.md` | Inventory map from the old `guardkit` locations into this repo. |
 | `diagrams/` | Architecture diagrams (`.svg` + editable `.excalidraw`). |
-| `grammars/` | GBNF grammars (e.g. Coach verdict constraints). |
-| `scripts/` | Operational scripts: llama-swap systemd units, keep-alive, health-check, infra. |
+| `scripts/` | Scripts the runbooks deploy: llama-swap systemd units, keep-alive, model staging. |
 
 ---
 
