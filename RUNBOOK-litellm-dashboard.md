@@ -8,7 +8,7 @@
 clients (agents, Claude Code — now each holding a VIRTUAL KEY)
    │  Authorization: Bearer sk-…      ← THIS overlay flips :4000 from open to authenticated
    ▼
-LiteLLM :4000  ──────────────► Postgres :5432 (docker, loopback-only)   ← keys · spend · dashboard state
+LiteLLM :4000  ──────────────► Postgres :5435 (docker, loopback-only)   ← keys · spend · dashboard state
    │   (unchanged: claude-* wildcard · DF-001 no-cloud · x-litellm-response-cost)
    ▼
 llama-swap :9000               ← the fleet (UNCHANGED — this overlay never touches it)
@@ -35,7 +35,10 @@ PINS (set 2026-08-05)
                                               (a user systemd unit cannot order After= a system service; see Phase 3)
   volume           litellm-pgdata             named docker volume — keys + spend history live here; survives
                                               container recreate; destroyed ONLY by the Appendix full-removal step
-  bind             127.0.0.1:5432             loopback only — never 0.0.0.0; the DB is reachable from this box only
+  bind             127.0.0.1:5435             loopback only — never 0.0.0.0; the DB is reachable from this box only.
+                                              PROMOTED 5432→5435 2026-08-06 (run 1's 1c gate caught 5432 held by
+                                              finproxy-postgres; 5433/5434 also taken by api-test/st-autobuild DBs
+                                              on the reference box — host port only; in-container stays 5432)
   db / user        litellm / litellm
   cpuset           0-3                        same cores as the litellm unit — the control plane stays off the
                                               fleet's cores 4-19 (front-door Phase 4.2 philosophy)
@@ -127,15 +130,15 @@ docker info >/dev/null 2>&1 \
 ```
 **FAIL → halt** (fix is one-time box setup, then re-run this overlay).
 
-### 1c — `:5432` is free, or already ours
+### 1c — `:5435` is free, or already ours
 
 ```bash
 if docker inspect litellm-postgres >/dev/null 2>&1; then
   echo "GATE PASS: container litellm-postgres exists (re-run mode) — Phase 3 will reuse it"
-elif ss -ltn 2>/dev/null | grep -q ':5432 '; then
-  echo "GATE FAIL: something else is listening on :5432 — reusing a foreign Postgres is out of scope; free the port or change the bind via a PINS PR. STOP."
+elif ss -ltn 2>/dev/null | grep -q ':5435 '; then
+  echo "GATE FAIL: something else is listening on :5435 — reusing a foreign Postgres is out of scope; free the port or change the bind via a PINS PR. STOP."
 else
-  echo "GATE PASS: :5432 free"
+  echo "GATE PASS: :5435 free"
 fi
 ```
 
@@ -173,7 +176,7 @@ if [ ! -f "$ENVF" ]; then
   cat > "$ENVF" <<EOF
 LITELLM_MASTER_KEY=${MK}
 POSTGRES_PASSWORD=${PGPW}
-DATABASE_URL=postgresql://litellm:${PGPW}@127.0.0.1:5432/litellm
+DATABASE_URL=postgresql://litellm:${PGPW}@127.0.0.1:5435/litellm
 EOF
   echo "[secrets] minted $ENVF"
 else
@@ -206,7 +209,7 @@ else
     --shm-size 256m \
     -e POSTGRES_DB=litellm -e POSTGRES_USER=litellm \
     -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-    -p 127.0.0.1:5432:5432 \
+    -p 127.0.0.1:5435:5432 \
     -v litellm-pgdata:/var/lib/postgresql/data \
     postgres:17
 fi
@@ -216,7 +219,7 @@ for i in $(seq 1 24); do
   sleep 5
 done
 docker exec litellm-postgres pg_isready -U litellm -d litellm \
-  && echo "GATE PASS: postgres accepting connections on 127.0.0.1:5432" \
+  && echo "GATE PASS: postgres accepting connections on 127.0.0.1:5435" \
   || { echo "GATE FAIL: postgres not ready after 120s — docker logs litellm-postgres. STOP."; }
 # [record in RESULTS] the actual minor + digest this run validated:
 docker exec litellm-postgres psql -U litellm -d litellm -tAc "show server_version;"
@@ -387,7 +390,7 @@ Everything that pointed at `:4000` keyless now gets `401`. That is the *feature*
 |---|---|---|
 | P0 drift report emitted + reviewed | | committed `DRIFT-litellm-dashboard-*` |
 | P1a front door green (`:4000`) + fleet green (`:9000`) | | precondition — FAIL→STOP |
-| P1b docker usable · P1c `:5432` ours/free | | one-time box setup if FAIL |
+| P1b docker usable · P1c `:5435` ours/free | | one-time box setup if FAIL |
 | P1d twin-config invariant (delta = `general_settings` only) | | routing-drift guard — FAIL→STOP |
 | P3 postgres container healthy (`pg_isready`) | | version + digest recorded in RESULTS |
 | P5.1 keyless `401` **and** master-keyed `200` | | auth flip proven both ways — FAIL→STOP |
@@ -430,7 +433,7 @@ Then write `RESULTS-litellm-dashboard-<YYYY-MM-DD>.md`:
 | Keyless requests suddenly `200` again on an authed box | a front-door re-run redeployed the PUBLIC config (the documented coupling) | re-run this overlay — Phase 4 redeploys the dashboard config; secrets/DB untouched (gate 5.1 is the detector) |
 | Every existing client `401`s | expected — auth flipped | Phase 6: mint virtual keys, update clients; interim escape hatch: `:9000` direct (DF-001 §3.3) |
 | `pg_isready` never passes | first-boot `initdb` still running, or a volume/permissions issue | `docker logs litellm-postgres`; if the volume is from a different PG major, see the Appendix major-upgrade note |
-| `:5432` already bound at Phase 1c | another Postgres on the box | free it, or change this overlay's bind via a PINS PR — silently reusing a foreign DB is out of scope |
+| `:5435` already bound at Phase 1c | another Postgres on the box | free it, or change this overlay's bind via a PINS PR — silently reusing a foreign DB is out of scope (this pin already moved once: 5432→5435, 2026-08-06) |
 | UI loads, `admin` login rejected | password ≠ current master key (stale shell env, or key rotated by hand) | use the live value: `grep LITELLM_MASTER_KEY /opt/litellm/litellm.env`; confirm the drop-in is applied: `systemctl --user show litellm -p EnvironmentFiles` |
 | 5.5 finds zero spend rows | batched flush not elapsed, or proxy started before DB and never reconnected | wait/retry; `systemctl --user restart litellm` once the DB is up (Restart= absorbs this at boot) |
 | Box offline at first run of Phase 4 | prisma engines + docker pull need network once | this overlay is opt-in and network-dependent on FIRST run only; re-runs after a green run are offline-safe |
