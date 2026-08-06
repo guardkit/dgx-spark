@@ -27,7 +27,7 @@ So: copy → update internal cross-references to the new repo → prove the new 
 | `README.md` (current operational state) | `ARCHITECTURE-current.md` | current | The live model lineup / matrix sets / routing recipes. This repo's `README.md` is the new front page; the old one becomes the steady-state architecture doc. |
 | `AUTOBUILD-ON-LLAMA-SWAP-findings.md` | **stays in guardkit** | internal record | Chronological engineering log with deep guardkit-internal / lpa-platform-poc refs. Kept in guardkit (its `../` links resolve there); referenced from this repo by URL, **not copied**. |
 | `RUNBOOK-v3-production-deployment.md` | **stays in guardkit** | internal record | The internal v3 deployment runbook (`TASK-RUN-D6F4` / `RESULTS-v3 Gap` / `findings §` cross-refs); superseded for public use by `RUNBOOK-single-spark-bring-up.md`. Referenced by URL, **not copied**. |
-| `CAPTURE-two-spark-video.md` | same name | current | Capture spine for the two-Spark talk. |
+| `CAPTURE-two-spark-video.md` | [`youtube-channel/video-plans/dgx-spark/`](https://github.com/guardkit/youtube-channel/tree/main/video-plans/dgx-spark) | moved 2026-08-06 | Video content lives in the youtube-channel repo; this repo is runbooks + evidence only. |
 | `RESULTS-v3-production-deployment.md` | **stays in guardkit** | internal record | v3 results (65 GB VRAM, 41.32 tok/s) with internal `tasks/completed/` refs. Referenced by URL, **not copied**. |
 | `gb10-memory-budget-and-macbook-offload.md` | same name | current | Where the 121 GB goes. |
 | `gb10-model-requirements-matrix.md` | same name | current-ish | Role mapping valid; speed expectations superseded. |
@@ -62,7 +62,7 @@ So: copy → update internal cross-references to the new repo → prove the new 
 | `README.md` | done — repo front page. |
 | `RUNBOOK-CONVENTIONS.md` | done — the method (recon → drift → gates). |
 | `MIGRATION.md` | done — this file. |
-| `TALK-ddd-southwest-got-a-spark-now-what.md` | done — DDD abstract + session spine. |
+| `TALK-ddd-southwest-got-a-spark-now-what.md` | done; moved 2026-08-06 → [`youtube-channel/talks/`](https://github.com/guardkit/youtube-channel/tree/main/talks). |
 | `RUNBOOK-single-spark-bring-up.md` | **next** — the exemplar runbook under the new conventions; the talk's live demo. |
 
 ---

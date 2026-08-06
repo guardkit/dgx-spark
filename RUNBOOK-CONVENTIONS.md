@@ -203,7 +203,6 @@ The reusable core: GB10 traps we've hit (ours + the community's), each with the 
 | Pattern | Use |
 |---|---|
 | `RUNBOOK-<topic>.md` | An executable runbook. |
-| `CAPTURE-<topic>.md` | A video capture spine — beats, say-lines, and failure triage for the **operator on recording day**. Followed by a human, never executed by an agent (renamed from `RUNBOOK-*-capture.md`, 2026-08-05 — the old prefix invited `claude "execute …"` on a filming guide). |
 | `RESULTS-<topic>.md` | Execution record (numbers, what passed). |
 | `VALIDATION-<id>-results.md` | Gate outcomes for a specific task/gap. |
 | `DECISION-<id>.md` | ADR (or a pointer to the canonical one in `guardkit/docs/decisions/`). |

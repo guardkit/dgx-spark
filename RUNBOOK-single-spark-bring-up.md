@@ -483,7 +483,7 @@ Leave running for subsequent work: `llama-swap` (`:9000`) *is* the endpoint. Not
 - [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) — the optional additive overlay that adds the LiteLLM `:4000` front door (deploying [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml)) on top of this fleet; [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md) is the rationale (single-node precursor to DF-004).
 - [`RUNBOOK-v3-production-deployment.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/RUNBOOK-v3-production-deployment.md) — the proven end-to-end procedure this exemplar distils.
 - [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) — SM121 build flags, model downloads, the dynamic-VRAM launcher, the LiteLLM Phase-4 appendix (merge conflicts resolved).
-- `TALK-ddd-southwest-got-a-spark-now-what.md` — the talk this runbook is the live demo for.
+- [`TALK-ddd-southwest-got-a-spark-now-what.md`](https://github.com/guardkit/youtube-channel/blob/main/talks/TALK-ddd-southwest-got-a-spark-now-what.md) (youtube-channel repo) — the talk this runbook is the live demo for.
 
 ---
 
