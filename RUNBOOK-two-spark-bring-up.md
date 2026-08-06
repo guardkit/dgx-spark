@@ -20,7 +20,7 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 
 **Machines:** Node A = `promaxgb10-41b1` (proven baseline); Node B = the new DGX Spark. Both Blackwell SM121, 128 GB unified (~121 usable, ceiling 115). 200 G QSFP56 ConnectX-7 single cable.
 **Prereq (hard):** Node A is **GREEN** on `RUNBOOK-single-spark-bring-up.md` (llama-swap on `:9000`, gates passed). This runbook does nothing to the Node A config.
-**One-time box setup:** passwordless sudo on **both** nodes (run the agent as that user, not root) **+ LAN SSH Node A → Node B** (the agent drives every Node B step over SSH from Node A; Phases 0–2 run pre-cable, so this is the ordinary LAN/Tailscale path — the CX-7 link-local mesh is Phase 5's job) — see [README → One-time box setup](./README.md#one-time-box-setup-passwordless-sudo). The only physically-manual inputs are the CX-7 cable + any firmware reboot.
+**One-time box setup:** passwordless sudo on **both** nodes (run the agent as that user, not root) **+ LAN SSH Node A → Node B** (the agent drives every Node B step over SSH from Node A; Phases 0–2 run pre-cable, so this is the ordinary LAN/Tailscale path — the CX-7 link-local mesh is Phase 5's job) — see [README → One-time box setup](./README.md#one-time-box-setup-passwordless-sudo). The only physically-manual inputs are the CX-7 cable + any firmware reboot (operator steps, conventions §2.3).
 **Prior art (re-checked in Phase 0):** [NVIDIA connect-two-sparks playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/README.md) · [NVIDIA NCCL playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/nccl/README.md) · the [DeepSeek-V4-Flash 2× Spark recipe thread](https://forums.developer.nvidia.com/t/deepseek-v4-flash-official-fp8-running-across-2x-dgx-spark-tp-2-mtp-200k-ctx-recipe-numbers/370309) · [corti "Two Sparks, One Cluster"](https://corti.com/two-sparks-one-cluster-why-stacking-nvidia-dgx-spark-units-unlocks-local-frontier-scale-inference/) · eugr/spark-vllm-docker.
 **Source material:** [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
 **Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the DeepSeek seat cold-start alone is ~6 min.
@@ -148,6 +148,8 @@ sudo apt-mark hold mlnx-fw-updater 2>/dev/null || true   # pin; no auto-flash
 ---
 
 ## Phase 3: Cable + link-up &nbsp;·&nbsp; **▶ GATE: `ibdev2netdev` shows `(Up)`**
+
+**✋ OPERATOR STEP (conventions §2.3):** connect the single QSFP cable to any QSFP port on each unit — the agent prompts, then polls `ibdev2netdev` until the iface appears (hotplug re-attach ≤ ~30 s) and continues into the gate below. No cable yet is a *pending input*, not a FAIL — wait for the operator.
 
 ```bash
 # Connect the single QSFP cable to ANY QSFP port on each unit (the official

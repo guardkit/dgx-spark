@@ -61,6 +61,21 @@ Execution modes:
 
 This is **naming existing behaviour, not new machinery**: Phase 0 recon is already read-only; staging/install steps already skip-if-present or overwrite safely; gates already assert against the running system, not against session history. For a **float-with-baseline** dependency (§3) the `update` mode *is* the maintenance loop — re-run pulls the latest, the gates re-prove it, RESULTS records the new validated baseline, and a pin lands reactively (a PR) only if a gate fails.
 
+## 2.3 Operator steps (physical inputs)
+
+Some steps need a physical action no agent can perform — connect a cable, power-cycle a box, reseat hardware. These are **operator steps**, marked in-place in the runbook:
+
+> **✋ OPERATOR STEP:** *\<the action, one line\>* — the agent prompts, then polls for *\<the machine state that proves it\>*.
+
+The executing agent's contract at an operator step:
+
+1. **Prompt now, then watch.** Tell the operator concisely what to do, and poll for the observable machine state the step names (e.g. the netdev appearing after cable insertion).
+2. **Continue on detection.** The moment the state appears, execution proceeds — no confirmation round-trip.
+3. **A pending input is not a FAIL.** Gates decide failures; an operator step just waits. Halt only if the operator says the input is unavailable, or a generous watch window expires unanswered.
+4. **RESULTS is written once, at the final phase** — never a partial "blocked" write-up at an operator step.
+
+The contract lives *here* — in the artifact every executor reads — because execution behaviour that varies by operator, machine, or harness (agent-side memory, session context, private notes) breaks reproducibility (§1) exactly the way ad-hoc prompting does. If an executor needs to know something at a step, the runbook says it.
+
 ---
 
 ## 3. Pins live in one block
