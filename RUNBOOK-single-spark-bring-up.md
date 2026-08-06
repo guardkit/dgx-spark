@@ -1,6 +1,6 @@
 # Runbook: Single-Spark Bring-Up — Unboxed GB10 → Trusted Multi-Model Endpoint
 
-**Status:** Draft (exemplar for the conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md); the DDD South West demo spine). Execute end-to-end at least twice before the talk: once to verify, once as a dress rehearsal. Flip to **Verified** after the first green walkthrough.
+**Status:** **Verified** (exemplar for the conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md); the DDD South West demo spine). First green walkthrough 2026-08-04 on `promaxgb10-41b1` — all Decision-Gate rows PASS, llama-swap v245 validated ([`RESULTS-single-spark-bring-up-2026-08-04.md`](./RESULTS-single-spark-bring-up-2026-08-04.md); that run's three findings are folded in below). The pre-talk dress rehearsal (the second end-to-end run) is still to schedule.
 
 **Purpose:** Take a DGX Spark / GB10 from fresh to a **trusted, self-verifying multi-model inference endpoint on `:9000`** — the **llama-swap** fleet — built by an **agent** (Claude Code / Codex / OpenCode) *executing this runbook*, not by hand. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon pass reports what's drifted upstream before anything runs. It stands up the **public, all-open-model config** committed at [`examples/llama-swap-config.public.yaml`](./examples/llama-swap-config.public.yaml) — every model is downloadable, so a viewer can replicate the whole box. **Want a single OpenAI/Anthropic front door — `claude-*` routing, per-agent keys, spend tracking — on top?** That is the optional additive overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md), run after this is green; together they are the full community stack (`client → LiteLLM → llama-swap → engines`, DECISION-DF-005), and this base alone is the fleet that stack rests on. (The operator's personal post-Graphiti variant is **Appendix B**.)
 
@@ -35,8 +35,9 @@ llama-swap :9000          ← the endpoint / front door (all-llama.cpp; one proc
 ```
 PINS (set 2026-06-21 · amended 2026-08-01)
   llama-swap            v245                         single-dash flags; matrix coexistence (v208+).
-                                                     PROMOTED v219→v245 2026-08-01 (draft PR — VALIDATE on the
-                                                     next run; the reference box runs v219 until that run is green)
+                                                     PROMOTED v219→v245 2026-08-01; VALIDATED 2026-08-04 (all gates
+                                                     green on the reference box, which now serves v245 — note its
+                                                     --version output is now v-prefixed: "version: v245")
   llama.cpp             SM121 build, 121a-real       PR #17570 (Anthropic Messages API); last-verified build b9430 (2026-05-30)
   workhorse  GGUF       Qwen3.6-35B-A3B-Instruct UD-Q4_K_XL   unsloth/Qwen3.6-35B-A3B-GGUF     (Player)
   coach      GGUF       Gemma-4-26B-A4B-it UD-Q4_K_XL         unsloth/gemma-4-26B-A4B-it-GGUF  (Coach; stock/open)
@@ -90,7 +91,8 @@ No side effects. Fixed sources only. Output is a drift report, never edited step
 ```bash
 echo "=== Phase 0.1: deterministic pin checks ==="
 # llama-swap pinned vs latest release
-PINNED_SWAP=v219
+PINNED_SWAP=v245   # = PINS block — a promotion PR edits both together (the stale v219 that sat
+                   # here false-drifted the 2026-08-04 run's check; this line must mirror the pin)
 LATEST_SWAP=$(curl -s --max-time 10 https://api.github.com/repos/mostlygeek/llama-swap/releases/latest | jq -r .tag_name 2>/dev/null)
 [ -z "$LATEST_SWAP" ] && echo "[recon] llama-swap check SKIPPED (offline)" \
   || { [ "$PINNED_SWAP" = "$LATEST_SWAP" ] && echo "[OK] llama-swap $PINNED_SWAP == latest" \
@@ -231,7 +233,9 @@ tar -xzf "$TMP/llama-swap.tgz" -C "$TMP"
 sudo install -m755 "$TMP/llama-swap" /usr/local/bin/llama-swap
 rm -rf "$TMP"
 sudo mkdir -p /opt/llama-swap/{config,logs,models}; sudo chown -R $USER:$USER /opt/llama-swap
-llama-swap --version | grep -q "version: ${SWAP_VER}" \
+# v-tolerant: v219 printed "version: 219", v245 prints "version: v245" — the format changed inside
+# the promotion gap and the old exact grep false-FAILed a correct binary (caught 2026-08-04).
+llama-swap --version | grep -qE "version: v?${SWAP_VER}([^0-9]|$)" \
   && echo "GATE PASS: llama-swap v${SWAP_VER} installed" \
   || echo "GATE FAIL: installed version != pinned v${SWAP_VER}. STOP."
 ```
@@ -386,10 +390,10 @@ curl -sf http://localhost:9000/v1/models | jq -r '.data[].id' | sort
 
 ```bash
 curl -s http://localhost:9000/v1/messages -H "Content-Type: application/json" -H "x-api-key: not-needed" \
-  -d '{"model":"workhorse","max_tokens":256,"messages":[{"role":"user","content":"Write an async Python function that fetches a URL with aiohttp and returns the parsed JSON body."}]}' \
+  -d '{"model":"workhorse","max_tokens":3072,"messages":[{"role":"user","content":"Write an async Python function that fetches a URL with aiohttp and returns the parsed JSON body."}]}' \
   > /tmp/spark-smoke.json
 ```
-**What the reply should look like (load-bearing lines):** a `content` array with assistant text (and, for the tool variant, a `tool_use` block); `stop_reason` present. ~256 tokens should return in ~5–6 s (≈ 40+ tok/s warm). If you get plain text where a tool was expected, `--jinja` isn't active. (Throughput is not gated here — it's a read-only smoke; record the number in RESULTS.)
+**What the reply should look like (load-bearing lines):** a `content` array with a `thinking` block **followed by** assistant text (and, for the tool variant, a `tool_use` block); `stop_reason: end_turn`. **`max_tokens` must be ≥ ~2K:** under `--reasoning auto` Qwen3.6 thinks first, and a small budget (256 — even 1024) returns a *thinking-only* reply with no text and `stop_reason: max_tokens` — that is the budget, not a template failure (verified 2026-08-04: genuine chain-of-thought on both `/v1/messages` and `/v1/chat/completions`). At 3072, expect ~1,900 tokens in ~30 s (≈ 40+ tok/s warm; 64 tok/s recorded 2026-08-04). If you get plain text where a tool was expected, `--jinja` isn't active. (Throughput is not gated here — it's a read-only smoke; record the number in RESULTS.)
 
 ### 5.3 Embeddings — dim matches the configured model
 
@@ -458,6 +462,7 @@ Then write `RESULTS-single-spark-bring-up-<YYYY-MM-DD>.md`:
 | 504 on first big request | cold load > `healthCheckTimeout` | raise to ≥600 |
 | RAG retrieval garbage / dim error | served embed dim ≠ index dim | Phase 5.3 gate; match `EXPECT_DIM` to the served model (1024 Qwen3-Embedding / 768 nomic) |
 | Plain text where a `tool_use` was expected | `--jinja` missing | add `--jinja` to the model `cmd` |
+| Reply is a `thinking` block only — no text, `stop_reason: max_tokens` | output budget below the model's reasoning phase (`--reasoning auto` thinks first) | raise `max_tokens` ≥ ~2K (the 5.2 smoke uses 3072); it's the budget, not the template |
 | `curl /v1/models` refused | llama-swap not running | `systemctl --user status llama-swap`; tail `/opt/llama-swap/logs/llama-swap.log` (native process — `docker logs` won't work) |
 
 > LiteLLM `:4000` front-door failure modes (504s / `:4000` refused / `claude-*` not routed / `claude-*` reaching cloud) live in the overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 7.
