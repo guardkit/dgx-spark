@@ -1,0 +1,87 @@
+# =============================================================================
+# LiteLLM — DASHBOARD variant of the PUBLIC front-door config (:4000)
+# =============================================================================
+# This is examples/litellm-config.public.yaml PLUS the `general_settings` block
+# materialized at the bottom — nothing else. Deployed by the overlay
+# RUNBOOK-litellm-dashboard.md (over a box already green on
+# RUNBOOK-litellm-front-door.md). It enables:
+#   - master-key auth on :4000  (EVERY request now needs a key — keyless 401s)
+#   - persisted virtual keys    (POST /key/generate, per-agent budgets)
+#   - the spend dashboard       (:4000/ui, backed by Postgres)
+#
+# INVARIANT (gate-checked in the dashboard runbook's Phase 1): after stripping
+# comments, the ONLY diff vs litellm-config.public.yaml is the general_settings
+# block. Routing, the claude-* wildcard, and the DF-001 no-cloud guard are
+# byte-for-byte the same policy — auth changes WHO may call, never WHERE a
+# request can route. Edit model_list/router_settings in the PUBLIC file first,
+# then mirror here (recon watches for the two files drifting apart).
+#
+# Secrets are NOT in this file: master_key and database_url resolve via
+# os.environ from /opt/litellm/litellm.env (0600, never committed) — see the
+# dashboard runbook's Phase 2.
+# =============================================================================
+
+model_list:
+  # ---------------------------------------------------------------------------
+  # Fleet -> llama-swap :9000. `model:` is the openai/<llama-swap-alias> the
+  # request is demultiplexed by; `api_base` is the llama-swap PROXY port (:9000),
+  # never an individual model's port. `api_key: none` is a placeholder llama-swap
+  # ignores (keeps strict OpenAI clients happy).
+  # ---------------------------------------------------------------------------
+  - model_name: workhorse
+    litellm_params:
+      model: openai/workhorse          # Qwen3.6-35B-A3B-Instruct (Player / agentic coder)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: coach
+    litellm_params:
+      model: openai/coach              # Gemma-4-26B-A4B-it (stock; the open Coach base)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: embed
+    litellm_params:
+      model: openai/embed              # Qwen3-Embedding-0.6B (1024-dim, RAG)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+  - model_name: gpt-oss-120b
+    litellm_params:
+      model: openai/gpt-oss-120b       # on-demand "big-brain" Player (evicts the fleet)
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+
+  # ---------------------------------------------------------------------------
+  # claude-* wildcard -> local workhorse. Anthropic/OpenAI SDK clients (Claude
+  # Code, DeepAgents, AutoBuild) need only point base_url at :4000 — no code
+  # change. NOTE: confirm the literal `claude-*` pattern resolves in YOUR
+  # installed LiteLLM version — the doc-blessed forms are `provider/*`, `*`, and
+  # custom prefixes. If it does not match, add explicit rows
+  # (claude-sonnet-4-6 / claude-opus-4-7 -> openai/workhorse) instead.
+  # ---------------------------------------------------------------------------
+  - model_name: "claude-*"
+    litellm_params:
+      model: openai/workhorse
+      api_base: http://localhost:9000/v1
+      api_key: "none"
+
+litellm_settings:
+  drop_params: true                    # silently drop params an upstream doesn't support, rather than 500
+
+# DF-001: BOTH fallback lists empty AND no cloud model anywhere above -> there is
+# no cloud target to escalate to. The runbook's no-cloud GATE asserts both empty
+# lists AND the absence of any cloud model in a fallback chain (the robust
+# invariant — empty-list "disable" is undocumented; a present cloud target is what
+# actually fires).  https://docs.litellm.ai/docs/routing-load-balancing
+router_settings:
+  fallbacks: []                        # NO local->cloud fallback
+  context_window_fallbacks: []         # also empty — the documented example escalates to claude-opus on overflow
+
+# -----------------------------------------------------------------------------
+# THE DASHBOARD DELTA (the only value-level diff vs the public config).
+# Both values resolve from /opt/litellm/litellm.env via the systemd drop-in
+# (EnvironmentFile=) — no secret ever lives in this file or in the repo.
+# master_key MUST start with `sk-`; it gates the admin API, /key/generate,
+# and is the `admin` password for :4000/ui.
+# -----------------------------------------------------------------------------
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"    # sk-… ; minted once in Phase 2, never rotated by a re-run
+  database_url: "os.environ/DATABASE_URL"        # postgresql://litellm:<pw>@127.0.0.1:5432/litellm
