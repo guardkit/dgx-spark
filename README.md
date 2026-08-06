@@ -2,7 +2,7 @@
 
 Runbooks, research, decisions, and operational scripts for running a local AI inference fleet on the **Dell DGX Spark / GB10** (Blackwell SM121, 128 GB unified memory).
 
-This is the consolidated home for the DGX Spark work that was previously scattered across `guardkit/docs/research/dgx-spark/` and `guardkit/scripts/`. See [`MIGRATION.md`](./MIGRATION.md) for what moved and what is still pending.
+This is the consolidated home for the DGX Spark work that was previously scattered across `guardkit/docs/research/dgx-spark/` and `guardkit/scripts/`. See [`MIGRATION.md`](https://github.com/guardkit/youtube-channel/blob/main/archive/dgx-spark-estate/MIGRATION.md) (archived) for what moved and where non-runbook content went.
 
 ---
 
@@ -109,7 +109,6 @@ Flat + prefixed, matching the established house convention:
 | `RESULTS-*.md` / `VALIDATION-*.md` | Execution records / gate outcomes for a given runbook. |
 | `DECISION-*.md` | ADRs (or pointers to the canonical ones in `guardkit/docs/decisions/`). |
 | `RUNBOOK-CONVENTIONS.md` | **The method.** Runbook anatomy + the recon→drift→gates pattern. |
-| `MIGRATION.md` | Inventory map from the old `guardkit` locations into this repo. |
 | `diagrams/` | Architecture diagrams (`.svg` + editable `.excalidraw`). |
 | `scripts/` | Scripts the runbooks deploy: llama-swap systemd units, keep-alive, model staging. |
 
