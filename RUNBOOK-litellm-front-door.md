@@ -1,6 +1,6 @@
 # Runbook: LiteLLM `:4000` Front Door — Additive Overlay over a Green llama-swap Fleet
 
-**Status:** Draft (additive **overlay** per [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1; the second act of the DDD South West demo). Execute once to verify before the talk. Flip to **Verified** after the first green walkthrough on a box already green on the base runbook.
+**Status:** **Verified** (additive **overlay** per [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1; the second act of the DDD South West demo). First green walkthrough 2026-08-04 on `promaxgb10-41b1`, same-day over the base runbook's first green — all Phase 5 gates PASS at litellm 1.95.0 ([`RESULTS-litellm-front-door-2026-08-04.md`](./RESULTS-litellm-front-door-2026-08-04.md)); the two findings from that run (stale `chat`, missing `-U`) are folded in below.
 
 **Purpose:** Add a **LiteLLM `:4000` front door** — one OpenAI/Anthropic-compatible endpoint with `claude-*` wildcard routing, per-agent keys, spend tracking, and a hard **no-cloud-fallback** policy — **on top of** an already-running llama-swap `:9000` fleet. This is **purely additive** (DECISION-DF-005): llama-swap is unchanged underneath, and direct `:9000` stays a documented fallback if LiteLLM is down (DF-001 §3.3). Running this turns the box into a genuine **superset** of the community stack (martinB78 → Dre Dyson → dasroot: `client → LiteLLM → llama-swap → engines`), not a llama-swap-only subset.
 
@@ -12,10 +12,10 @@ LiteLLM :4000             ← THIS overlay adds the front door (control plane: c
    │   (LiteLLM-down fallback: clients may hit llama-swap :9000 directly — DF-001 §3.3)
    ▼
 llama-swap :9000          ← the base fleet (stood up by RUNBOOK-single-spark-bring-up.md; UNCHANGED — this overlay only pins its CPU affinity)
-   └── always-on: workhorse · coach · chat · embed   ·   on-demand: gpt-oss-120b
+   └── always-on: workhorse · coach · embed   ·   on-demand: gpt-oss-120b   (chat retired from the base lineup 2026-08-01)
 ```
 
-**Prereq (hard, asserted in Phase 1):** the box is **GREEN** on [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) — the llama-swap `:9000` fleet is serving the four always-on aliases under its user systemd unit. This overlay does **nothing** to the llama-swap config; it adds the LiteLLM unit and pins llama-swap's CPU affinity via a drop-in.
+**Prereq (hard, asserted in Phase 1):** the box is **GREEN** on [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) — the llama-swap `:9000` fleet is serving the three always-on aliases under its user systemd unit. This overlay does **nothing** to the llama-swap config; it adds the LiteLLM unit and pins llama-swap's CPU affinity via a drop-in.
 **Conventions:** [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1 (overlay = precondition gate, not transclusion) · §3 (float-with-baseline) · §8 (the two LiteLLM gate rows this overlay cites).
 **One-time box setup:** passwordless sudo for the operator user; run the agent **as that user** — see [README → Running a runbook](./README.md#one-time-box-setup-passwordless-sudo).
 **Decision record:** [`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md) — why LiteLLM `:4000` is the single-Spark front door (and the single-node precursor to the two-Spark front door, DF-004).
@@ -28,7 +28,7 @@ llama-swap :9000          ← the base fleet (stood up by RUNBOOK-single-spark-b
 
 ```
 PINS (set 2026-06-25)
-  litellm    PyPI       litellm[proxy]  (latest)   pip --user --break-system-packages  (front door :4000; floated not frozen — stable interface + gate-protected, CONVENTIONS §3; validated at 1.89.4 on GB10 2026-06-25, wheels-only ~16s)
+  litellm    PyPI       litellm[proxy]  (latest)   pip -U --user --break-system-packages  (front door :4000; floated not frozen — stable interface + gate-protected, CONVENTIONS §3; validated at 1.95.0 on GB10 2026-08-04, wheels-only; previously 1.89.4 2026-06-25)
   GB10_CORES           20                           10x Cortex-X925 + 10x Cortex-A725 (NOT 72-core Grace) — for the CPUAffinity ranges below
   ENDPOINT             LiteLLM :4000 (clients)      llama-swap :9000 remains a direct-port fallback (DF-001 §3.3)
   CONFIG               examples/litellm-config.public.yaml   (this overlay's canonical target)
@@ -84,11 +84,11 @@ Write `DRIFT-litellm-front-door-<timestamp>.md` (conventions §5) and commit it 
 This overlay asserts the base runbook's **output state** (CONVENTIONS §2.1) — it does not re-run any base phase. If `:9000` isn't serving the fleet under its user unit, **stop and run the base runbook first**.
 
 ```bash
-# (a) the four always-on aliases are served on :9000
+# (a) the three always-on aliases are served on :9000
 ALIASES=$(curl -sf http://localhost:9000/v1/models | jq -r '.data[].id' 2>/dev/null | sort | tr '\n' ' ')
 echo "llama-swap :9000 aliases: ${ALIASES:-<none reachable>}"
 MISS=
-for m in chat coach embed workhorse; do
+for m in coach embed workhorse; do   # the three always-on aliases (chat retired from the base lineup 2026-08-01)
   echo " $ALIASES " | grep -q " $m " || { echo "GATE FAIL: alias '$m' not served on :9000."; MISS=1; }
 done
 # (b) llama-swap is supervised as a USER unit (so the CPU-affinity drop-in in Phase 3 takes effect)
@@ -108,11 +108,13 @@ systemctl --user is-active --quiet llama-swap \
 > **Update mode:** re-running this phase pulls the latest `litellm[proxy]`. The gates in Phase 4 re-prove the new release; record the version in RESULTS as the new validated baseline (CONVENTIONS §3). No pin edit unless a gate fails.
 
 ```bash
-pip install --user --break-system-packages 'litellm[proxy]'   # latest; [proxy] extra is pure-Python, wheels-only on aarch64 (~16s; validated baseline 1.89.4)
+pip install -U --user --break-system-packages 'litellm[proxy]'   # latest; [proxy] extra is pure-Python, wheels-only on aarch64 (validated baseline 1.95.0).
+# -U is load-bearing: without it, a box that already has litellm reports "already satisfied" and
+# silently does NOT float to latest — breaking this phase's own update-mode claim (verified both ways 2026-08-04).
 hash -r
 LITELLM_BIN=$(command -v litellm || echo ~/.local/bin/litellm)
 VER=$("$LITELLM_BIN" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-echo "[record in RESULTS] litellm ${VER}   (validated baseline: 1.89.4 on GB10 2026-06-25)"
+echo "[record in RESULTS] litellm ${VER}   (validated baseline: 1.95.0 on GB10 2026-08-04)"
 # Deliberately NOT version-frozen (CONVENTIONS §3): litellm's surface here (model_list/openai-prefix/api_base,
 # --port, /v1/*) is stable and the no-cloud + routes gates below prove THIS release works at runtime. Recon flags
 # BerriAI/litellm drift; if a future release ever breaks a run, pin it THEN via a PR to the PINS block.
@@ -243,7 +245,7 @@ SERVED=$(echo "$RESP" | jq -r '.model // "?"')
 | Gate | Result | Note |
 |---|---|---|
 | P0 Drift report emitted + reviewed | | committed `DRIFT-litellm-front-door-*` |
-| P1 base fleet green on `:9000` (four aliases + llama-swap user unit active) | | precondition — FAIL→STOP, run the base runbook first |
+| P1 base fleet green on `:9000` (three aliases + llama-swap user unit active) | | precondition — FAIL→STOP, run the base runbook first |
 | P4.1 LiteLLM no-cloud fallback (both lists empty + no cloud target) | | DF-001 — FAIL→STOP |
 | P4.2 LiteLLM ↔ llama-swap CPUAffinity disjoint | | **WARN** (not hard-gated) |
 | P4.3 front door `:4000` answers + `claude-*` → local | | no outbound cloud (structural) |
