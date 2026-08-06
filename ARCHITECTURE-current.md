@@ -91,7 +91,7 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 | Document | Status |
 |---|---|
 | [`RUNBOOK-llama-swap-setup.md`](./RUNBOOK-llama-swap-setup.md) | **Superseded by RUNBOOK-v3.** Describes the old vLLM proxy architecture. Kept for the llama.cpp SM121 build flags and the dynamic VRAM launcher pattern. |
-| [`examples/llama-swap-config.example.yaml`](./examples/llama-swap-config.example.yaml) | **Superseded.** Old config with vLLM proxy entries. Live config is at `/opt/llama-swap/config/config.yaml`. |
+| [`llama-swap-config.example.yaml`](https://github.com/guardkit/youtube-channel/blob/main/archive/dgx-spark-estate/examples/llama-swap-config.example.yaml) (archived) | **Superseded.** Old config with vLLM proxy entries. Live config is at `/opt/llama-swap/config/config.yaml`. |
 | [`dark-factory-economics-and-model-serving.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/dark-factory-economics-and-model-serving.md) (guardkit repo) | Original research doc: April 2026 cost crisis (£30 Gemini spend in 3 days), forum research, DECISION-DF-001. Conclusions about model choices are superseded. |
 | [`dark-factory-dataset-factory-conversation-starter.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/dark-factory-dataset-factory-conversation-starter.md) (guardkit repo) | Original conversation starter. Historical. |
 | [`TASK-graphiti-yaml-endpoint-migration.md`](https://github.com/guardkit/guardkit/blob/main/docs/research/dgx-spark/TASK-graphiti-yaml-endpoint-migration.md) (guardkit repo) | Task spec for the 2026-04-29 vLLM→llama-swap endpoint migration. Historical. |
