@@ -1,6 +1,6 @@
 # Runbook: LiteLLM Virtual Keys + Spend Dashboard (Postgres) — Additive Overlay over the `:4000` Front Door
 
-**Status:** Draft (additive **overlay** per [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1 — an overlay **over the front-door overlay**). Flip to **Verified** after the first green walkthrough on a box already green on [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md).
+**Status:** **Verified** (additive **overlay** per [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md) §2.1 — an overlay **over the front-door overlay**). First green walkthrough 2026-08-06 on `promaxgb10-41b1`, over the 2026-08-04-green front door — a full halt→promotion→re-run arc: the 1c port gate stopped run 1, the bind moved 5432→5435 by a reviewed PINS commit, run 2 passed every Phase 7 gate ([`RESULTS-litellm-dashboard-2026-08-06.md`](./RESULTS-litellm-dashboard-2026-08-06.md); that run's findings — prisma generate, prisma db push, evidence inspect target, stale `chat` — are folded in below).
 
 **Purpose:** Add the **opt-in control-plane persistence** the front-door runbook deliberately skips ([its "does NOT cover" list](./RUNBOOK-litellm-front-door.md)): a **master key** on `:4000`, **per-agent virtual keys** (`POST /key/generate`, budgets), and the **spend dashboard** at `:4000/ui` — backed by a **containerized Postgres**. Routing is untouched: the DF-001 no-cloud guard, the `claude-*` wildcard, and llama-swap `:9000` underneath are byte-identical policy. **Auth changes WHO may call `:4000`, never WHERE a request can route.**
 
@@ -113,7 +113,7 @@ else
 fi
 # the fleet underneath (the front door's own precondition — cheap to re-assert):
 ALIASES=$(curl -sf http://localhost:9000/v1/models | jq -r '.data[].id' 2>/dev/null | sort | tr '\n' ' ')
-for m in chat coach embed workhorse; do
+for m in coach embed workhorse; do   # the three always-on aliases (chat retired from the base lineup 2026-08-01)
   echo " $ALIASES " | grep -q " $m " || { echo "GATE FAIL: alias '$m' not on :9000 — base fleet not green. STOP."; MISS=1; }
 done
 [ -z "$MISS" ] && echo "GATE PASS: preconditions green — proceed."
@@ -183,9 +183,13 @@ else
   echo "[secrets] $ENVF exists — REUSED (re-runs never rotate keys)"
 fi
 chmod 600 "$ENVF"; ls -l "$ENVF"
-# prisma: LiteLLM's DB layer. The [proxy] extra has carried it as a dep in recent releases,
-# but assert rather than assume (cheap, idempotent):
+# prisma: LiteLLM's DB layer. TWO steps, both idempotent — the pip package alone is NOT enough:
+# `import prisma` succeeds while the engine binaries are still absent, and litellm then
+# crash-loops on start with "Unable to find Prisma binaries. Please run 'prisma generate'
+# first." (18 restarts observed 2026-08-06 before the generate).
 python3 -c "import prisma" 2>/dev/null || pip install --user --break-system-packages prisma
+PATH="$HOME/.local/bin:$PATH" prisma generate \
+  --schema="$(python3 -c 'import litellm,os;print(os.path.dirname(litellm.__file__))')/proxy/schema.prisma"
 ```
 
 The UI login is then **username `admin`, password = `LITELLM_MASTER_KEY`** (LiteLLM's default; `UI_USERNAME`/`UI_PASSWORD` env vars can split them later if wanted — add them to this same env file).
@@ -245,11 +249,19 @@ EnvironmentFile=/opt/litellm/litellm.env
 EOF
 
 systemctl --user daemon-reload
+
+# Push the schema BEFORE the authenticated start — litellm 1.95.0 (pip-user install) does NOT
+# do this itself: it comes up keyed-200 over an EMPTY database and the failure only surfaces
+# at gate 5.3's /key/generate (TableNotFoundError: LiteLLM_VerificationToken — caught 2026-08-06).
+# Engine binaries were generated in Phase 2; Postgres is up from Phase 3; needs DATABASE_URL:
+set -a; . /opt/litellm/litellm.env; set +a
+PATH="$HOME/.local/bin:$PATH" prisma db push --skip-generate \
+  --schema="$(python3 -c 'import litellm,os;print(os.path.dirname(litellm.__file__))')/proxy/schema.prisma"
+
 systemctl --user restart litellm
 
-# First authenticated start is the slow one: prisma downloads its engine binaries (network, once)
-# and pushes the schema into Postgres. Poll with the MASTER key until the surface answers:
-set -a; . /opt/litellm/litellm.env; set +a
+# First authenticated start: poll with the MASTER key until the surface answers (with the
+# generate + db push above already done, this is seconds, not the old first-run stall):
 for i in $(seq 1 36); do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $LITELLM_MASTER_KEY" http://localhost:4000/v1/models)
   [ "$CODE" = "200" ] && break
@@ -407,7 +419,11 @@ Everything that pointed at `:4000` keyless now gets `401`. That is the *feature*
 mkdir -p evidence/litellm-dashboard
 cp /opt/litellm/config.yaml evidence/litellm-dashboard/litellm-config-$(date +%F).yaml          # env-indirected: contains NO secrets
 systemctl --user cat litellm.service > evidence/litellm-dashboard/litellm.service-$(date +%F).txt  # includes the drop-in; references the env file PATH only
-docker inspect --format '{{.Config.Image}} {{index .RepoDigests 0}}' litellm-postgres \
+# RepoDigests lives on the IMAGE object, not the container — the container-inspect form
+# template-errors ("map has no entry for key RepoDigests"; caught 2026-08-06):
+{ docker inspect --format '{{.Config.Image}}' litellm-postgres; \
+  docker inspect --format '{{index .RepoDigests 0}}' postgres:17; \
+  docker exec litellm-postgres psql -U litellm -d litellm -tAc "show server_version;"; } \
   > evidence/litellm-dashboard/postgres-image-$(date +%F).txt
 # NEVER capture /opt/litellm/litellm.env — the config's os.environ indirection exists precisely so
 # that every committable artifact is secret-free by construction.
@@ -429,7 +445,8 @@ Then write `RESULTS-litellm-dashboard-<YYYY-MM-DD>.md`:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| LiteLLM restart-loops after Phase 4; log shows prisma errors | first-run prisma engine download blocked, or `prisma` pkg missing | needs network once; `pip install --user --break-system-packages prisma`; tail `/opt/litellm/litellm.log` |
+| LiteLLM restart-loops after Phase 4; log shows "Unable to find Prisma binaries" | engine binaries not generated (the pip package alone is not enough), or the download is blocked (needs network once) | Phase 2's `prisma generate --schema=<litellm>/proxy/schema.prisma`; tail `/opt/litellm/litellm.log` |
+| `/key/generate` 500s `TableNotFoundError` while keyed `/v1/models` is `200` | schema never pushed — litellm does not run `db push` itself on this install | Phase 4's `prisma db push --skip-generate --schema=…`, then `systemctl --user restart litellm` |
 | Keyless requests suddenly `200` again on an authed box | a front-door re-run redeployed the PUBLIC config (the documented coupling) | re-run this overlay — Phase 4 redeploys the dashboard config; secrets/DB untouched (gate 5.1 is the detector) |
 | Every existing client `401`s | expected — auth flipped | Phase 6: mint virtual keys, update clients; interim escape hatch: `:9000` direct (DF-001 §3.3) |
 | `pg_isready` never passes | first-boot `initdb` still running, or a volume/permissions issue | `docker logs litellm-postgres`; if the volume is from a different PG major, see the Appendix major-upgrade note |
