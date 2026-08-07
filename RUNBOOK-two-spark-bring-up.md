@@ -40,8 +40,11 @@ PINS (set 2026-06-22)
   vLLM              eugr/spark-vllm-docker @ f7d6e3b5   (PINNED DEFAULT for the V4-Flash TP build — Docker, recipe deepseek-v4-flash, --no-ray --port 8080; pinned 2026-08-02. Reference build for A/B: jasl/vllm @ dda4668b + torch 2.9.1 — the canonical thread's validated commit — Phase 8)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
   DeepSeek          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
-  SEAT_DIALS        --gpu-memory-utilization 0.75 --max-model-len 98304   (validated 2026-08-07; the recipe
-                    defaults 0.8/500K put a front-door host at ~113 GB used — OVER the 115 ceiling; Node A FROZE there)
+  SEAT_DIALS        --gpu-memory-utilization 0.76 --max-model-len 98304   (validated 2026-08-07; the recipe
+                    defaults 0.8/500K put a front-door host at ~113 GB used — OVER the 115 ceiling; Node A FROZE there.
+                    NOT 0.75: the 96K KV requirement has a ~6.9 GiB floor that barely moves with max-model-len,
+                    and 0.75's available KV wobbles 6.83–6.97 GiB run-to-run → intermittent startup ValueError;
+                    0.76 measures 8.2 GiB available — real margin at ~109 GB used, still ~6 GB under the ceiling)
   litellm           litellm[proxy] (latest)   front door :4000; NO cloud fallback (fallbacks: [] AND context_window_fallbacks: []); floated not frozen (CONVENTIONS §3); validated at 1.89.4 on GB10
   embed             Qwen3-Embedding-0.6B  (1024-dim, always-on; matches the single-Spark public config — pin ONE dim end-to-end)
   MEM_RULE          swap pool XOR two-box DeepSeek  (the ~158 GB DeepSeek + a full pool cannot co-reside across 2x128 GB)
@@ -377,11 +380,13 @@ ss -ltnp | grep -E ':8080\b' && echo "FAIL: port squatted — stop/re-port the o
 #    Launch TP=2 across both nodes — DEFAULT (eugr recipe: MTP k=2, fp8 KV, deepseek_v4 tool parsers included).
 #    The SEAT_DIALS (PINS) are MANDATORY on a front-door host: recipe defaults (0.8 util / 500K ctx) put
 #    Node A at ~113 GB used — over the 115 ceiling — and Node A FROZE there (the registry's ~114 GB gotcha,
-#    reproduced 2026-08-07: nvidia-smi blocked + NVRM NV_ERR_NO_MEMORY). 0.75/96K fits: ~107 GB used,
-#    KV 6.97 GiB (96K needs ~5.3; vLLM's startup ValueError prints the exact arithmetic when it doesn't fit).
+#    reproduced 2026-08-07: nvidia-smi blocked + NVRM NV_ERR_NO_MEMORY). 0.76/96K fits with margin:
+#    ~109 GB used, KV 8.2 GiB available vs the ~6.9 GiB the 96K config needs (vLLM's startup ValueError
+#    prints the exact arithmetic when a combination doesn't fit — trust it over hand-estimates: the
+#    requirement has a ~6.9 GiB floor that barely moves with max-model-len).
 #    -n pins the cluster + rendezvous to the CX-7 link IPs (never let it default to the LAN).
 cd ~/spark-vllm-docker && ./run-recipe.sh deepseek-v4-flash --no-ray --port 8080 \
-  -n ${N1},${N2} --gpu-memory-utilization 0.75 --max-model-len 98304
+  -n ${N1},${N2} --gpu-memory-utilization 0.76 --max-model-len 98304
 #    --no-ray is MANDATORY (the recipe yaml defaults to the ray backend; mp/no-ray is the 2-node way);
 #    --port 8080 holds the estate port contract (recipe default is 8000). The harness autodiscovers the
 #    NCCL env — ASSERT it picked the direct link (NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1), never trust it blind.
