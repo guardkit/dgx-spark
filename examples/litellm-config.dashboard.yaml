@@ -68,18 +68,6 @@ model_list:
       api_base: http://localhost:9000/v1
       api_key: "none"
 
-  # ---------------------------------------------------------------------------
-  # claude-opus — DF-003 ATTENDED path ONLY (two-spark front door). A NAMED
-  # cloud model, reachable only by its exact name with an operator present (no
-  # ANTHROPIC_API_KEY ships in the unit env — supply it attended). It must NEVER
-  # appear in a fallback chain (the no-cloud gate asserts exactly that). The
-  # exact name wins over the claude-* wildcard above; every other claude-*
-  # request still lands on the local workhorse.
-  # ---------------------------------------------------------------------------
-  - model_name: claude-opus
-    litellm_params:
-      model: anthropic/claude-opus-4-7
-
 litellm_settings:
   drop_params: true                    # silently drop params an upstream doesn't support, rather than 500
 

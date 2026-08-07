@@ -33,7 +33,7 @@ Personal operations guide for **my** two-GB10 deployment. **This is not a public
 **The one adaptation:** the two-Spark Phase 7 LiteLLM `model_list` is written for the *public* aliases. Edit it to the Dell's **real** aliases before deploying:
 - `model_name: workhorse` → `model: openai/qwen36-workhorse`
 - add `model_name: coach` → `model: openai/coach-ft-v3`
-- `embed` matches as-is; `deepseek` and `claude-opus` rows unchanged.
+- `embed` matches as-is; the `deepseek` row is unchanged. (No cloud rows exist — the front door is local-only; frontier planning is subscription-side, never via LiteLLM.)
 - Confirm the live aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`.
 
 (Applying the front door restarts the Dell's llama-swap once to pick up the CPU-affinity drop-in → a one-time ~81 GB fleet bounce. Schedule it.)

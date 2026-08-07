@@ -17,13 +17,14 @@
 #     :8080 — the single-proxy-port PRINCIPLE is the universal part, not the
 #     number. Keep :9000 here; never call it "the standard llama-swap port". )
 #
-# DF-001 GUARD (no cloud on the unattended path): this config names exactly ONE
-# cloud model — `claude-opus`, the DF-003 ATTENDED path (two-spark front door),
-# reachable only by exact name with an operator present — AND ships empty
-# fallback lists, so nothing can ever ESCALATE to it. A claude-* request still
-# lands on the local workhorse. LiteLLM's own documented context_window_fallbacks
-# example escalates to claude-opus on context overflow; that is the exact
-# unattended-spend footgun we deliberately disable (the on-camera gate beat).
+# DF-001 GUARD (no cloud, ever): this config names NO cloud model anywhere AND
+# ships empty fallback lists, so there is nothing to ESCALATE to. Every claude-*
+# request lands on the local workhorse. LiteLLM's own documented
+# context_window_fallbacks example escalates to claude-opus on context overflow;
+# that is the exact unattended-spend footgun we deliberately disable (the
+# on-camera gate beat). Frontier planning happens on a Claude SUBSCRIPTION
+# (Claude Code / claude.ai) — never through this proxy: LiteLLM's anthropic
+# backend is API-key/per-token billing only, which we don't use.
 #
 # VIRTUAL KEYS + PERSISTED SPEND are OPT-IN and need Postgres (DATABASE_URL +
 # master_key) — see the bottom of this file + RUNBOOK-litellm-front-door.md. DB-less (this
@@ -81,18 +82,6 @@ model_list:
       model: openai/workhorse
       api_base: http://localhost:9000/v1
       api_key: "none"
-
-  # ---------------------------------------------------------------------------
-  # claude-opus — DF-003 ATTENDED path ONLY (two-spark front door). A NAMED
-  # cloud model, reachable only by its exact name with an operator present (no
-  # ANTHROPIC_API_KEY ships in the unit env — supply it attended). It must NEVER
-  # appear in a fallback chain (the no-cloud gate asserts exactly that). The
-  # exact name wins over the claude-* wildcard above; every other claude-*
-  # request still lands on the local workhorse.
-  # ---------------------------------------------------------------------------
-  - model_name: claude-opus
-    litellm_params:
-      model: anthropic/claude-opus-4-7
 
 litellm_settings:
   drop_params: true                    # silently drop params an upstream doesn't support, rather than 500

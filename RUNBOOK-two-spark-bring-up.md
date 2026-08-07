@@ -291,15 +291,13 @@ model_list:
     litellm_params: { model: openai/deepseek-ai/DeepSeek-V4-Flash, api_base: http://localhost:8080/v1, api_key: "none" }
     # ^ the segment after openai/ must be the id vLLM actually SERVES — the full HF repo id
     #   (assert via :8080/v1/models once the seat is up); a bare "deepseek-v4-flash" 404s upstream
-  - model_name: claude-opus      # DF-003 ATTENDED path only — never a fallback target
-    litellm_params: { model: anthropic/claude-opus-4-7 }
 router_settings:
   fallbacks: []                  # NO local->cloud fallback (DF-001)
   context_window_fallbacks: []   # also empty — LiteLLM's documented example escalates to claude-opus on overflow (the exact unattended-spend footgun)
 ```
-> **If Node A runs a personal / non-public fleet** (different aliases than the public `workhorse`/`coach`/`chat`/`embed` — e.g. the reference box serves `qwen36-workhorse`, `coach-ft-v3`, `embed`, …), **adapt this `model_list` to Node A's actual `:9000` aliases** before deploying. Each row is `model_name:` (the name your *agents* call, left side) → `model: openai/<llama-swap-alias>` (what it routes to on Node A, right side); `api_base` stays the llama-swap proxy port `:9000`. So map `workhorse` → `openai/qwen36-workhorse`, add a `coach` → `openai/coach-ft-v3` row, etc. `embed` usually matches as-is. Confirm Node A's aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`. The `deepseek` and `claude-opus` rows are unchanged.
+> **If Node A runs a personal / non-public fleet** (different aliases than the public `workhorse`/`coach`/`chat`/`embed` — e.g. the reference box serves `qwen36-workhorse`, `coach-ft-v3`, `embed`, …), **adapt this `model_list` to Node A's actual `:9000` aliases** before deploying. Each row is `model_name:` (the name your *agents* call, left side) → `model: openai/<llama-swap-alias>` (what it routes to on Node A, right side); `api_base` stays the llama-swap proxy port `:9000`. So map `workhorse` → `openai/qwen36-workhorse`, add a `coach` → `openai/coach-ft-v3` row, etc. `embed` usually matches as-is. Confirm Node A's aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`. The `deepseek` row is unchanged.
 
-**▶ GATE — no cloud fallback (DF-001):** the robust invariant is *no cloud model is reachable as a fallback target*. `claude-opus` is *named* (DF-003 attended path) but must never appear in a fallback chain.
+**▶ GATE — no cloud fallback (DF-001):** the robust invariant is *no cloud model is named anywhere in this config, fallback or otherwise*. Frontier planning happens on a Claude **subscription** (Claude Code / claude.ai), never through the front door — LiteLLM's anthropic backend is API-key per-token billing only, which this estate does not use. (An earlier revision carried a named `claude-opus` "DF-003 attended" row here; removed 2026-08-07 — subscription auth cannot be routed through LiteLLM, so the row was unusable by design.)
 ```bash
 CFG=/opt/litellm/config.yaml
 grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallbacks:\s*\[\]' "$CFG" \
@@ -307,11 +305,11 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
   || echo "GATE FAIL: a cloud fallback path exists — DF-001 violation. STOP."
 # NOTE: the leading `^\s*` anchor is load-bearing — without it, an empty `context_window_fallbacks: []`
 # line satisfies the first grep's `fallbacks: []` substring even when `fallbacks:` is POPULATED (false-pass).
-! sed 's/#.*//' "$CFG" | grep -qiE 'fallback.*(claude|gemini|anthropic|vertex|bedrock|openai/gpt)' \
-  && echo "GATE PASS: no cloud model named as a fallback target (claude-opus is attended-only, not a fallback)" \
-  || echo "GATE FAIL: a cloud model appears in a fallback chain — DF-001 violation. STOP."
+! sed 's/#.*//' "$CFG" | grep -qiE 'anthropic/|vertex|bedrock|gemini|openai/gpt-[0-9]' \
+  && echo "GATE PASS: no cloud model named anywhere in YAML values" \
+  || echo "GATE FAIL: a cloud model is named in the config — DF-001 violation. STOP."
 # `sed 's/#.*//'` strips comments first so the in-file "…escalates to claude-opus on overflow" note
-# (and the attended-only claude-opus model line) can't false-FAIL the gate — it asserts YAML values only.
+# can't false-FAIL the gate — it asserts YAML values only.
 ```
 
 **▶ GATE — CPU-pin LiteLLM disjoint from llama-swap on Node A (WARN, not STOP):** Node A runs *both* the LiteLLM front door and the llama-swap pool, so under concurrent multi-model load they must not share a core (symptom: LiteLLM 504s + flaky llama-swap health). Set non-overlapping `CPUAffinity=` on the two user units; the GB10 CPU is **20 cores** (10× Cortex-X925 + 10× Cortex-A725) — e.g. litellm `0-3`, llama-swap `4-19`. WARN on overlap (the disjointness check is sound; the 504s rationale is community-sourced — see DF-005's verification note). Identical mechanism + gate as the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 4.2:
@@ -429,7 +427,7 @@ Record decode tok/s (TP=2 / single-node / PP=2), cold-start, and TTFT@32K/128K.
 | P4(b) transport NET/IB (not Socket) | | no silent TCP fallback |
 | P5 passwordless SSH both ways | | |
 | P6 power-off mitigation on both | | `-lgc` (unverified) + thermal |
-| P7 LiteLLM no-cloud guard (both fallbacks empty + no cloud target) | | claude-opus attended-only, not a fallback |
+| P7 LiteLLM no-cloud guard (both fallbacks empty + no cloud model named) | | config is local-only, no cloud rows |
 | P7 LiteLLM ↔ llama-swap CPUAffinity disjoint on Node A | | **WARN** (not hard-gated) |
 | P7 front door `:4000` answers from a local model | | proves routing to llama-swap :9000 |
 | P8 pool evicted before DeepSeek (memory XOR) | | |
@@ -470,4 +468,4 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 
 - **`RUNBOOK-single-spark-bring-up.md`** — Node A baseline. This runbook is additive on top; it never edits the Node A config.
 - **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
-- **[`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)** (this repo) — the **single-node precursor**: the same LiteLLM `:4000` front door + no-cloud-fallback gate + disjoint-`CPUAffinity` gate, on one Spark. This two-node fabric is its **superset**; the LiteLLM Phase here re-uses the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md)'s install/unit/gates (same mechanism, divergent config — this adds the cross-node `deepseek` backend + the attended `claude-opus` DF-003 row).
+- **[`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)** (this repo) — the **single-node precursor**: the same LiteLLM `:4000` front door + no-cloud-fallback gate + disjoint-`CPUAffinity` gate, on one Spark. This two-node fabric is its **superset**; the LiteLLM Phase here re-uses the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md)'s install/unit/gates (same mechanism, divergent config — this adds the cross-node `deepseek` backend; a `claude-opus` DF-003 row was briefly carried here and removed 2026-08-07: subscription auth cannot route through LiteLLM, so it was unusable by design).

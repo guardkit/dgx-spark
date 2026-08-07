@@ -4,7 +4,7 @@
 **Date:** 2026-06-24
 **Author:** Rich (pair-programmed with Claude)
 **Scope:** The serving topology of the **single** GB10 dark-factory inference layer — how the box presents *one* OpenAI/Anthropic-compatible endpoint to every agent, and where routing/keys/spend/fallback-control live versus model lifecycle/memory.
-**Companions:** DECISION-DF-001 (no-cloud-fallback on the unattended critical path — this decision carries that guard onto the LiteLLM layer) · DECISION-DF-004 (two-Spark topology — already commits LiteLLM `:4000` as the unified front door; this is the single-node precursor that makes the single→two-node story continuous) · DECISION-DF-003 (attended frontier-planning path — the *only* sanctioned route to a cloud model; unchanged).
+**Companions:** DECISION-DF-001 (no-cloud-fallback on the unattended critical path — this decision carries that guard onto the LiteLLM layer) · DECISION-DF-004 (two-Spark topology — already commits LiteLLM `:4000` as the unified front door; this is the single-node precursor that makes the single→two-node story continuous) · DECISION-DF-003 (attended frontier-planning path — the *only* sanctioned route to a frontier model; satisfied by subscription tooling, never via the LiteLLM front door — amended 2026-08-07).
 **Related:** `dark-factory-economics-and-model-serving.md` §3.8 (llama-swap vs LiteLLM role split; griffith.mark's three-stage model) · `two-spark-serving-research-and-references.md` · `RUNBOOK-single-spark-bring-up.md` (the runbook this decision amends) · `RUNBOOK-CONVENTIONS.md` (gate/recon pattern) · LiteLLM docs (https://docs.litellm.ai/).
 
 ---
@@ -51,7 +51,7 @@ This box serves *many* models from *more than one engine* (llama.cpp fleet via l
 
 1. **LiteLLM `:4000` is the single front door** for the single-Spark setup. Every agent points at `:4000`. It routes by model name to llama-swap `:9000` (the llama.cpp fleet) and to vLLM backends as applicable.
 2. **llama-swap is unchanged** as the unified-memory/lifecycle layer beneath it. LiteLLM does not load or evict models.
-3. **No cloud fallback on local models (DF-001), enforced by a gate.** Auto cloud-fallback is LiteLLM's headline feature and the exact mechanism behind the April Gemini-spend incident. The config ships `fallbacks: []` **and** `context_window_fallbacks: []`. Cloud models (`claude-*`) may be *named* only for the attended DF-003 path — never as an automatic fallback target. Local→local fallback (e.g. strategist → workhorse) is permitted; local→cloud is not.
+3. **No cloud fallback on local models (DF-001), enforced by a gate.** Auto cloud-fallback is LiteLLM's headline feature and the exact mechanism behind the April Gemini-spend incident. The config ships `fallbacks: []` **and** `context_window_fallbacks: []`. No cloud model is named in the config at all — the DF-003 attended path is satisfied by Claude subscription tooling (Claude Code / claude.ai) outside the front door, since LiteLLM cloud backends require per-token API billing, which this estate does not use. *(Amended 2026-08-07: an earlier reading allowed a named attended-only cloud row; the two-spark run briefly carried one and it was removed as unusable-by-design.)* Local→local fallback (e.g. strategist → workhorse) is permitted; local→cloud is not.
 4. **Direct `:9000` remains a documented fallback** if LiteLLM is unavailable (DF-004 §chokepoint mitigation) — additive, never on the critical path.
 
 ---

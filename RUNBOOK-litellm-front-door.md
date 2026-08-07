@@ -189,7 +189,7 @@ grep -qE '^\s*fallbacks:\s*\[\]' "$CFG" && grep -qE '^\s*context_window_fallback
 # `sed 's/#.*//'` strips comments FIRST — the in-file note "…escalates to claude-opus on overflow"
 # is prose, not a route, and must not false-FAIL the gate. The check is on YAML values only.
 ```
-**FAIL → halt.** Cloud models may be *named* only for the attended DF-003 path (the public box names none at all).
+**FAIL → halt.** No cloud model is named anywhere in this config. (The DF-003 attended frontier-planning path is satisfied by Claude *subscription* tooling — Claude Code / claude.ai — outside the front door; LiteLLM's cloud backends are API-key per-token billing, which this estate does not use.)
 
 ### 4.2 **▶ GATE — CPU-pin LiteLLM disjoint from llama-swap (WARN, not STOP)** &nbsp;·&nbsp; (registry: CONVENTIONS §8 "LiteLLM ↔ llama-swap CPU contention")
 
