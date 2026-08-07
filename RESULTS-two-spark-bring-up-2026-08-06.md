@@ -40,6 +40,7 @@ DECISION-DF-004 said a second node buys **capacity, not speed**. Measured: the 3
 | all_gather busbw | **23.85 / 23.89 GB/s** + NET/IB | 16 GiB, nccl-tests @ NCCL 2.28.9-1+cuda13.0 |
 
 **Consequence for DF-004:** the topology + memory rule + capacity-not-speed principle are **validated on hardware**, but the runbook's own promotion condition ("incl. PP-vs-TP") is only partially met — **DF-004 stays PROPOSED** until a PP lane exists (follow-on PR) or the condition is amended.
+*(Addendum 2026-08-07: the condition **was** amended — the operator dropped the PP leg as inapplicable to the estate's single-operator batch-1 regime; **DF-004 is now ACCEPTED** on the TP + single-node measurements. PP-vs-TP became a revisit trigger in DF-004 §4.4.)*
 
 ## Execution-caught findings (amendments backlog — fold into the runbook by PR)
 

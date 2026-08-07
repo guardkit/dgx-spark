@@ -414,7 +414,7 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 #      TP wins at batch=1 single-stream (the DeepSeek seat's actual regime). Record both.
 ```
 Record decode tok/s (TP=2 / single-node / PP=2), cold-start, and TTFT@32K/128K.
-**First-run baselines (2026-08-07, eugr lane, SEAT_DIALS 0.75/96K, clocks clamped 2150):** TP=2 warm single-stream **32.9 tok/s** (usage-counted; MTP k=2 — chunk-counting undercounts ~2×, MTP packs ~2 tok/chunk) · TTFT 0.36 s short / 28.9 s @ ~32K · cold 230 s, warm relaunch 114 s · single-node contrast (workhorse 35B) **62.1 tok/s** — capacity-not-speed measured. **PP=2 DEFERRED:** the pinned eugr recipe exposes no pipeline-parallel knob — an on-hardware PP run needs a harness change (PR) or the jasl reference lane; until it runs, **DF-004 stays PROPOSED** per Phase 11.
+**First-run baselines (2026-08-07, eugr lane, SEAT_DIALS 0.75/96K, clocks clamped 2150):** TP=2 warm single-stream **32.9 tok/s** (usage-counted; MTP k=2 — chunk-counting undercounts ~2×, MTP packs ~2 tok/chunk) · TTFT 0.36 s short / 28.9 s @ ~32K · cold 230 s, warm relaunch 114 s · single-node contrast (workhorse 35B) **62.1 tok/s** — capacity-not-speed measured. **PP=2: resolved by amendment** — the pinned eugr recipe exposes no pipeline-parallel knob, and the estate's regime is single-operator batch-1 (where TP wins; PP's advantage is concurrency-only). The operator amended DF-004's acceptance condition on 2026-08-07 and **DF-004 is ACCEPTED** on the TP + single-node measurements; PP-vs-TP is a revisit trigger in DF-004 §4.4 if a multi-stream workload ever materialises.
 
 ## Phase 10: Decision Gate
 
@@ -435,7 +435,7 @@ Record decode tok/s (TP=2 / single-node / PP=2), cold-start, and TTFT@32K/128K.
 
 ## Phase 11: Evidence → RESULTS
 
-Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded numbers + the drift report link). Save the LiteLLM config + the vLLM launch command + the `all_gather_perf` output to `evidence/two-spark-bring-up/`. **Only after the on-hardware Phase 9 benchmark (incl. PP-vs-TP) may DF-004 flip PROPOSED → ACCEPTED.**
+Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded numbers + the drift report link). Save the LiteLLM config + the vLLM launch command + the `all_gather_perf` output to `evidence/two-spark-bring-up/`. **DF-004 flipped PROPOSED → ACCEPTED 2026-08-07** on the on-hardware TP=2 + single-node measurements, with the PP-vs-TP leg removed from the acceptance condition by operator amendment (single-operator batch-1 regime; see DF-004's status line + §4.4 revisit trigger).
 
 ---
 
@@ -468,5 +468,5 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 ## Appendix: relationship to the other artifacts
 
 - **`RUNBOOK-single-spark-bring-up.md`** — Node A baseline. This runbook is additive on top; it never edits the Node A config.
-- **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. Stays **PROPOSED** until Phase 9 runs on our own hardware.
+- **[`DECISION-DF-004`](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md)** (guardkit repo) — the topology + the memory-budget rule + the "capacity not speed" principle this runbook implements. **ACCEPTED 2026-08-07** on this runbook's first-run measurements (acceptance condition amended by the operator: PP leg dropped for the single-operator batch-1 regime).
 - **[`DECISION-DF-005`](./DECISION-DF-005-single-spark-serving-topology-litellm-front-door.md)** (this repo) — the **single-node precursor**: the same LiteLLM `:4000` front door + no-cloud-fallback gate + disjoint-`CPUAffinity` gate, on one Spark. This two-node fabric is its **superset**; the LiteLLM Phase here re-uses the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md)'s install/unit/gates (same mechanism, divergent config — this adds the cross-node `deepseek` backend; a `claude-opus` DF-003 row was briefly carried here and removed 2026-08-07: subscription auth cannot route through LiteLLM, so it was unusable by design).
