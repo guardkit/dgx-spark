@@ -91,7 +91,10 @@ models:
     aliases:
       - "autobuild-player"
       - "qwen36-workhorse"
-      - "claude-sonnet-4-6"   # so Claude Code / Anthropic-compatible clients resolve
+      - "claude-opus-5"       # current Claude Code / Agent SDK default ids resolve
+      - "claude-sonnet-5"     #   to the local workhorse (names only — nothing
+      - "claude-fable-5"      #   routes to Anthropic; no key, no cloud)
+      - "claude-sonnet-4-6"   # legacy SDK default, kept for older clients
 
   # ---------------------------------------------------------------------------
   # COACH — stock Gemma-4-26B-A4B-it (25B total / 3.8B active MoE), UD-Q4_K_XL.

@@ -60,7 +60,7 @@ model_list:
   # change. NOTE: confirm the literal `claude-*` pattern resolves in YOUR
   # installed LiteLLM version — the doc-blessed forms are `provider/*`, `*`, and
   # custom prefixes. If it does not match, add explicit rows
-  # (claude-sonnet-4-6 / claude-opus-4-7 -> openai/workhorse) instead.
+  # (claude-opus-5 / claude-sonnet-5 -> openai/workhorse) instead.
   # ---------------------------------------------------------------------------
   - model_name: "claude-*"
     litellm_params:

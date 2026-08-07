@@ -229,14 +229,14 @@ curl -sf http://localhost:4000/v1/models | jq -r '.data[].id' | sort
 #     max_tokens is generous so workhorse (--reasoning auto) emits real text; accept content OR reasoning_content
 #     — a reasoning model can put its answer in reasoning_content and leave content empty (verified on GB10).
 RESP=$(curl -s http://localhost:4000/v1/chat/completions -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-6","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
+  -d '{"model":"claude-opus-5","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
 GEN=$(echo "$RESP" | jq -r '(.choices[0].message.content // "") + (.choices[0].message.reasoning_content // "")')
 SERVED=$(echo "$RESP" | jq -r '.model // "?"')
 [ -n "$GEN" ] \
   && echo "GATE PASS: claude-* routed to a local model via :4000 (served=${SERVED}, ${#GEN} chars generated)" \
   || { echo "GATE FAIL: no local completion for claude-* via :4000. STOP."; echo "$RESP" | head -c 400; }
 ```
-**Routing safety is structural:** because the public config names **no** cloud model and ships empty fallback lists (4.1), a `claude-*` request *cannot* reach a cloud API — there is no target. If the literal `claude-*` wildcard doesn't resolve in your installed LiteLLM version, add explicit `claude-sonnet-4-6` / `claude-opus-4-7` rows mapping to `openai/workhorse` (see the config's note).
+**Routing safety is structural:** because the public config names **no** cloud model and ships empty fallback lists (4.1), a `claude-*` request *cannot* reach a cloud API — there is no target. If the literal `claude-*` wildcard doesn't resolve in your installed LiteLLM version, add explicit rows for the ids your clients actually send — currently `claude-opus-5` / `claude-sonnet-5` (Claude Code / Agent SDK defaults; check with your SDK version) — mapping to `openai/workhorse` (see the config's note).
 
 ---
 
@@ -279,7 +279,7 @@ Then write `RESULTS-litellm-front-door-<YYYY-MM-DD>.md`:
 | Phase 1 gate FAILs: `:9000` not serving | the base fleet isn't up | execute [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md) to green first (its Decision Gate 5.4) |
 | LiteLLM 504s / flaky health under concurrent load | LiteLLM & llama-swap sharing a CPU core | Phase 4.2 — set disjoint `CPUAffinity=` (litellm 0-3 / llama-swap 4-19; re-derive for the 20-core GB10) |
 | `:4000` refused but `:9000` works | LiteLLM down | use llama-swap `:9000` directly (documented DF-001 §3.3 fallback); `systemctl --user status litellm`; tail `/opt/litellm/litellm.log` |
-| `claude-*` request errors / not routed | the `claude-*` wildcard isn't matched in your LiteLLM version | Phase 4.3 — add explicit `claude-sonnet-4-6` / `claude-opus-4-7` → `openai/workhorse` rows |
+| `claude-*` request errors / not routed | the `claude-*` wildcard isn't matched in your LiteLLM version | Phase 4.3 — add explicit `claude-opus-5` / `claude-sonnet-5` → `openai/workhorse` rows (the ids current SDKs send) |
 | `claude-*` reaches a cloud API | a cloud model was added to the config / a fallback chain | Phase 4.1 no-cloud gate; the public config names NO cloud model (DF-001) |
 | llama-swap lost its CPU affinity after a base re-run | a base-runbook restart dropped the drop-in | re-run this overlay (Phase 3 re-applies the `10-cpu-affinity.conf` drop-in — self-healing) |
 | every `:4000` request `401`s (including gate 4.3) | the dashboard overlay is applied — auth is on, by design | use a key ([`RUNBOOK-litellm-dashboard.md`](./RUNBOOK-litellm-dashboard.md) Phase 6); NOTE: re-running THIS overlay overwrites the config back to DB-less/keyless — heal by re-running the dashboard overlay |

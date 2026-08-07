@@ -451,7 +451,8 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 | DeepSeek hangs after ~6–7 requests, 0 decode | vLLM #40969 (FULL_AND_PIECEWISE + chunked prefill) | cudagraph mode change / `--enforce-eager` (slower) |
 | DeepSeek decode ~5 tok/s not ~44 | MTP speculative decode off | `--speculative-config deepseek_mtp num_speculative_tokens=2` |
 | NIC bricked (pre-init, error -110) | unsolicited `mlnx-fw-updater` flash | Phase 2 hold; `fwupdmgr` downgrade to known-good |
-| Unattended run escalated to claude-opus + spend | LiteLLM `context_window_fallbacks` | Phase 7: set it `[]` too |
+| Unattended run escalated to a cloud model + spend | LiteLLM `context_window_fallbacks` | Phase 7: set it `[]` too |
+| Fleet models preload while the DeepSeek seat is up | live edit of the llama-swap config — `-watch-config` re-runs the `hooks.on_startup.preload` list on every reload, no service restart needed | `curl localhost:9000/unload` immediately (unloads all); edit the fleet config only while the seat is down (MEM_RULE) |
 | LiteLLM 504s / flaky health on Node A under load | LiteLLM & llama-swap sharing a CPU core | Phase 7: disjoint `CPUAffinity=` (litellm 0-3 / llama-swap 4-19; 20-core GB10) |
 | busbw ~2.8 GB/s, NET/IB correct, raw `ib_write_bw` ~13 Gb/s | runtime hotplug attach — slot power never advertised, NIC power-capped | Phase 3 power-cap guard: hotplug flag off + reboot BOTH with cable in |
 | busbw ~17–18 GB/s (below 20, above the fw-degraded ~15.5) | secondary-path netdev (`enP2p…`) still MTU 1500 | Phase 3: `mtu: 9000` on BOTH PCIe paths, both nodes |

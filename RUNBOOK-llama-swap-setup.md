@@ -198,7 +198,10 @@ models:
     aliases:
       - "Qwen/Qwen3-Coder-Next-FP8"
       - "autobuild-player"
-      - "claude-sonnet-4-6"      # For Claude Agent SDK default-model fallbacks
+      - "claude-opus-5"          # Current Claude Code / Agent SDK default ids —
+      - "claude-sonnet-5"        #   name-mapping ONLY: resolves to the local model,
+      - "claude-fable-5"         #   nothing routes to Anthropic (no key, no cloud)
+      - "claude-sonnet-4-6"      # Legacy SDK defaults, kept for older clients
       - "claude-opus-4-7"        # ditto
 
   "gpt-oss-120b":
@@ -629,25 +632,21 @@ model_list:
   # ===========================================
   # Claude Agent SDK catch-all — route to local Coder-Next
   # ===========================================
-  - model_name: claude-sonnet-4-6
+  - model_name: claude-opus-5        # current SDK default ids; add legacy 4-x
+    litellm_params:                    # rows only if older clients are in play
+      model: openai/qwen-coder-next
+      api_base: "http://localhost:9000/v1"
+      api_key: "dummy"
+
+  - model_name: claude-sonnet-5
     litellm_params:
       model: openai/qwen-coder-next
       api_base: "http://localhost:9000/v1"
       api_key: "dummy"
 
-  - model_name: claude-opus-4-7
-    litellm_params:
-      model: openai/qwen-coder-next
-      api_base: "http://localhost:9000/v1"
-      api_key: "dummy"
-
-  # ===========================================
-  # Cloud fallback — interactive sessions only
-  # ===========================================
-  - model_name: gemini-3.1-pro
-    litellm_params:
-      model: gemini/gemini-3.1-pro
-      api_key: "os.environ/GEMINI_API_KEY"
+  # NO cloud rows — DF-001. (An earlier revision carried a gemini-3.1-pro
+  # "interactive fallback" row here; removed 2026-08-07 — API billing has no
+  # place in this estate, and the April Gemini spend is exactly the footgun.)
 
 litellm_settings:
   drop_params: true              # Silently drop unsupported params rather than error

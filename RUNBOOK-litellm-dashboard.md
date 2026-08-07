@@ -321,7 +321,7 @@ VK=$(curl -sf -X POST http://localhost:4000/key/generate \
              || echo "GATE FAIL: /key/generate returned no key — DB write path broken (litellm log + docker logs litellm-postgres). STOP."
 RESP=$(curl -s http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $VK" -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-6","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
+  -d '{"model":"claude-opus-5","max_tokens":128,"messages":[{"role":"user","content":"In one short sentence, say hello and name yourself."}]}')
 GEN=$(echo "$RESP" | jq -r '(.choices[0].message.content // "") + (.choices[0].message.reasoning_content // "")')
 [ -n "$GEN" ] \
   && echo "GATE PASS: claude-* under a VIRTUAL key → local model (${#GEN} chars; supersedes front-door 4.3 on this box)" \
