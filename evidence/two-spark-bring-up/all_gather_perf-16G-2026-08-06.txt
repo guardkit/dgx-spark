@@ -1,0 +1,31 @@
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+[promaxgb10-41b1:61562] Warning: could not find environment variable "LD_LIBRARY_PATH"
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+# nccl-tests version 2.19.7 nccl-headers=22809 nccl-library=22809
+# Collective test starting: all_gather_perf
+# nThread 1 nGpus 1 minBytes 17179869184 maxBytes 17179869184 step: 2(factor) warmup iters: 1 iters: 20 agg iters: 1 validation: 1 graph: 0 unalign: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid  61586 on promaxgb10-41b1 device  0 [000f:01:00] NVIDIA GB10
+#  Rank  1 Group  0 Pid  55043 on spark-fcf6 device  0 [000f:01:00] NVIDIA GB10
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+ 17179869184    2147483648     float    none      -1   363815   47.22   23.61       0   356613   48.18   24.09       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 23.8491 
+#
+# Collective test concluded: all_gather_perf
+#
+

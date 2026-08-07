@@ -1,0 +1,5 @@
+run 1: TTFT 1.30s, decode 34.6 tok/s (512 tokens by usage, total 16.1s)
+run 2: TTFT 0.39s, decode 33.5 tok/s (512 tokens by usage, total 15.6s)
+run 3: TTFT 0.34s, decode 33.9 tok/s (512 tokens by usage, total 15.4s)
+run 4: TTFT 0.34s, decode 31.1 tok/s (512 tokens by usage, total 16.8s)
+WARM AVG: TTFT 0.36s, decode 32.9 tok/s over 3 runs

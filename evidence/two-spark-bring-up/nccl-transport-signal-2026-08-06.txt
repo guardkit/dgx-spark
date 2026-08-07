@@ -1,0 +1,2 @@
+promaxgb10-41b1:72112:72112 [0] NCCL INFO NET/IB : Using [0]rocep1s0f1:1/RoCE [1]roceP2p1s0f1:1/RoCE [RO]; OOB enp1s0f1np1:169.254.207.1<0>
+spark-fcf6:59531:59531 [0] NCCL INFO NET/IB : Using [0]rocep1s0f0:1/RoCE [1]roceP2p1s0f0:1/RoCE [RO]; OOB enp1s0f0np0:169.254.207.2<0>

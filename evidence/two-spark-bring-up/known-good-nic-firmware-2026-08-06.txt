@@ -1,0 +1,11 @@
+# Known-good CX-7 firmware record (Phase 1/2 brick guard) — recorded 2026-08-06 pre-cable, boot-log method
+## Node A promaxgb10-41b1
+Aug 04 20:32:56 promaxgb10-41b1 kernel: mlx5_core 0000:01:00.0: firmware version: 28.45.4028
+Aug 04 20:32:56 promaxgb10-41b1 kernel: mlx5_core 0000:01:00.1: firmware version: 28.45.4028
+Aug 04 20:32:56 promaxgb10-41b1 kernel: mlx5_core 0002:01:00.0: firmware version: 28.45.4028
+Aug 04 20:32:56 promaxgb10-41b1 kernel: mlx5_core 0002:01:00.1: firmware version: 28.45.4028
+## Node B spark-fcf6
+Aug 04 19:44:42 spark-fcf6 kernel: mlx5_core 0000:01:00.0: firmware version: 28.45.4028
+Aug 04 19:44:42 spark-fcf6 kernel: mlx5_core 0000:01:00.1: firmware version: 28.45.4028
+Aug 04 19:44:42 spark-fcf6 kernel: mlx5_core 0002:01:00.0: firmware version: 28.45.4028
+Aug 04 19:44:42 spark-fcf6 kernel: mlx5_core 0002:01:00.1: firmware version: 28.45.4028

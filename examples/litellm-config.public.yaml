@@ -64,7 +64,7 @@ model_list:
       api_key: "none"
   - model_name: deepseek
     litellm_params:
-      model: openai/deepseek-v4-flash  # cross-node TP=2 vLLM seat (RUNBOOK-two-spark-bring-up Phase 8; on-demand, pool XOR DeepSeek)
+      model: openai/deepseek-ai/DeepSeek-V4-Flash  # cross-node TP=2 vLLM seat (RUNBOOK-two-spark-bring-up Phase 8; on-demand, pool XOR DeepSeek)
       api_base: http://localhost:8080/v1
       api_key: "none"
 

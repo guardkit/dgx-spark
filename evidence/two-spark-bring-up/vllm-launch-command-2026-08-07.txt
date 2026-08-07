@@ -1,0 +1,23 @@
+# vLLM two-box DeepSeek seat — launch record (2026-08-07, final operating point)
+## Invocation (Node A head, eugr/spark-vllm-docker @ f7d6e3b5)
+./run-recipe.sh deepseek-v4-flash --no-ray --port 8080 -n 169.254.207.1,169.254.207.2 --gpu-memory-utilization 0.75 --max-model-len 98304
+## Rationale: recipe defaults (0.8 util / 500K ctx) put Node A at ~113G used — over the 115G freeze line with the front door resident; A froze once there. 0.75/96K fits: A ~107G used, KV 6.97 GiB (needs ~5.3 for 96K).
+## Container command:
+sleep infinity
+## Container env (fabric):
+VLLM_HOST_IP=169.254.207.1
+GLOO_SOCKET_IFNAME=enp1s0f1np1
+TP_SOCKET_IFNAME=enp1s0f1np1
+NCCL_IGNORE_CPU_AFFINITY=1
+NCCL_SOCKET_IFNAME=enp1s0f1np1
+NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1
+NCCL_IB_DISABLE=0
+NV_LIBNCCL_PACKAGE_NAME=libnccl2
+NV_LIBNCCL_PACKAGE_VERSION=2.28.3-1
+NCCL_VERSION=2.28.3-1
+NV_LIBNCCL_PACKAGE=libnccl2=2.28.3-1+cuda13.0
+NV_LIBNCCL_DEV_PACKAGE_NAME=libnccl-dev
+NV_LIBNCCL_DEV_PACKAGE_VERSION=2.28.3-1
+NV_LIBNCCL_DEV_PACKAGE=libnccl-dev=2.28.3-1+cuda13.0
+VLLM_BASE_DIR=/workspace/vllm
+## Image: vllm-node e98df406f2ca, embedded vLLM 0.26.1rc1.dev439+g7b9f2dad8 (eugr-tracked), flashinfer 0.6.17
