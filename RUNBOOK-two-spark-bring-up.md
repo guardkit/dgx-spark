@@ -1,6 +1,6 @@
 # Runbook: Two-Spark Bring-Up — Add Node B → a Networked GB10 Pair (capacity, not speed)
 
-**Status:** Draft (conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md)). Execute once to verify.
+**Status:** **Verified** — first execution GREEN 2026-08-06→07 ([`RESULTS-two-spark-bring-up-2026-08-06.md`](./RESULTS-two-spark-bring-up-2026-08-06.md)); that run's 12 execution-caught findings are folded in below. Conventions in [`RUNBOOK-CONVENTIONS.md`](./RUNBOOK-CONVENTIONS.md).
 
 **Purpose:** Take an **already-working single Spark** (Node A, stood up by [`RUNBOOK-single-spark-bring-up.md`](./RUNBOOK-single-spark-bring-up.md)) and **add a second GB10 (Node B)** over a 200 G ConnectX-7 link, to serve a model **too large for one node** behind a unified front door — *without* disturbing the single-node fleet. The procedure is version-pinned; the gotchas are gates; a Phase 0 recon reports upstream drift first. **This is purely additive: Node A is unchanged.**
 
@@ -23,7 +23,7 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 **One-time box setup:** passwordless sudo on **both** nodes (run the agent as that user, not root) **+ LAN SSH Node A → Node B** (the agent drives every Node B step over SSH from Node A; Phases 0–2 run pre-cable, so this is the ordinary LAN/Tailscale path — the CX-7 link-local mesh is Phase 5's job) — see [README → One-time box setup](./README.md#one-time-box-setup-passwordless-sudo). The only physically-manual inputs are the CX-7 cable + any firmware reboot (operator steps, conventions §2.3).
 **Prior art (re-checked in Phase 0):** [NVIDIA connect-two-sparks playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/connect-two-sparks/README.md) · [NVIDIA NCCL playbook](https://github.com/NVIDIA/dgx-spark-playbooks/blob/main/nvidia/nccl/README.md) · the [DeepSeek-V4-Flash 2× Spark recipe thread](https://forums.developer.nvidia.com/t/deepseek-v4-flash-official-fp8-running-across-2x-dgx-spark-tp-2-mtp-200k-ctx-recipe-numbers/370309) · [corti "Two Sparks, One Cluster"](https://corti.com/two-sparks-one-cluster-why-stacking-nvidia-dgx-spark-units-unlocks-local-frontier-scale-inference/) · eugr/spark-vllm-docker.
 **Source material:** [`two-spark-serving-research-and-references.md`](./two-spark-serving-research-and-references.md) (in this repo); `DECISION-DF-004` lives in the [guardkit repo](https://github.com/guardkit/guardkit/blob/main/docs/decisions/DECISION-DF-004-two-spark-serving-topology-unified-front-door.md).
-**Expected wall-clock:** ~45–90 min the first time (firmware + cable + NCCL + first TP cold-start dominate); the DeepSeek seat cold-start alone is ~6 min.
+**Expected wall-clock:** ~45–90 min with weights pre-staged and the hotplug-off reboot (Phase 3) already done; the first-ever run measured ~2.5 h active execution plus ~1 h weight pre-stage and the operator steps. DeepSeek seat cold-start: **230 s** first load, **~114 s** warm relaunch (InstantTensor ~9 GB/s off NVMe cache).
 **Outputs:** `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md`, committed `DRIFT-two-spark-bring-up-<YYYY-MM-DD>.md`, the live `/opt/litellm/config.yaml` + the vLLM launch command.
 
 ---
@@ -34,11 +34,14 @@ Synology NAS — Postgres + pgvector (fleet-memory)                          (LA
 PINS (set 2026-06-22)
   CX-7 firmware     >= 28.45.4028  (UEFI 1.107.26)   fixes the all_gather-halving regression (Apr-2026 throttle)
   DGX OS / driver   7.5.0 / 580.159.03 / CUDA 13.0.2 / UEFI 1.108.20   (both nodes, matched)
-  nccl-tests        v2.28.9-1   built make MPI=1, NVCC_GENCODE sm_121
+  NCCL              libnccl2/-dev 2.28.9-1+cuda13.0 (deb, NOT preinstalled — install exactly); nccl-tests built
+                    from upstream HEAD (no 2.28.x tag exists; 717b683 validated) make MPI=1, NVCC_GENCODE sm_121
   BUSBW_PASS_GBPS   20          healthy single-cable ~22.1; 25 = theoretical ceiling, NOT the bar; ~15.5 = fw-degraded; ~10.25 = both-ports-miswired
   vLLM              eugr/spark-vllm-docker @ f7d6e3b5   (PINNED DEFAULT for the V4-Flash TP build — Docker, recipe deepseek-v4-flash, --no-ray --port 8080; pinned 2026-08-02. Reference build for A/B: jasl/vllm @ dda4668b + torch 2.9.1 — the canonical thread's validated commit — Phase 8)
   torch             2.9.1       (2.10.0 breaks CUDA graphs -> one-node-drop hang)
   DeepSeek          DeepSeek-V4-Flash (284B-A13B, FP4+FP8, ~158 GB) + MTP (deepseek_mtp, num_speculative_tokens=2)
+  SEAT_DIALS        --gpu-memory-utilization 0.75 --max-model-len 98304   (validated 2026-08-07; the recipe
+                    defaults 0.8/500K put a front-door host at ~113 GB used — OVER the 115 ceiling; Node A FROZE there)
   litellm           litellm[proxy] (latest)   front door :4000; NO cloud fallback (fallbacks: [] AND context_window_fallbacks: []); floated not frozen (CONVENTIONS §3); validated at 1.89.4 on GB10
   embed             Qwen3-Embedding-0.6B  (1024-dim, always-on; matches the single-Spark public config — pin ONE dim end-to-end)
   MEM_RULE          swap pool XOR two-box DeepSeek  (the ~158 GB DeepSeek + a full pool cannot co-reside across 2x128 GB)
@@ -116,6 +119,7 @@ curl -sf http://localhost:9000/v1/models >/dev/null && echo "PASS: Node A llama-
 uname -m   # aarch64 on both
 ```
 - Both Sparks powered; the **single** 200 G QSFP56 CX-7 cable in hand.
+- **Management LAN should be wired.** If a node's LAN is Wi-Fi, set `sudo nmcli connection modify <profile> connection.autoconnect-retries 0` (= retry forever) — NM's default gives up after 4 attempts, and one AP auth blip then strands the box unattended (80-min outage observed 2026-08-07; the box was healthy underneath).
 - **Record known-good NIC firmware per node BEFORE cabling** (the brick guard, Phase 2). `mstflint -d <dev> q | grep -i 'FW Version'` on each (DGX OS ships `mstflint`, not the legacy Mellanox-OFED `flint`); save it.
 **Pass:** Node A green; both nodes on a matched DGX OS / driver.
 
@@ -149,19 +153,45 @@ sudo apt-mark hold mlnx-fw-updater 2>/dev/null || true   # pin; no auto-flash
 
 ## Phase 3: Cable + link-up &nbsp;·&nbsp; **▶ GATE: `ibdev2netdev` shows `(Up)`**
 
-**✋ OPERATOR STEP (conventions §2.3):** connect the single QSFP cable to any QSFP port on each unit — the agent prompts, then polls `ibdev2netdev` until the iface appears (hotplug re-attach ≤ ~30 s) and continues into the gate below. No cable yet is a *pending input*, not a FAIL — wait for the operator.
+**✋ OPERATOR STEP (conventions §2.3):** connect the single QSFP cable to the **same-position** QSFP port on each unit (a Phase-8 harness requirement — see below) — the agent prompts, then polls `ibdev2netdev` / mlx5 module events and continues into the gate below. No cable yet is a *pending input*, not a FAIL — wait for the operator. **Zero `Cable plugged` module events after insertion = not seated** (upside-down or short of the click — observed 2026-08-06; the event fires instantly on a good seat): prompt a firm reseat, don't diagnose the NIC.
 
 ```bash
-# Connect the single QSFP cable to ANY QSFP port on each unit (the official
-# connect-two-sparks playbook: "using any QSFP interface on each device").
-# Same port on both is a Stacking-guide TIDINESS tip, NOT a link-up requirement.
+# Connect the single QSFP cable to the SAME-POSITION QSFP port on each unit.
+# Any port LINKS UP (the official playbook allows it) — but the eugr Phase-8
+# harness pushes ONE global iface name to every node, so asymmetric ports kill
+# rank 1 (gloo: "Unable to find address for: enp1s0f1np1"). Same port on both
+# is a REQUIREMENT for the TP lane, not a tidiness tip (2026-08-07: B's cable
+# had to be moved mid-run to match A).
 ibdev2netdev                       # expect an enp1s0f1np1-style iface marked (Up)
-ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan (40-cx7.yaml) is fine for one cable
+ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan (40-cx7.yaml below)
 ```
 **Pass:** one CX-7 iface `(Up)` (use the `enp1...` name; ignore the `enP2p...` duplicate — the NIC surfaces 4 names for 2 ports because it's wired as two PCIe Gen5 x4 paths).
 **⚠️ WARN:** do **not** cable *both* CX-7 ports unless you IP all four interfaces — the link silently halves to 100 GbE (~10 GB/s busbw).
 
+**IP + MTU — the exact `40-cx7.yaml` validated 2026-08-07 (write on each node, `netplan apply`):**
+```yaml
+# /etc/netplan/40-cx7.yaml   (Node A shown; Node B: 169.254.207.2/16 — same iface names, same port both boxes)
+network:
+  version: 2
+  ethernets:
+    enp1s0f1np1:            # primary PCIe path — carries the IP
+      addresses: [169.254.207.1/16]
+      mtu: 9000
+    enP2p1s0f1np1:          # secondary PCIe path — NO IP, but the MTU is load-bearing:
+      dhcp4: false          # NCCL stripes across BOTH paths; leaving this netdev at 1500
+      link-local: [ipv6]    # costs ~6 GB/s busbw (17.85 vs 23.85 measured 2026-08-06)
+      mtu: 9000
+```
+**▶ NM-ZEROCONF GUARD (load-bearing, recurs):** netplan's NM backend renders the secondary iface with `ipv4.method=link-local` regardless of the yaml above — a random 169.254 zeroconf lands on `enP2p…` at boot/cable events, the two nodes' GID tables go asymmetric (one side gains an IPv4 GID), and NCCL dies with `ibv_modify_qp … Invalid argument` on the P2 device. Pin it after **every** `netplan apply` and re-check after **every** reboot (both nodes):
+```bash
+sudo nmcli connection modify netplan-enP2p1s0f1np1 ipv4.method disabled ipv6.method link-local
+sudo nmcli device reapply enP2p1s0f1np1
+# assert: ONLY fe80 GIDs on the P2 device, symmetric on both nodes
+grep -H . /sys/class/infiniband/roceP2p1s0f1/ports/1/gids/* | grep -v ':0000:0000:0000:0000:0000:0000:0000:0000'
+```
+
 **Hot-plug notes (post-Jan-2026 DGX OS — the card is off the bus until the cable wakes it):**
+- **▶ POWER-CAP GUARD (found 2026-08-06 — supersedes the flap-only decision rule below): a runtime hotplug attach leaves the NIC power-capped.** The hotplugged slot never advertises power capability (`mlx5_pcie_event: PCIe slot power capability was not advertised`), and the fabric caps at ~13–14 Gb/s raw `ib_write_bw` / ~2.8 GB/s busbw — *below every classic failure signature, with transport correctly NET/IB and the wire at 200 G*. The default path is therefore **disable hotplug + boot with the cable in**: `sudo mv /etc/nvidia/cx7-hotplug-enabled{,.off}` on BOTH nodes, reboot both — the boot-time attach initializes at full power (23.85 GB/s measured; ~18 W idle cost, the documented trade). Runtime insertion remains fine for link-up + the stability watch; do the hotplug-off reboot **before Phase 4**.
 - On cable insertion the hotplug driver re-attaches the NIC and the netdevs appear. If they don't within ~30 s: force it (`sudo /opt/nvidia/dgx-spark-mlnx-hotplug/mtk-hotplug-handler.sh plug-in`), then re-check; a reboot with the cable in also works.
 - **QSFP56 cable caveat:** a June-2026 forum report (same FW 28.45.4028) saw a third-party **QSFP56** DAC trigger FALSE "Cable removal" events — NICs vanish ~20 s after boot *with the cable inserted*. NVIDIA's approved list is **QSFP112** DACs (Amphenol NJAAKK-N911/0006, Luxshare LMTQF022-SD-R). A 200G QSFP56 DAC is electrically fine for the link; only the hotplug *presence detection* may be picky. **If the link flaps: disable hot-plug** (`/etc/nvidia/cx7-hotplug-enabled` — remove/rename the flag, reboot; costs ~18 W idle) and it will hold.
 - **THE ESTATE'S CABLE (identified 2026-08-02): FS.COM 0.5 m 200G QSFP56 passive DAC, P/N `QSFP-200G-PC005`, NV/ME-coded — the same vendor/form-factor/length class as the June report's suspect part.** Decision rule, pre-made so cable day never stalls:
@@ -186,12 +216,15 @@ ip -br addr show | grep -E 'enp1|169.254'   # link-local 169.254.x.x via netplan
 
 ```bash
 sudo apt install -y libopenmpi-dev openmpi-bin build-essential   # OpenMPI is NOT preinstalled; `make MPI=1` needs it (both nodes)
-git clone https://github.com/NVIDIA/nccl-tests ~/nccl-tests && cd ~/nccl-tests
+sudo apt install -y libnccl2=2.28.9-1+cuda13.0 libnccl-dev=2.28.9-1+cuda13.0   # NCCL is NOT preinstalled either (nccl.h missing = build fails); install the PIN exactly (both nodes)
+git clone https://github.com/NVIDIA/nccl-tests ~/nccl-tests && cd ~/nccl-tests   # build from HEAD — upstream has no 2.28.x tag (717b683 validated 2026-08-06)
 # Resolve the real MPI prefix per-box — do NOT hardcode (the path varies by install):
 MPI_HOME=$(dirname "$(mpicc --showme:incdirs 2>/dev/null | awk '{print $1}')"); : "${MPI_HOME:=/usr/lib/aarch64-linux-gnu/openmpi}"
 make MPI=1 MPI_HOME="$MPI_HOME" NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
-# Pin the FABRIC vars to the link iface (resolve the real name per-box via ibdev2netdev):
-export NCCL_SOCKET_IFNAME=enp1s0f1np1 UCX_NET_DEVICES=enp1s0f1np1 OMPI_MCA_btl_tcp_if_include=enp1s0f1np1
+# Pin the FABRIC vars (same iface name on both boxes now that same-port is required; the OMPI include
+# takes the CIDR, which resolves per-node). Export ALL THREE for EVERY mpirun — including the debug run:
+# dropping OMPI_MCA_btl_tcp_if_include lets OMPI wander onto docker/tailscale ifaces and HANG (hit 2026-08-07).
+export NCCL_SOCKET_IFNAME=enp1s0f1np1 UCX_NET_DEVICES=enp1s0f1np1 OMPI_MCA_btl_tcp_if_include=169.254.0.0/16
 ```
 
 ### 4.2 Run the official benchmark + assert both signals
@@ -238,6 +271,7 @@ A GB10 firmware bug **hard powers-off under sustained GPU load** (reproduces in 
 sudo nvidia-smi -lgc 200,2150
 ```
 **Better-evidenced mitigation (do this if you have a recurring power-off):** thermal — repaste + run case-off (~15 °C drop) with USB-fan airflow ran multi-day TP loops crash-free. Treat `-lgc` as a hopeful stopgap, thermal as the real fix.
+**⚠️ `-lgc` does NOT persist across reboot** — re-apply on both nodes after every boot, before any TP launch (candidate amendment: a systemd oneshot). **And it does NOT prevent the memory-ceiling freeze**: 2026-08-07, Node A froze under the seat (nvidia-smi blocked >368 s + NVRM `NV_ERR_NO_MEMORY`) *with the clamp applied* — that failure is fixed by the Phase 8 `SEAT_DIALS`, not here. Treat the clamp as power-off-specific.
 **Pass:** clocks clamped on both nodes (and thermal addressed if a power-off has occurred).
 
 ---
@@ -254,7 +288,9 @@ model_list:
   - model_name: embed            # Qwen3-Embedding-0.6B, 1024-dim (matches the single-Spark public config)
     litellm_params: { model: openai/embed, api_base: http://localhost:9000/v1, api_key: "none" }
   - model_name: deepseek         # cross-node TP=2, brought up on demand (Phase 8)
-    litellm_params: { model: openai/deepseek-v4-flash, api_base: http://localhost:8080/v1, api_key: "none" }
+    litellm_params: { model: openai/deepseek-ai/DeepSeek-V4-Flash, api_base: http://localhost:8080/v1, api_key: "none" }
+    # ^ the segment after openai/ must be the id vLLM actually SERVES — the full HF repo id
+    #   (assert via :8080/v1/models once the seat is up); a bare "deepseek-v4-flash" 404s upstream
   - model_name: claude-opus      # DF-003 ATTENDED path only — never a fallback target
     litellm_params: { model: anthropic/claude-opus-4-7 }
 router_settings:
@@ -338,8 +374,16 @@ The ~158 GB DeepSeek shards to ~75–80 GB/node + KV — it claims the large maj
 #    On Node A always (and Node B too, if it ran single-Spark): stop the keepalive timer + the fleet.
 sudo systemctl stop llama-swap-keepalive.timer        # (system unit, per the single-Spark runbook)
 systemctl --user stop llama-swap                      # fleet goes dormant during TP; `start` to revive after
-# 2. Launch TP=2 across both nodes — DEFAULT (eugr recipe: MTP k=2, fp8 KV, deepseek_v4 tool parsers included):
-cd ~/spark-vllm-docker && ./run-recipe.sh deepseek-v4-flash --no-ray --port 8080
+# 2. Pre-launch: assert :8080 is FREE — an open-webui container squatted it 2026-08-07 → vLLM EADDRINUSE:
+ss -ltnp | grep -E ':8080\b' && echo "FAIL: port squatted — stop/re-port the owner first" || echo "PASS: 8080 free"
+#    Launch TP=2 across both nodes — DEFAULT (eugr recipe: MTP k=2, fp8 KV, deepseek_v4 tool parsers included).
+#    The SEAT_DIALS (PINS) are MANDATORY on a front-door host: recipe defaults (0.8 util / 500K ctx) put
+#    Node A at ~113 GB used — over the 115 ceiling — and Node A FROZE there (the registry's ~114 GB gotcha,
+#    reproduced 2026-08-07: nvidia-smi blocked + NVRM NV_ERR_NO_MEMORY). 0.75/96K fits: ~107 GB used,
+#    KV 6.97 GiB (96K needs ~5.3; vLLM's startup ValueError prints the exact arithmetic when it doesn't fit).
+#    -n pins the cluster + rendezvous to the CX-7 link IPs (never let it default to the LAN).
+cd ~/spark-vllm-docker && ./run-recipe.sh deepseek-v4-flash --no-ray --port 8080 \
+  -n ${N1},${N2} --gpu-memory-utilization 0.75 --max-model-len 98304
 #    --no-ray is MANDATORY (the recipe yaml defaults to the ray backend; mp/no-ray is the 2-node way);
 #    --port 8080 holds the estate port contract (recipe default is 8000). The harness autodiscovers the
 #    NCCL env — ASSERT it picked the direct link (NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1), never trust it blind.
@@ -355,7 +399,7 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 #     — FULL_AND_PIECEWISE + chunked prefill silently hangs after ~6–7 requests on GB10. The eugr recipe
 #     ships VLLM_USE_BREAKABLE_CUDAGRAPH=0 in its env — confirm the hang doesn't reproduce during Phase 9.)
 ```
-**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the DeepSeek seat. *(Pre-verify on the single-Spark baseline that `curl -sf localhost:9000/running | jq` returns `{running:[...]}` on llama-swap v219 before relying on this — the admin endpoint shape is build-dependent.)*
+**▶ GATE:** before the launch, assert the pool is down (`curl -sf localhost:9000/running | jq '.running|length'` → 0 or torn down) so peak memory can't cross the freeze line. After load, `/v1/models` on `:8080` lists the DeepSeek seat. *(Endpoint shape verified on llama-swap v245, 2026-08-06: `/running` returns `{running:[...]}`. Note the fleet returns **429** while models are cold-loading after a revive — wait for `state:"ready"`.)*
 **Treat the seat as single-stream:** concurrency=2 collapses decode to ~1 tok/s at 65 K. `--max-num-seqs 2` is a KV-budget cap, not a throughput target.
 **Tear down** the DeepSeek seat, then revive each node you drained: `systemctl --user start llama-swap` + `sudo systemctl start llama-swap-keepalive.timer` — back to daily/pool mode.
 
@@ -371,7 +415,8 @@ export NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1 NCCL_IB_DISABLE=0 \
 #  (c) PP=2 vs TP=2 for the DeepSeek seat — PP wins under concurrency (~555 vs ~252 @batch128),
 #      TP wins at batch=1 single-stream (the DeepSeek seat's actual regime). Record both.
 ```
-Record decode tok/s (TP=2 / single-node / PP=2), cold-start (~6 min), and TTFT@32K/128K.
+Record decode tok/s (TP=2 / single-node / PP=2), cold-start, and TTFT@32K/128K.
+**First-run baselines (2026-08-07, eugr lane, SEAT_DIALS 0.75/96K, clocks clamped 2150):** TP=2 warm single-stream **32.9 tok/s** (usage-counted; MTP k=2 — chunk-counting undercounts ~2×, MTP packs ~2 tok/chunk) · TTFT 0.36 s short / 28.9 s @ ~32K · cold 230 s, warm relaunch 114 s · single-node contrast (workhorse 35B) **62.1 tok/s** — capacity-not-speed measured. **PP=2 DEFERRED:** the pinned eugr recipe exposes no pipeline-parallel knob — an on-hardware PP run needs a harness change (PR) or the jasl reference lane; until it runs, **DF-004 stays PROPOSED** per Phase 11.
 
 ## Phase 10: Decision Gate
 
@@ -410,6 +455,14 @@ Write `RESULTS-two-spark-bring-up-<YYYY-MM-DD>.md` (gate table filled + recorded
 | NIC bricked (pre-init, error -110) | unsolicited `mlnx-fw-updater` flash | Phase 2 hold; `fwupdmgr` downgrade to known-good |
 | Unattended run escalated to claude-opus + spend | LiteLLM `context_window_fallbacks` | Phase 7: set it `[]` too |
 | LiteLLM 504s / flaky health on Node A under load | LiteLLM & llama-swap sharing a CPU core | Phase 7: disjoint `CPUAffinity=` (litellm 0-3 / llama-swap 4-19; 20-core GB10) |
+| busbw ~2.8 GB/s, NET/IB correct, raw `ib_write_bw` ~13 Gb/s | runtime hotplug attach — slot power never advertised, NIC power-capped | Phase 3 power-cap guard: hotplug flag off + reboot BOTH with cable in |
+| busbw ~17–18 GB/s (below 20, above the fw-degraded ~15.5) | secondary-path netdev (`enP2p…`) still MTU 1500 | Phase 3: `mtu: 9000` on BOTH PCIe paths, both nodes |
+| NCCL `ibv_modify_qp … Invalid argument` on the P2 device | NM zeroconf IPv4 on one node's `enP2p…` → asymmetric GID tables | Phase 3 NM-zeroconf guard (`ipv4.method disabled` + reapply) |
+| rank 1 dies: gloo `Unable to find address for <iface>` | cable in different port positions — eugr pushes ONE global iface name | move the cable: SAME port position both boxes (Phase 3) |
+| vLLM API `OSError: [Errno 98] Address already in use` | something squats `:8080` (an open-webui container did) | Phase 8 pre-launch `ss` check; stop/re-port the squatter |
+| Box FREEZES (nvidia-smi blocked, NVRM `NV_ERR_NO_MEMORY`) — not a power-off | unified-memory ceiling (~114 GB used); recipe defaults 0.8/500K | Phase 8 `SEAT_DIALS` 0.75/96K — the `-lgc` clamp does NOT prevent this |
+| Box unreachable but alive; NM `no secrets: no agents`; Wi-Fi down | Wi-Fi LAN + NM autoconnect gave up after 4 retries | Phase 1: `autoconnect-retries 0` (infinite); prefer wired |
+| mpirun warns `cannot find a corresponding process entry` / hangs | ghost `orted` from an aborted earlier run | `pkill -x orted` on both nodes, re-run |
 
 ---
 
