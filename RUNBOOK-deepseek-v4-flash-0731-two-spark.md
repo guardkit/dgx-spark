@@ -17,7 +17,7 @@
  │ NVFP4 MLA KV (~10 GiB/1M)│ NET/IB   │ NVFP4 MLA KV             │
  └──────────────────────────┘          └──────────────────────────┘
    llama-swap :9000 STOPPED               llama-swap :9000 STOPPED
-   (drained Phase 1.6, revived Phase 9 — the pool XOR DeepSeek rule)
+   (drained Phase 1.5, revived Phase 9 — the pool XOR DeepSeek rule)
 ```
 
 **Execution modes**
@@ -108,7 +108,7 @@ PINS (set 2026-08-01)
 
 ```bash
 # Recipe repo HEAD vs pin
-PINNED=d728faee9f5a8d5ebafe7bc44bca6c5d8d0d192f
+PINNED=cd366d5e20a00426f3c6fce1f08a179acd936262
 LATEST=$(git ls-remote https://github.com/tonyd2wild/DeepSeek-v4-Flash-0731-DSpark-1M-NVFP4-KV-2x-DGX-Spark HEAD | cut -f1)
 [ "$PINNED" = "$LATEST" ] && echo "recipe: pinned == HEAD" || echo "DRIFT: recipe HEAD moved ($LATEST)"
 
@@ -208,7 +208,7 @@ free -g | awk '/^Mem:/ { if ($7 >= 110) print "PASS: " $7 " GB available"; else 
 ```bash
 # Clone at the PIN (skip-if-present at the right commit):
 git clone https://github.com/tonyd2wild/DeepSeek-v4-Flash-0731-DSpark-1M-NVFP4-KV-2x-DGX-Spark ~/dspark-recipe
-git -C ~/dspark-recipe checkout d728faee9f5a8d5ebafe7bc44bca6c5d8d0d192f
+git -C ~/dspark-recipe checkout cd366d5e20a00426f3c6fce1f08a179acd936262
 # Build the Stage A/B/C runtime (heavy — 30-60 min; no-ops if the image exists):
 cd ~/dspark-recipe && ./build-dspark-vllm-runtime.sh
 docker image inspect vllm-dspark-runtime:dspark-nvfp4-stage-c >/dev/null && echo PASS || exit 1
@@ -305,8 +305,9 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 #     mixed agent traffic ~88 tok/s aggregate at c=4 (~22/stream)
 # 5.6 TOOL-CALLING gate — run WITH speculative decoding ON (the draft-rejection trap):
 #     DSpark spec decode can shred the tool-call opener tag at draft-rejection boundaries,
-#     leaking calls into content as raw DSML (t/372268 post 296). Four blocking sub-checks
-#     (each maps to a reported 08-02/03 failure mode on the retired hf+jinja path):
+#     leaking calls into content as raw DSML (t/372268 post 296). Five blocking sub-checks
+#     ((a)–(d) map to reported 08-02/03 failure modes on the retired hf+jinja path; (e) covers
+#     the t/372268 #573 streaming-parser bug on the native path):
 #     (a) FIVE live requests with a simple tools=[...] schema, stream:false → every response
 #         carries choices[0].message.tool_calls as a PARSED array, content holds zero raw
 #         DSML markup, AND the follow-up turn returns NON-EMPTY content (t/372268 #558:
