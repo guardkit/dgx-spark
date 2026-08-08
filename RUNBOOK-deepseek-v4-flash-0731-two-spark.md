@@ -41,10 +41,16 @@ PINS (set 2026-08-01)
                      d728faee; delta is docs/tooling only — sparkrun recipe #14, docs k=3→5
                      correction that MATCHES our MTP_NUM_TOKENS=5 pin, runtime-tag note)
   runtime image      vllm-dspark-runtime:dspark-nvfp4-stage-c            (built per node from the recipe;
-                     Patches 2b+3 baked IN — Patch 4 is NOT, see next pin)
-  PATCH 4            manual read-only bind-mount of the patched dspark.py (recipe README, 2026-07-31)
-                     MANDATORY for 0731 — without it the draft loader silently drops 12 shared-expert
-                     tensors and acceptance collapses 60.2% → 25.7% (decode ~halves)
+                     Patches 2b+3 AND 4 baked IN as of cd366d5e — see next pin. vLLM inside:
+                     0.21.1rc1.dev339+g1967a5627bc3, recorded 2026-08-08)
+  PATCH 4            the w1/w3→gate_up_proj shared-expert mapping in the draft proposer — MANDATORY
+                     for 0731 (without it the loader silently drops 12 shared-expert tensors and
+                     acceptance collapses 60.2% → 25.7%; decode ~halves). VERIFIED 2026-08-08:
+                     images built from cd366d5e BAKE it (recipe/overlay dspark.py, "Added
+                     2026-07-31"); the run still stages /opt/dspark/dspark.patched.py = the
+                     IMAGE'S OWN copy and ro-bind-mounts it (belt-and-braces — a foreign-version
+                     copy is impossible by construction, and the mount slot is where the fix goes
+                     if a future image loses it). Functional proof = the Phase 4 loader-log gate
   weights            deepseek-ai/DeepSeek-V4-Flash-0731    167 GB · 48 shards · native FP4-QAT experts
                      + FP8 attention · DSpark drafter ships IN-weights (no second model)
   spec decode        method=dspark · num_speculative_tokens ≤ 5   (dspark_block_size=5; the HF card
@@ -77,6 +83,13 @@ PINS (set 2026-08-01)
   crash knobs        VLLM_DSPARK_GPU_REJECTED_CONTEXT_MASK=1 (Patch-2 ragged-path
                      requirement) · NO repetition_penalty anywhere (illegal-memory crash;
                      if one appears anyway, remove it before any other diagnosis)
+  #573 parser fix    /opt/dspark/deepseekv32_tool_parser.patched.py — the image's own
+                     deepseekv32_tool_parser.py + the t/372268 #573 one-liner (never emit an
+                     explicit empty tool_calls list in a streaming delta; the v4 parser
+                     subclasses v3.2, so the fix lands in the parent), ro-bind-mounted on
+                     BOTH nodes. Applied 2026-08-08 after gate 5.6(e) caught the empty-delta
+                     frame live on the stock image. Supersede when the recipe merges PR #17's
+                     minimal guard
   socket ifnames     GLOO_SOCKET_IFNAME + TP_SOCKET_IFNAME = same value as
                      NCCL_SOCKET_IFNAME (PR #13: TP init FAILED on a non-author Spark
                      pair without them; zero cost if redundant)
@@ -185,7 +198,8 @@ mstflint -d $(ibdev2netdev | awk '{print $1}' | head -1) q | grep -i 'FW Version
 D=$(python3 -c "from huggingface_hub import snapshot_download; print(snapshot_download('deepseek-ai/DeepSeek-V4-Flash-0731', local_files_only=True))" ) \
   && echo "PASS: cache at $D" || { echo "FAIL: weights not fully staged"; exit 1; }
 ls "$D"/*.safetensors | wc -l   # assert 48 shards
-du -s --block-size=1G "$D"      # assert ≥ 165 GB
+du -sL --block-size=1G "$D"     # assert ≥ 155 GiB (= the 167 decimal-GB release). -L is load-bearing:
+                                # HF snapshots are symlink farms — plain `du -s` reads ~1 GB (false-FAIL, fixed 2026-08-08)
 # uid-1000 lock-file trap: the container writes HF lock files — cache must be writable by uid 1000
 [ -w "$D" ] && echo PASS || echo "FAIL: HF cache not writable by uid 1000"
 ```
@@ -194,8 +208,10 @@ du -s --block-size=1G "$D"      # assert ≥ 165 GB
 ```bash
 df --output=avail -BG / | tail -1        # assert ≥ 60 GB free (image build headroom)
 nvidia-smi --query-gpu=driver_version --format=csv,noheader   # assert ≥ 580.173.02
-# libcuda "file too short" trap (forum field report 2026-08-01): host libcuda must be sane
-S=$(stat -c%s /lib/aarch64-linux-gnu/libcuda.so.1 2>/dev/null || echo 0); [ "$S" -gt 1000000 ] \
+# libcuda "file too short" trap (forum field report 2026-08-01): host libcuda must be sane.
+# Path + -L fixed 2026-08-08: DGX OS puts it under /usr/lib, and libcuda.so.1 is a symlink —
+# without -L, stat reads the ~21-byte link itself and false-FAILs.
+S=$(stat -Lc%s /usr/lib/aarch64-linux-gnu/libcuda.so.1 2>/dev/null || echo 0); [ "$S" -gt 1000000 ] \
   && echo PASS || echo "FAIL: host libcuda.so.1 missing/truncated — do not launch containers"
 ```
 
@@ -203,8 +219,9 @@ S=$(stat -c%s /lib/aarch64-linux-gnu/libcuda.so.1 2>/dev/null || echo 0); [ "$S"
 ```bash
 # On BOTH nodes, record the pre-drain state (Phase 9 revives against this snapshot):
 curl -s localhost:9000/running > /tmp/predrain-$(hostname).json && cat /tmp/predrain-$(hostname).json
-# Drain:
-systemctl --user stop llama-swap-keepalive.timer llama-swap
+# Drain (the keepalive timer is ABSENT on both estate boxes as of 2026-08-08 — stop it only if present):
+systemctl --user stop llama-swap
+systemctl --user stop llama-swap-keepalive.timer 2>/dev/null || true
 # Assert drained + memory actually returned:
 curl -s --max-time 3 localhost:9000/running | grep -q . && { echo "FAIL: llama-swap still answering"; exit 1; } || echo "PASS: drained"
 free -g | awk '/^Mem:/ { if ($7 >= 110) print "PASS: " $7 " GB available"; else { print "FAIL: only " $7 " GB available"; exit 1 } }'
@@ -218,21 +235,31 @@ free -g | awk '/^Mem:/ { if ($7 >= 110) print "PASS: " $7 " GB available"; else 
 # Clone at the PIN (skip-if-present at the right commit):
 git clone https://github.com/tonyd2wild/DeepSeek-v4-Flash-0731-DSpark-1M-NVFP4-KV-2x-DGX-Spark ~/dspark-recipe
 git -C ~/dspark-recipe checkout cd366d5e20a00426f3c6fce1f08a179acd936262
-# Build the Stage A/B/C runtime (heavy — 30-60 min; no-ops if the image exists):
-cd ~/dspark-recipe && ./build-dspark-vllm-runtime.sh
+# Build the Stage A/B/C runtime (heavy — 30-60 min; no-ops if the image exists).
+# WORKER_BUILD=0 is load-bearing for per-node builds (2026-08-08): the script defaults to ALSO
+# rsync+building on $WORKER_HOST — duplicating the worker's own build when run on both nodes; with
+# WORKER_HOST unset it instead errors at the very end (post-build, harmless, but reads like a failure).
+cd ~/dspark-recipe && WORKER_BUILD=0 ./build-dspark-vllm-runtime.sh
 docker image inspect vllm-dspark-runtime:dspark-nvfp4-stage-c >/dev/null && echo PASS || exit 1
 ```
 
-**Patch 4 (mandatory for 0731 — the image does NOT contain it):** stage the patched `dspark.py` per the recipe README ("two lines, no rebuild — bind-mount it read-only" over the image's `/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py`).
+**Patch 4 (mandatory for 0731 — BAKED IN as of the cd366d5e image, verified 2026-08-08):** the staging below asserts the mapping is in the image, then bind-mounts the image's own copy read-only over `/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py` (belt-and-braces; the mount slot is also where the fix goes if a future image loses it).
 **⚠️ TWO files in the recipe are named `dspark.py` — this is the root of the forum's filepath confusion. Patch 4's target is `recipe/overlay/vllm/v1/spec_decode/dspark.py`** (the proposer's `_STACKED_PARAM_NAME_MAPPING`, lines 15–18; the patch header reads `--- a/vllm/v1/spec_decode/dspark.py`). It is **NOT** `recipe/overlay/vllm/models/deepseek_v4/nvidia/dspark.py` (the draft weight loader — already baked into stage-c; never mount that one).
-**▶ GATE — version-match:** the patched file must come from **this image's** vLLM tree (a `dspark.py` lifted from another vLLM version crashes with `propose() got an unexpected keyword argument`). Extract the image's own copy, apply the two-line w1/w3→`gate_up_proj` mapping to *that*, and diff to confirm only those lines changed:
+**▶ GATE — version-match:** the mounted file must come from **this image's** vLLM tree (a `dspark.py` lifted from another vLLM version crashes with `propose() got an unexpected keyword argument`). Extract the image's own copy — per node, from that node's image — and assert the baked mapping; the mounted file IS that copy:
 
 ```bash
+sudo mkdir -p /opt/dspark
 docker run --rm --entrypoint cat vllm-dspark-runtime:dspark-nvfp4-stage-c \
-  /opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py > /opt/dspark/dspark.orig.py
-# apply the recipe's Patch 4 hunk to a copy → /opt/dspark/dspark.patched.py
-diff /opt/dspark/dspark.orig.py /opt/dspark/dspark.patched.py | grep -c '^[<>]'   # assert exactly the patch's line count
+  /opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py > /tmp/dspark.orig.py
+grep -c 'shared_experts.gate_up_proj", ".shared_experts.w[13]"' /tmp/dspark.orig.py   # assert 2 (the baked mapping)
+sudo cp /tmp/dspark.orig.py /opt/dspark/dspark.orig.py
+sudo cp /tmp/dspark.orig.py /opt/dspark/dspark.patched.py
+# Only if that grep reads 0 (a future image LOST the mapping): apply the recipe's Patch 4 hunk to the
+# extracted copy instead, and diff-gate — only the hunk's lines may differ:
+#   diff /opt/dspark/dspark.orig.py /opt/dspark/dspark.patched.py | grep -c '^[<>]'   # == the hunk's line count
 ```
+
+**#573 parser fix (staged the same way — see PINS):** extract the image's `vllm/tool_parsers/deepseekv32_tool_parser.py`, change its streaming return so `tool_calls` is passed only when non-empty (`if delta_tool_calls: return DeltaMessage(content=content, tool_calls=delta_tool_calls)` then `if content: return DeltaMessage(content=content)` — replacing the stock `if delta_tool_calls or content:` single return), stage as `/opt/dspark/deepseekv32_tool_parser.patched.py` on BOTH nodes. Gate 5.6(e) is the functional proof every run.
 
 ---
 
@@ -259,6 +286,9 @@ grep -rq 'repetition_penalty' docker-compose.dspark.yml .env.dspark && echo "FAI
 # Patch 4 bind-mount present in the compose:
 grep -q 'dspark.patched.py:/opt/env/lib/python3.12/site-packages/vllm/v1/spec_decode/dspark.py:ro' \
   docker-compose.dspark.yml && echo PASS || echo "FAIL: Patch 4 not mounted"
+# #573 parser fix mounted (see PINS; gate 5.6(e) is its functional proof):
+grep -q 'deepseekv32_tool_parser.patched.py:/opt/env/lib/python3.12/site-packages/vllm/tool_parsers/deepseekv32_tool_parser.py:ro' \
+  docker-compose.dspark.yml && echo PASS || echo "FAIL: #573 parser fix not mounted"
 # Tool calling — the demo lane dies without these (and raw DSML leaks into content without the parsers):
 grep -q 'tokenizer-mode deepseek_v4'    docker-compose.dspark.yml && echo PASS || echo "FAIL: NATIVE deepseek_v4 tokenizer-mode (the hf+jinja path is SUPERSEDED — see PINS)"
 grep -q 'tool-call-parser deepseek_v4'  docker-compose.dspark.yml && echo PASS || echo "FAIL: tool-call parser"
@@ -280,16 +310,21 @@ grep -qE '^GLOO_SOCKET_IFNAME=' .env.dspark && grep -qE '^TP_SOCKET_IFNAME=' .en
 ## Phase 4: Launch (worker-first) — **▶ GATE: Patch 4 proven from the loader log**
 
 ```bash
-# Node B first: ./start-deepseek-v4-flash-dspark.sh worker   → then Node A: ... head
-# Cold start ~6-8 min. Then, on the head:
+# ONE command, run on the HEAD: cd ~/dspark-recipe && ./start-deepseek-v4-flash-dspark.sh
+# (the script itself is worker-first: it syncs compose+.env to $WORKER_HOST, starts rank 1 headless,
+#  then the head, waits for the API and smoke-chats. Earlier drafts' "worker"/"head" args don't exist.)
+# Cold start ~6-9 min first boot, ~5 min warm. Container name is dspark-recipe-vllm-dspark-1 on both
+# nodes (earlier drafts said dspark-head). Then, on the head:
 curl -s localhost:8888/v1/models | grep -q DeepSeek-V4-Flash-0731 && echo PASS || exit 1   # weights (root field)
 curl -s localhost:8888/v1/models | grep -Eq '"id":\s*"deepseek-v4-flash-0731"' && echo PASS \
   || { echo "FAIL: served id ≠ deepseek-v4-flash-0731 (SERVED_MODEL_NAME override not applied) — the Phase 6 deepseek route would 404"; exit 1; }
-docker logs dspark-head 2>&1 | grep -q "B12X" && echo "PASS: B12X MoE backend active" || echo FAIL
-# THE load-bearing assertion — the draft loader must NOT have dropped shared-expert tensors:
-docker logs dspark-head 2>&1 | grep "Skipping unknown DSpark weight" | grep -c "shared_experts" \
+docker logs dspark-recipe-vllm-dspark-1 2>&1 | grep -q "B12X" && echo "PASS: B12X MoE backend active" || echo FAIL
+# THE load-bearing assertion — the draft loader must NOT have dropped shared-expert tensors (run on BOTH nodes):
+docker logs dspark-recipe-vllm-dspark-1 2>&1 | grep "Skipping unknown DSpark weight" | grep -c "shared_experts" \
   # assert 0 — any hit means Patch 4 did not take; acceptance will read ~25% in Phase 5. HALT.
-docker logs dspark-head 2>&1 | grep -i "KV cache size"   # record tokens + GiB in RESULTS (expect ~1.5M tok / ~10 GiB)
+docker logs dspark-recipe-vllm-dspark-1 2>&1 | grep -i "KV cache size"   # record tokens in RESULTS
+#   expect ≥ 1.5M tok — observed 1.98M and 1.73M across boots 2026-08-08 (UMA wobble is normal; this
+#   vLLM build emits no GiB figure). FAR below ~1.5M → check the hybrid-KV manager before blaming UMA.
 ```
 
 ---
@@ -300,8 +335,13 @@ Under speculative decoding vLLM emits at most one SSE chunk per decode *step* �
 
 ```bash
 # 5.1 Warm-up: FIVE long generations (~1k tokens each) — cold-start costs ~30%; do not gate on them.
-# 5.2 Acceptance gate (the Patch 4 functional proof):
-curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥ 0.50 (post-fix 0.602; unpatched 0.257)
+# 5.2 Acceptance gate (the Patch 4 functional proof) — measure a STRUCTURED-REQUEST DELTA, never the
+#     blended counter: acceptance is strongly content-dependent (structured 0.994 / narrative 0.256
+#     measured 2026-08-08 — an all-narrative warm-up mimics the banked "unpatched 0.257" on a HEALTHY
+#     engine). Snapshot the spec_decode counters, run ONE structured counting request (stream:false),
+#     snapshot again; assert on the delta:
+#       Δaccepted_tokens / Δdraft_tokens ≥ 0.50   (healthy ≈0.99 structured; unpatched ~0.26 even there)
+curl -s localhost:8888/metrics | grep spec_decode   # counters: num_draft_tokens_total / num_accepted_tokens_total / num_drafts_total
 # BANKED FAILURE SIGNATURES (diagnose by shape, not guesswork):
 #   Signature A — drafting healthy but acceptance ~26%: Patch 4 mount not in effect. A WRONG
 #     mapping raises KeyError loudly (DSPARK-SHARED-EXPERT-FIX.md), so clean boot + low
@@ -324,7 +364,10 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 #     (a) FIVE live requests with a simple tools=[...] schema, stream:false → every response
 #         carries choices[0].message.tool_calls as a PARSED array, content holds zero raw
 #         DSML markup, AND the follow-up turn returns NON-EMPTY content (t/372268 #558:
-#         calls fired but answers came back empty);
+#         calls fired but answers came back empty). PLUS one MULTI-TURN session driving a
+#         2nd and 3rd tool call in the SAME conversation — MiaAI #21: the encoding package
+#         can corrupt dict-typed arguments when re-rendering PRIOR calls, so single-turn
+#         tests cannot catch it (clean on this stack 2026-08-08);
 #     (b) reasoning separation: <think>/reasoning lands in reasoning_content, never in
 #         content (recipe Issue #16, open — watch it);
 #     (c) tool-JSON validity at reasoning_effort MAX and LOW — never test "high": it is a
@@ -333,9 +376,10 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 #     (d) a 3-turn session keeps the prefix cache warm (TTFT turn-3 ≪ turn-1 — the #554
 #         regression class the jinja path caused);
 #     (e) a STREAMING tools request never emits empty `tool_calls: []` deltas — they break
-#         clients that check `if (delta.tool_calls)` (t/372268 #573, verified on Spark;
-#         fix = the #573 one-line patch to deepseekv32_tool_parser.py omitting the empty
-#         field). The demo harness streams, so this one is load-bearing.
+#         clients that check `if (delta.tool_calls)` (t/372268 #573; REPRODUCED here
+#         2026-08-08 on the stock image, then fixed by the staged parser mount — PINS +
+#         Phase 2; this gate re-proves the mount every run). The demo harness streams,
+#         so this one is load-bearing.
 #     Any failure: interpose the opencode_compat_proxy shim (Appendix A) or reduce
 #     num_speculative_tokens and re-test — do NOT record the harness demo until all clean.
 ```
@@ -358,9 +402,16 @@ grep -q 'model: openai/deepseek-v4-flash-0731' "$CFG" && echo PASS || echo "FAIL
 grep -q 'api_base: http://localhost:8888/v1'   "$CFG" && echo PASS || echo "FAIL: deepseek api_base :8888"
 # The fallback lane stays addressable by name (renamed, never deleted):
 grep -qE '^\s*-\s*model_name:\s*deepseek-fp8\s*$' "$CFG" && echo PASS || echo "FAIL: deepseek-fp8 row missing"
-# Live listing shows BOTH names (dashboard box: any virtual key works for /v1/models):
+# Live listing shows BOTH names (dashboard box: any virtual key works for /v1/models;
+# `set -a; source /opt/litellm/litellm.env; set +a` → $LITELLM_MASTER_KEY works too):
 curl -s localhost:4000/v1/models -H "Authorization: Bearer $LITELLM_KEY" | grep -o '"deepseek[^"]*"' | sort -u
 #   expect: "deepseek" and "deepseek-fp8"
+# ⚠️ litellm.service carries Wants=llama-swap.service — restarting litellm REVIVES the drained fleet
+# mid-session (caught live 2026-08-08: embed reloaded; Node A fell to 2 GB avail + 10 GB swap).
+# Re-assert the drain after ANY litellm restart while the seat is up:
+systemctl --user stop llama-swap
+curl -s --max-time 3 localhost:9000/running | grep -q . && echo "FAIL: llama-swap answering again" || echo "PASS: drain re-asserted"
+free -g | awk '/^Mem:/{print "avail: " $7 " GB"}'   # back near the post-launch baseline before Phase 7
 ```
 
 Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
@@ -384,7 +435,7 @@ The 0731 checkpoint has <48 h of public field time; the recipe's 40-min soak was
 | 1.3 | Weights | 48 shards, ≥165 GB, writable, both | |
 | 1.4 | Driver/libcuda | ≥ 580.173.02, libcuda sane | |
 | 1.5 | Drain | `/running` empty both, ≥110 GB avail | |
-| 2 | Image + Patch 4 staged | version-matched diff | |
+| 2 | Image + Patch 4 + #573 parser staged | baked-mapping grep == 2 · image's-own-copy mounts | |
 | 3 | Config traps | all anchored greps PASS | |
 | 4 | Launch | B12X active, **zero dropped shared_experts**, /v1/models 200, served id `deepseek-v4-flash-0731` | |
 | 5.2 | Acceptance | ≥ 0.50 | |
@@ -402,12 +453,18 @@ The 0731 checkpoint has <48 h of public field time; the recipe's 40-min soak was
 ```bash
 # Stop the DeepSeek seat (both nodes):
 cd ~/dspark-recipe && docker compose -f docker-compose.dspark.yml down
-# Revive (both nodes):
-systemctl --user start llama-swap && systemctl --user start llama-swap-keepalive.timer
+# Revive (both nodes; the keepalive timer is absent on the estate boxes — start it only if present):
+systemctl --user start llama-swap
+systemctl --user start llama-swap-keepalive.timer 2>/dev/null || true
 # ▶ GATE: revive proven against the Phase 1.5 snapshot, not assumed:
 curl -s localhost:9000/running    # assert the preload set is state=ready on each node (diff vs /tmp/predrain-*.json)
-# Node A workhorse probe — max_tokens ≥ 600 (the reasoning channel eats small probes):
-#   assert non-empty content. Node B: assert the office front door answers again (its :8477 page loads).
+# Node A workhorse probe — max_tokens ≥ 1500 (raised from 600 on 2026-08-08: qwen36-workhorse with
+#   `--reasoning auto` spent an entire 700-token budget reasoning and returned EMPTY content — a
+#   false-FAIL, not a broken fleet): assert non-empty content.
+# Node B functional probes (the ":8477 office front door" of earlier drafts exists nowhere on the box —
+#   no unit, container, compose file, or listener references it; assertion replaced 2026-08-08):
+#   a completion from a Node B fleet model via :9000 returns content (e.g. gemma4-tutor), and the
+#   fleet-dependent containers (audio-*, study_tutor_http) report Up/healthy in `docker ps`.
 ```
 
 ---
@@ -416,7 +473,7 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 
 | Issue | Status at pin date | Caught by |
 |---|---|---|
-| Draft-loader drops shared_experts w1/w3 (0731) | Patch 4 manual, NOT in image | Phase 4 log gate + 5.2 acceptance |
+| Draft-loader drops shared_experts w1/w3 (0731) | Patch 4 BAKED in cd366d5e images (verified 2026-08-08); mount kept belt-and-braces | Phase 4 log gate + 5.2 acceptance |
 | `VLLM_USE_B12X_MOE` unset → ~29 tok/s | silent | Phase 3 grep + 5.3 decode |
 | nst > 5 → acceptance ~4% | HF card recommends 7 (trap) | Phase 3 grep |
 | Preview checkpoint is the `.env` default | silent wrong-model | Phase 3 grep + Phase 4 /v1/models |
@@ -431,13 +488,14 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 | Harness 400s on `developer` role / `reasoning_effort` (typical vLLM) | expected | harness compat flags — see `demo/orbit-globe/README.md` |
 | The t/372268 post-538 tool path (`--tokenizer-mode hf` + jinja mount) | **SUPERSEDED 08-03** — 4 adverse reports incl. its author (#540/#544/#554/#558/#560) | PINS pin the native `deepseek_v4` tokenizer + encoding package; Phase 3 grep FAILS if a jinja mount reappears |
 | Missing `<think>` token in reasoning content (recipe Issue #16) | open — **MULTI-CONFIRMED 08-04** (doongkc + roady001): reasoning streams as visible content, only the closing `</think>` is emitted | Phase 5.6(b); any chat-UI consumer inherits visible reasoning spill until fixed |
-| Streaming parser emits empty `tool_calls: []` deltas (t/372268 #573) | reported + patched in-thread | Phase 5.6(e); the #573 one-line parser patch |
+| Streaming parser emits empty `tool_calls: []` deltas (t/372268 #573) | REPRODUCED + FIXED in-estate 2026-08-08 (parser mount, PINS + Phase 2); supersede when PR #17's guard merges | Phase 5.6(e) re-proves every run |
 | reasoning_effort "high" = silent no-op on 0731 | multi-corroborated 08-04 | PINS; /tokenize prefix-count check in 5.6(c) |
 | vLLM-from-source path (only if ever leaving the recipe image) | PR #41834 still unmerged; preview tag `sm120-pr-41834-stable-preview-20260804` = first head validated on SM121 | leave `VLLM_DEEPSEEK_V4_EAGER_SCRATCH_POOL` unset — the eager scratch pool had a cross-layer reuse race corrupting output under concurrency (default OFF since 08-04) |
 | GB10 UMA accounting: available KV capacity varies 4.22–5.34 GiB across boots (vLLM #48140) | open | clean reboot before the demo session; record the boot's KV line in RESULTS |
 | Concurrent-agent fairness: `--max-num-batched-tokens 8192` starves decode under concurrent prefill | single-source (t/378890, published harness) | OPTIONAL: 2048 for multi-agent sessions (p95 gap 6.1s→1.6s); not for the single-stream demo |
 | Compose default served id is `deepseek-v4-flash-dspark` ≠ the front-door route target | recipe default (discovered 2026-08-08) | Phase 3 `SERVED_MODEL_NAME` grep + Phase 4 served-id gate |
 | Two LiteLLM rows sharing `model_name: deepseek` → load-balance group round-robins into the down lane | design trap (base runbook's row renamed `deepseek-fp8` 2026-08-08; examples are canonical) | Phase 6 row-count grep |
+| `litellm.service` `Wants=llama-swap.service` → any litellm restart revives the drained fleet into contended memory | caught live 2026-08-08 (Node A 2 GB avail / 10 GB swap) | Phase 6 drain re-assert + Phase 7 memory gate |
 
 ## Appendix B — Rollback + RESULTS template
 

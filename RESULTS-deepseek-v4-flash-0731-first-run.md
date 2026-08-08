@@ -59,6 +59,8 @@
 
 ## Deviations
 
+> **All amendment candidates below were FOLDED INTO the runbook 2026-08-08** (same-day commit following this run): PINS Patch-4/#573 wording, `du -sL`, libcuda path+`-L`, keepalive-timer conditionals, `WORKER_BUILD=0`, Phase 2 staging flow (both mounts), Phase 3 parser-mount grep, Phase 4 container names + KV expectation, Phase 5.2 delta method, 5.6(a) multi-turn, Phase 6 drain re-assert, Phase 9 probe budget + Node B functional probes, Appendix A rows.
+
 - **D1 — Patch 4 pre-baked:** PINS state "Patch 4 is NOT in the image", but the pinned commit's `recipe/overlay/vllm/v1/spec_decode/dspark.py` carries the w1/w3→gate_up_proj mapping ("Added 2026-07-31") and the build bakes the overlay in. The bind-mount is therefore the image's own copy (version-match gate trivially satisfied, foreign-version crash impossible); the runbook's "diff == patch line count" expectation doesn't apply to a pre-applied patch. Functional proof deferred to the Phase 4 loader-log gate + 5.2 acceptance. **Amendment candidate:** PINS Patch-4 wording for images built from cd366d5e onward.
 - **D2 — keepalive timer absent:** `llama-swap-keepalive.timer` (named in Phase 1.5/9) is not loaded on either node; only `llama-swap.service` exists. Drain/revive operate on what exists; revive gate is the snapshot diff + probes.
 - **D3 — builder's worker-build tail step:** `build-dspark-vllm-runtime.sh` defaults `WORKER_BUILD=1` and errors post-build without `WORKER_HOST` (env file didn't exist at build start). Both nodes' local images built and self-validated; the redundant cross-build step was skipped by that error. Harmless.
