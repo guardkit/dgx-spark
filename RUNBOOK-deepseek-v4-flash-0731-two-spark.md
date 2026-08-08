@@ -91,6 +91,15 @@ PINS (set 2026-08-01)
   A/B candidate      eugr B12X 0731 stack — archived at vendor/eugr-0731-ab/ (fp8 KV;
                      runs as a measured A/B in a LATER session, never this bring-up)
   head/API           Node A :8888  ·  worker-first launch order (worker up before head)
+  served id          SERVED_MODEL_NAME=deepseek-v4-flash-0731   (the compose DEFAULTS to
+                     deepseek-v4-flash-dspark — without the override the Phase 4 served-id
+                     gate fails and the Phase 6 front-door route 404s upstream)
+  front door         bare alias `deepseek` = THIS seat (openai/deepseek-v4-flash-0731 @ :8888);
+                     the eugr FP8 fallback lane is `deepseek-fp8` @ :8080 (renamed 2026-08-08
+                     from the two-spark runbook's original `deepseek` row). Choose by NAME,
+                     never port. NEVER two rows named `deepseek` — LiteLLM load-balances
+                     same-named rows into the down lane. Canonical rows:
+                     examples/litellm-config.public.yaml (mirrored to the dashboard twin)
   MEM_CEILING_GB     115 per node        (121 usable; freeze observed at 114)
   fabric (inherited) CX-7 FW ≥ 28.45.4028 · NCCL busbw ≥ 20 GB/s · transport NET/IB (never TCP)
   FALLBACK lane      eugr/spark-vllm-docker @ f7d6e3b5 · recipe deepseek-v4-flash · FP8 TP=2 · MTP k=2
@@ -235,6 +244,8 @@ Copy `~/dspark-recipe/.env.dspark.example` → `.env.dspark` and set for OUR top
 cd ~/dspark-recipe
 grep -q '^DSPARK_MODEL=deepseek-ai/DeepSeek-V4-Flash-0731$' .env.dspark && echo PASS \
   || echo "FAIL: DSPARK_MODEL — the example DEFAULTS TO THE PREVIEW checkpoint"
+grep -q '^SERVED_MODEL_NAME=deepseek-v4-flash-0731$' .env.dspark && echo PASS \
+  || echo "FAIL: SERVED_MODEL_NAME — compose DEFAULTS to deepseek-v4-flash-dspark; the Phase 4 gate and the Phase 6 deepseek route both expect deepseek-v4-flash-0731"
 grep -q '^VLLM_USE_B12X_MOE=1$'  .env.dspark && echo PASS || echo "FAIL: B12X off → ~29 tok/s silently"
 grep -q '^MTP_NUM_TOKENS=5$'     .env.dspark && echo PASS || echo "FAIL: leftover =3 costs ~24% decode"
 grep -Eq 'num_speculative_tokens.:\s*[1-5]\b' docker-compose.dspark.yml && echo PASS \
@@ -271,7 +282,9 @@ grep -qE '^GLOO_SOCKET_IFNAME=' .env.dspark && grep -qE '^TP_SOCKET_IFNAME=' .en
 ```bash
 # Node B first: ./start-deepseek-v4-flash-dspark.sh worker   → then Node A: ... head
 # Cold start ~6-8 min. Then, on the head:
-curl -s localhost:8888/v1/models | grep -q DeepSeek-V4-Flash-0731 && echo PASS || exit 1
+curl -s localhost:8888/v1/models | grep -q DeepSeek-V4-Flash-0731 && echo PASS || exit 1   # weights (root field)
+curl -s localhost:8888/v1/models | grep -Eq '"id":\s*"deepseek-v4-flash-0731"' && echo PASS \
+  || { echo "FAIL: served id ≠ deepseek-v4-flash-0731 (SERVED_MODEL_NAME override not applied) — the Phase 6 deepseek route would 404"; exit 1; }
 docker logs dspark-head 2>&1 | grep -q "B12X" && echo "PASS: B12X MoE backend active" || echo FAIL
 # THE load-bearing assertion — the draft loader must NOT have dropped shared-expert tensors:
 docker logs dspark-head 2>&1 | grep "Skipping unknown DSpark weight" | grep -c "shared_experts" \
@@ -329,9 +342,28 @@ curl -s localhost:8888/metrics | grep spec_decode   # assert mean acceptance ≥
 
 ---
 
-## Phase 6: Front door (optional lane) — `deepseek` alias, no-cloud guard re-proven
+## Phase 6: Front door (optional lane) — bare `deepseek` = THIS seat · `deepseek-fp8` = the fallback lane · no-cloud guard re-proven
 
-Add to the LiteLLM `:4000` config: `model_name: deepseek` → `openai/deepseek-v4-flash-0731`, `api_base: http://<NODE_A>:8888/v1`. Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
+**Naming contract (2026-08-08):** agents choose lanes by NAME, never by port. The bare `deepseek` alias always names the pinned PRIMARY seat — this runbook's 0731 DSpark lane on `:8888` — and lane-suffixed aliases name alternates (`deepseek-fp8` = the eugr FP8 fallback on `:8080`, renamed from the two-spark runbook's original `deepseek` row the same day). The two seats can never be up together (seat XOR seat — each drains both nodes), so this is selection-by-name, not load balancing: the lane that's running answers, and a call to the down lane fails loudly (`fallbacks: []` — nothing silently re-routes, DF-001).
+
+The canonical rows live in [`examples/litellm-config.public.yaml`](./examples/litellm-config.public.yaml) (mirrored byte-for-byte in the dashboard twin; the deployed `/opt/litellm/config.yaml` follows its own header's mirror invariant — on the personal-alias box adapt the fleet rows, keep the deepseek rows verbatim). Deploy the row pair from there, restart the `litellm` user unit, then assert — do not eyeball:
+
+```bash
+CFG=/opt/litellm/config.yaml
+# Exactly ONE bare `deepseek` row — same-named rows form a LiteLLM load-balance group that
+# round-robins real traffic into the DOWN lane (and fallbacks are empty by design):
+[ "$(grep -cE '^\s*-\s*model_name:\s*deepseek\s*$' "$CFG")" = 1 ] && echo PASS || echo "FAIL: bare-deepseek row count ≠ 1"
+# The bare alias routes to THIS seat (served id + head port — both pinned):
+grep -q 'model: openai/deepseek-v4-flash-0731' "$CFG" && echo PASS || echo "FAIL: deepseek upstream id"
+grep -q 'api_base: http://localhost:8888/v1'   "$CFG" && echo PASS || echo "FAIL: deepseek api_base :8888"
+# The fallback lane stays addressable by name (renamed, never deleted):
+grep -qE '^\s*-\s*model_name:\s*deepseek-fp8\s*$' "$CFG" && echo PASS || echo "FAIL: deepseek-fp8 row missing"
+# Live listing shows BOTH names (dashboard box: any virtual key works for /v1/models):
+curl -s localhost:4000/v1/models -H "Authorization: Bearer $LITELLM_KEY" | grep -o '"deepseek[^"]*"' | sort -u
+#   expect: "deepseek" and "deepseek-fp8"
+```
+
+Then **re-run the two-spark runbook's Phase 7 anchored no-cloud greps verbatim** (`fallbacks: []`, `context_window_fallbacks: []`, no cloud model in any chain after comment-stripping). A new alias is exactly when that gate earns its keep (DF-001).
 
 The coding-harness demo workspace for this endpoint lives at [`demo/orbit-globe/`](./demo/orbit-globe/) — harness wiring (pi primary, opencode backup), AGENTS.md + skills environment, and the task brief. It presumes Phase 5.6 green.
 
@@ -354,12 +386,12 @@ The 0731 checkpoint has <48 h of public field time; the recipe's 40-min soak was
 | 1.5 | Drain | `/running` empty both, ≥110 GB avail | |
 | 2 | Image + Patch 4 staged | version-matched diff | |
 | 3 | Config traps | all anchored greps PASS | |
-| 4 | Launch | B12X active, **zero dropped shared_experts**, /v1/models 200 | |
+| 4 | Launch | B12X active, **zero dropped shared_experts**, /v1/models 200, served id `deepseek-v4-flash-0731` | |
 | 5.2 | Acceptance | ≥ 0.50 | |
 | 5.3 | Decode | ≥ 45 tok/s structured, stream:false | |
 | 5.4 | Prefill | ≥ 1,000 tok/s @8k | |
 | 5.6 | Tool calls (spec decode ON) | 5/5 parsed `tool_calls`, zero DSML leaks | |
-| 6 | No-cloud guard | anchored greps PASS | |
+| 6 | Front door | bare-`deepseek` row ==1 → :8888 · `deepseek-fp8` present · no-cloud greps PASS | |
 | 7 | Mini-soak | 0 errors, 0 empty, mem stable | |
 | 9 | **Fleet revived** | preload ready both, probes answer | |
 
@@ -404,6 +436,8 @@ curl -s localhost:9000/running    # assert the preload set is state=ready on eac
 | vLLM-from-source path (only if ever leaving the recipe image) | PR #41834 still unmerged; preview tag `sm120-pr-41834-stable-preview-20260804` = first head validated on SM121 | leave `VLLM_DEEPSEEK_V4_EAGER_SCRATCH_POOL` unset — the eager scratch pool had a cross-layer reuse race corrupting output under concurrency (default OFF since 08-04) |
 | GB10 UMA accounting: available KV capacity varies 4.22–5.34 GiB across boots (vLLM #48140) | open | clean reboot before the demo session; record the boot's KV line in RESULTS |
 | Concurrent-agent fairness: `--max-num-batched-tokens 8192` starves decode under concurrent prefill | single-source (t/378890, published harness) | OPTIONAL: 2048 for multi-agent sessions (p95 gap 6.1s→1.6s); not for the single-stream demo |
+| Compose default served id is `deepseek-v4-flash-dspark` ≠ the front-door route target | recipe default (discovered 2026-08-08) | Phase 3 `SERVED_MODEL_NAME` grep + Phase 4 served-id gate |
+| Two LiteLLM rows sharing `model_name: deepseek` → load-balance group round-robins into the down lane | design trap (base runbook's row renamed `deepseek-fp8` 2026-08-08; examples are canonical) | Phase 6 row-count grep |
 
 ## Appendix B — Rollback + RESULTS template
 

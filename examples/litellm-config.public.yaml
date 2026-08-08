@@ -63,11 +63,25 @@ model_list:
       model: openai/gpt-oss-120b       # on-demand "big-brain" Player (evicts the fleet)
       api_base: http://localhost:9000/v1
       api_key: "none"
+  # ---------------------------------------------------------------------------
+  # DeepSeek seats (cross-node TP=2, on-demand, pool XOR DeepSeek — and seat XOR
+  # seat: the two lanes can never be up together). NAMING CONTRACT (2026-08-08):
+  # the bare `deepseek` alias ALWAYS names the pinned PRIMARY seat; alternates
+  # carry a lane suffix. Agents choose by NAME, never by port; a call to the
+  # down lane fails loudly (fallbacks are empty — DF-001; nothing re-routes).
+  # NEVER give two rows the same model_name: LiteLLM treats same-named rows as
+  # ONE load-balance group and round-robins traffic into the dead endpoint.
+  # ---------------------------------------------------------------------------
   - model_name: deepseek
     litellm_params:
-      model: openai/deepseek-ai/DeepSeek-V4-Flash  # cross-node TP=2 vLLM seat (RUNBOOK-two-spark-bring-up Phase 8; on-demand, pool XOR DeepSeek)
-      api_base: http://localhost:8080/v1
-      api_key: "none"
+      model: openai/deepseek-v4-flash-0731  # PRIMARY: 0731 DSpark seat, head = Node A :8888 (RUNBOOK-deepseek-v4-flash-0731
+      api_base: http://localhost:8888/v1    #   Phase 6). The id after openai/ MUST equal the served id — that runbook pins
+      api_key: "none"                       #   SERVED_MODEL_NAME=deepseek-v4-flash-0731 (the compose default is …-dspark).
+  - model_name: deepseek-fp8
+    litellm_params:
+      model: openai/deepseek-ai/DeepSeek-V4-Flash  # FALLBACK lane: eugr FP8 TP=2 (RUNBOOK-two-spark-bring-up Phase 8; renamed
+      api_base: http://localhost:8080/v1           #   from `deepseek` 2026-08-08). The full HF repo id is what that lane
+      api_key: "none"                              #   serves — a bare "deepseek-v4-flash" 404s upstream.
 
   # ---------------------------------------------------------------------------
   # claude-* wildcard -> local workhorse. Anthropic/OpenAI SDK clients (Claude

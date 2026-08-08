@@ -290,15 +290,19 @@ model_list:
     litellm_params: { model: openai/workhorse, api_base: http://localhost:9000/v1, api_key: "none" }
   - model_name: embed            # Qwen3-Embedding-0.6B, 1024-dim (matches the single-Spark public config)
     litellm_params: { model: openai/embed, api_base: http://localhost:9000/v1, api_key: "none" }
-  - model_name: deepseek         # cross-node TP=2, brought up on demand (Phase 8)
+  - model_name: deepseek-fp8     # cross-node TP=2 FP8 lane, brought up on demand (Phase 8)
     litellm_params: { model: openai/deepseek-ai/DeepSeek-V4-Flash, api_base: http://localhost:8080/v1, api_key: "none" }
     # ^ the segment after openai/ must be the id vLLM actually SERVES — the full HF repo id
     #   (assert via :8080/v1/models once the seat is up); a bare "deepseek-v4-flash" 404s upstream
+    # NAMING (2026-08-08): renamed from `deepseek` -> `deepseek-fp8`. The BARE `deepseek` alias names
+    # the pinned PRIMARY seat and is owned by the 0731 overlay (RUNBOOK-deepseek-v4-flash-0731 Phase 6
+    # -> :8888) — never re-create a bare `deepseek` row here: two rows sharing one model_name form a
+    # LiteLLM load-balance group that round-robins traffic into the down lane.
 router_settings:
   fallbacks: []                  # NO local->cloud fallback (DF-001)
   context_window_fallbacks: []   # also empty — LiteLLM's documented example escalates to claude-opus on overflow (the exact unattended-spend footgun)
 ```
-> **If Node A runs a personal / non-public fleet** (different aliases than the public `workhorse`/`coach`/`chat`/`embed` — e.g. the reference box serves `qwen36-workhorse`, `coach-ft-v3`, `embed`, …), **adapt this `model_list` to Node A's actual `:9000` aliases** before deploying. Each row is `model_name:` (the name your *agents* call, left side) → `model: openai/<llama-swap-alias>` (what it routes to on Node A, right side); `api_base` stays the llama-swap proxy port `:9000`. So map `workhorse` → `openai/qwen36-workhorse`, add a `coach` → `openai/coach-ft-v3` row, etc. `embed` usually matches as-is. Confirm Node A's aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`. The `deepseek` row is unchanged.
+> **If Node A runs a personal / non-public fleet** (different aliases than the public `workhorse`/`coach`/`chat`/`embed` — e.g. the reference box serves `qwen36-workhorse`, `coach-ft-v3`, `embed`, …), **adapt this `model_list` to Node A's actual `:9000` aliases** before deploying. Each row is `model_name:` (the name your *agents* call, left side) → `model: openai/<llama-swap-alias>` (what it routes to on Node A, right side); `api_base` stays the llama-swap proxy port `:9000`. So map `workhorse` → `openai/qwen36-workhorse`, add a `coach` → `openai/coach-ft-v3` row, etc. `embed` usually matches as-is. Confirm Node A's aliases with `curl -s localhost:9000/v1/models | jq -r '.data[].id'`. The `deepseek-fp8` row is unchanged.
 
 **▶ GATE — no cloud fallback (DF-001):** the robust invariant is *no cloud model is named anywhere in this config, fallback or otherwise*. Frontier planning happens on a Claude **subscription** (Claude Code / claude.ai), never through the front door — LiteLLM's anthropic backend is API-key per-token billing only, which this estate does not use. (An earlier revision carried a named `claude-opus` "DF-003 attended" row here; removed 2026-08-07 — subscription auth cannot be routed through LiteLLM, so the row was unusable by design.)
 ```bash
@@ -344,7 +348,7 @@ echo "$RESP" | jq -e '.choices[0].message.content' >/dev/null \
   || { echo "GATE FAIL: no local completion via :4000 — check LiteLLM + the llama-swap :9000 backend. STOP."; echo "$RESP" | head -c 400; }
 ```
 
-**Install + run it (agent steps — not a pre-install):** the agent runs `pip install --user --break-system-packages 'litellm[proxy]'` (latest; validated baseline 1.89.4 on GB10 — floated not frozen, CONVENTIONS §3), writes the config above to `/opt/litellm/config.yaml` (heredoc), then runs it as a **CPU-pinned user systemd unit** — the same unit as the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 3 (`CPUAffinity=0-3`, llama-swap drop-in `4-19`), which is where the single-node LiteLLM front door (DECISION-DF-005, the precursor to this decision) is specified. Direct ad-hoc start for a quick test: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0`.
+**Install + run it (agent steps — not a pre-install):** the agent runs `pip install --user --break-system-packages 'litellm[proxy]'` (latest; validated baseline 1.89.4 on GB10 — floated not frozen, CONVENTIONS §3), then deploys **`examples/litellm-config.public.yaml` — the canonical model_list; the block above is an excerpt, not the source** — to `/opt/litellm/config.yaml` (adapt fleet aliases per the personal-fleet note; on a box running the dashboard overlay, edit the examples pair and mirror per the deployed file's header instead of overwriting — a blind heredoc here would clobber rows owned by later overlays, e.g. the 0731 runbook's bare `deepseek` row). Then run it as a **CPU-pinned user systemd unit** — the same unit as the single-Spark front-door overlay [`RUNBOOK-litellm-front-door.md`](./RUNBOOK-litellm-front-door.md) Phase 3 (`CPUAffinity=0-3`, llama-swap drop-in `4-19`), which is where the single-node LiteLLM front door (DECISION-DF-005, the precursor to this decision) is specified. Direct ad-hoc start for a quick test: `litellm --config /opt/litellm/config.yaml --port 4000 --host 0.0.0.0`.
 
 ---
 
