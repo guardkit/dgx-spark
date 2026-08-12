@@ -156,6 +156,12 @@ sudo apt-mark hold mlnx-fw-updater 2>/dev/null || true   # pin; no auto-flash
 
 ## Phase 3: Cable + link-up &nbsp;·&nbsp; **▶ GATE: `ibdev2netdev` shows `(Up)`**
 
+**▶ WHERE NVIDIA SYNC FITS (asked every time — answer it before it's asked).** NVIDIA's [Sync "Cluster Assistant"](https://docs.nvidia.com/sync/latest/cluster-assistant.html) ([2:43 walkthrough](https://www.youtube.com/watch?v=MehBUQtb9qM)) is a laptop GUI (Win/Mac/Ubuntu) that discovers GB10 boxes (mDNS locally, explicit IP over VPN), verifies they are *physically* connected, **creates a ConnectX-7 network if none exists**, benchmarks bandwidth + latency against expected limits (warning if under), and configures **device-to-device SSH on the CX-7 network** — distinct from the laptop→device keys. That is this phase's IP plumbing **plus all of Phase 5**, automated. It is **not** a substitute for this runbook: NVIDIA draws the boundary themselves — *"NVIDIA Sync doesn't yet set up such workloads"* — and it touches none of Phase 2 (firmware/brick guard), none of Phase 4's **second** signal (`NET/IB` vs a silent TCP fallback — Sync runs no NCCL), none of Phase 6 (power-off clamp), and none of Phases 7–9. Against this runbook's 12 first-run findings it would have **detected 2 and fixed 0** ([RESULTS](./RESULTS-two-spark-bring-up-2026-08-06.md)).
+
+- **Using Sync in place of the manual netplan below is fine on a fresh pairing** — it does not exempt you from the three details this phase owns, each of which cost measured bandwidth or a hard NCCL failure on the first run: **MTU 9000 on BOTH PCIe paths**, the **NM-zeroconf GID guard**, and the **hotplug power-cap guard**. Run Sync, then run this phase's asserts *on top*. Phase 4's two-signal gate is unchanged either way — a green Sync bandwidth check is not a busbw + `NET/IB` pass.
+- **⚠️ On an already-working pair, don't.** "Creates a network" is unspecified — it may rewrite `40-cx7.yaml` / NM state and re-trigger the zeroconf guard below. Sync's place is a *fresh* pairing, or a read-only second opinion.
+- **Untested on this estate:** whether Sync discovers **OEM** GB10 boxes — Node A is a Dell Pro Max GB10, not a DGX Spark. The docs say "DGX Spark"; the walkthrough says "GB10 devices". Assume nothing until it's run.
+
 **✋ OPERATOR STEP (conventions §2.3):** connect the single QSFP cable to the **same-position** QSFP port on each unit (a Phase-8 harness requirement — see below) — the agent prompts, then polls `ibdev2netdev` / mlx5 module events and continues into the gate below. No cable yet is a *pending input*, not a FAIL — wait for the operator. **Zero `Cable plugged` module events after insertion = not seated** (upside-down or short of the click — observed 2026-08-06; the event fires instantly on a good seat): prompt a firm reseat, don't diagnose the NIC.
 
 ```bash
@@ -258,7 +264,9 @@ If `ib_write_bw` is healthy but NCCL fails → **NCCL config** (TCP fallback / i
 ## Phase 5: Mesh / passwordless SSH &nbsp;·&nbsp; **▶ GATE: SSH round-trip both directions**
 
 ```bash
-# discover-sparks (playbook) generates a shared ed25519 key, or use NVIDIA Sync "Cluster Assistant".
+# discover-sparks (playbook) generates a shared ed25519 key. NVIDIA Sync's "Cluster Assistant" does
+# THIS PHASE IN FULL (device-to-device keys on the CX-7 network) — see the Sync note in Phase 3 for
+# what it does NOT do. Either way the gate is the same: assert the round trip, never trust the tool.
 ssh ${N2} hostname && ssh -o BatchMode=yes ${N2} 'ssh -o BatchMode=yes '"${N1}"' hostname' \
   && echo "GATE PASS: passwordless SSH both ways" || echo "GATE FAIL: fix keys. STOP."
 ```
