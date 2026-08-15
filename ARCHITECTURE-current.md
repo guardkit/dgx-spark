@@ -119,6 +119,7 @@ The keep-alive timer (`llama-swap-keepalive.timer`, 5-min cadence) probes these 
 5. **Drop qwen-coder-next** (2026-05-30, §9.9): Forum AgentBench shows workhorse-class beats coder-next on agent tasks (59.3% vs 46.0%); coder-next's ~92 GB resident footprint blocked Graphiti during every autobuild run. Launch script + HF cache preserved for zero-download restoration if needed.
 6. **`tutor` and `lpa` matrix sets are mutually exclusive with the family** (2026-05-30, §9.9, §9.11): Long sessions of either require pausing the keep-alive timer.
 7. **Gemma 4 26B-A4B is not viable as Graphiti backend** (2026-05-30, §9.8): Thinking-mode markers leak into `json_object` calls; hallucinated dedup indices. Added to the eliminated list in `docs/reference/graphiti-llm-selection.md`.
+8. **DECISION-DF-031** (2026-08-15, PROPOSED, `ai-transition/docs/decisions/`): Stage-three task-aware routing is two routers split by attendance — the attended harness router (DF-003, subscription escalation outside the front door) and the unattended Jarvis router (DF-001, local fleet only via `:4000`), sharing sticky-per-task under the matrix-set constraint.
 
 ---
 
