@@ -193,7 +193,7 @@ The reusable core: GB10 traps we've hit (ours + the community's), each with the 
 | Gotcha | Why it bites | Gate (assertion) | Source |
 |---|---|---|---|
 | `mmap` on unified memory | Severe slowdown on GB10 | every `llama-server` cmd contains `--no-mmap` | setup §5 |
-| f16 KV cache | Quality degradation on Qwen3.x / SM121 | KV type is `q8_0` (`--cache-type-k/v q8_0`) | setup §5 |
+| f16 KV cache | Memory: f16 KV is 2× the q8_0 footprint at large ctx (small on hybrid DeltaNet models — e.g. Qwen3.6-35B-A3B has KV on 10 of 40 layers: 2.5 GiB f16 vs 1.3 GiB q8_0 at 131K). No quality receipt: upstream measures q8_0 K/V as near-lossless vs f16 (f16 is the quality reference); the 2026-04-21 "quality degradation on Qwen3.x / SM121" wording was unsourced and is retired 2026-08-18. | KV type is `q8_0` (`--cache-type-k/v q8_0`) on large-ctx models, stated EXPLICITLY (the gate checks presence, not absence of f16) | setup §5 |
 | `-np` splits ctx across slots | per-slot ctx = ctx/np; large chunks 400 | `ctx_size / np ≥ expected_max_chunk_tokens` | findings §9.1, v3 §5.2 |
 | 121 GB memory ceiling | Freeze observed at 114 GB / 7 GB free | projected `resident + KV < MEM_CEILING_GB (115)` before load; gate on **total** unified mem (`free`), not just compute-apps | findings §9.4 |
 | `pkill -f llama-server` | Matches the running script → self-kill | use `pkill -x llama-server` | v3 §4.2 |

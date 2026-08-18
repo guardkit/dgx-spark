@@ -264,7 +264,7 @@ It ships three always-on open models (`workhorse` · `coach` · `embed`) plus on
 - `matrix.sets` declaring the fleet coexists — without it, llama-swap evicts on every cross-model request → load→kill→load thrash.
 - **Coexistence-set membership (the subtle one):** a model an always-on *service* depends on (e.g. the fleet-memory relay's RAG `embed`) must be a member of **every** coexistence set that runs concurrently with that service — not just `all`. If only `all` lists it, any *other* set requested by a different live service (a vision set, a tutor set) evicts it on a cross-set request, and the service eats an 85–181s cold-start on its next call. A *deliberately* exclusive set (the `big`/120B Player, which you pause for) may still evict it — that's fine. The public config has only `all` + the exclusive `big`, so nothing routine evicts `embed`; richer personal configs with several routine sets must replicate the dependency into each (FEAT-HARV; `TASK-LLSWAP-EMRESIDENT01`).
 - `hooks.on_startup.preload` for the three always-on — deterministic cold-start.
-- Every `cmd`: `--no-mmap`, `--jinja`, `-ngl 999`; `--cache-type-k/v q8_0` on the large-ctx models (workhorse/coach). f16 KV degrades on SM121 / blows the ceiling at large ctx.
+- Every `cmd`: `--no-mmap`, `--jinja`, `-ngl 999`; `--cache-type-k/v q8_0` on the large-ctx models (workhorse/coach) — a memory pin (f16 KV is 2× the footprint at large ctx; no quality receipt either way, see CONVENTIONS §8). llama-server defaults to f16 when the flag is ABSENT, so the gate must assert the flag is PRESENT on those models, not merely that `f16` is not spelled out.
 
 **Adjust before starting:** the `--model` paths to where you staged the GGUFs (Phase 1.3) and the binary path (`/usr/local/bin/llama-server`, or the build tree per Phase 2.1).
 
@@ -274,7 +274,9 @@ It ships three always-on open models (`workhorse` · `coach` · `embed`) plus on
 CFG=/opt/llama-swap/config/config.yaml
 grep -q 'matrix:' "$CFG"            && echo "GATE PASS: matrix coexistence block present" || echo "GATE FAIL: no matrix block — eviction thrash. STOP."
 grep -q 'healthCheckTimeout: 600' "$CFG" && echo "GATE PASS: cold-load timeout" || echo "GATE FAIL: raise healthCheckTimeout to ≥600."
-! grep -qE -- '--cache-type-[kv][ =]f16' "$CFG" && echo "GATE PASS: no explicit f16 KV" || echo "GATE FAIL: f16 KV present."
+# KV gate (2026-08-18): assert the q8_0 flags are PRESENT on the large-ctx models (llama-server defaults to f16 when absent).
+# KV_GATE_MODELS = the served ids in YOUR config (public example: workhorse coach; a live box may use e.g. qwen36-workhorse coach-ft-v4).
+for m in ${KV_GATE_MODELS:-workhorse coach}; do awk -v m="$m" '$0 ~ "^  \042"m"\042:" {f=1} f && /cache-type-k q8_0/ {k=1} f && /cache-type-v q8_0/ {v=1} f && /^  \042/ && $0 !~ m {exit} END {exit !(k&&v)}' "$CFG" && echo "GATE PASS: $m has q8_0 K+V" || echo "GATE FAIL: $m lacks explicit --cache-type-k/v q8_0 (llama-server default = f16)"; done
 grep -cq -- '--no-mmap' "$CFG" && echo "GATE PASS: --no-mmap present" || echo "GATE FAIL: add --no-mmap."
 # The config cmds invoke /usr/local/bin/llama-server — confirm it exists (Phase 2.1 copied it there) or every model fails healthcheck at start:
 test -x /usr/local/bin/llama-server && echo "GATE PASS: server binary present" || echo "GATE FAIL: /usr/local/bin/llama-server missing — run Phase 2.1's copy step (or point the config cmds at the build tree). STOP."

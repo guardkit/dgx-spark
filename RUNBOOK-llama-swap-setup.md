@@ -268,7 +268,7 @@ hooks:
 | Decision | Reason |
 |---|---|
 | `--no-mmap` everywhere | DGX Spark unified memory: mmap causes severe slowdowns (confirmed in NVIDIA forum guide) |
-| `--cache-type-k/v q8_0` | f16 KV cache on Qwen3.5 family causes quality degradation; q8_0 is the recommended setting for SM121 |
+| `--cache-type-k/v q8_0` | Halves the KV footprint at large ctx with a near-lossless quality delta (upstream: <0.1% perplexity, ≤4/500 answers changed; V is the more sensitive of the two; V quantisation requires `--flash-attn on`). NOT a quality fix: f16 is the quality reference and no SM121-specific f16 defect is on record — the earlier "causes quality degradation" wording (2026-04-21, unsourced) is retired 2026-08-18. On hybrid Gated-DeltaNet models (Qwen3.5/3.6 MoE) only the full-attention layers hold KV, so the saving is ~1.2 GiB at 131K on the 35B-A3B. |
 | `--reasoning off` on Coder-Next | Coder-Next doesn't produce thinking blocks anyway, but explicit suppression avoids the llama.cpp Issue #20090 thinking-block-drop bug |
 | `--jinja` flag everywhere | Required for tool use (Claude Agent SDK sends `tool_use`/`tool_result` blocks) |
 | Claude model aliases on Coder-Next | Claude Agent SDK sometimes requests by default model name; aliases catch those without requiring SDK-side config |
