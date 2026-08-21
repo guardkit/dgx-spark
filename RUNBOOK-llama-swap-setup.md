@@ -263,6 +263,43 @@ hooks:
       - "qwen-coder-next"
 ```
 
+### TTL policy — pin deliberately, and keep the list short
+
+`ttl: 0` means **never idle-unload**. It is the right setting for a small always-on family (the
+seats a serving box must answer instantly with) and the wrong setting for everything else. It has
+one failure mode, and it is silent:
+
+> Any model with `ttl: 0` that is *ever touched* stays resident for the lifetime of the process.
+> Add tunes over time — each copying its neighbour's stanza — and the never-unload set grows until
+> the sum of those weights exceeds the box. Nothing errors. The symptom is that requests start
+> paying an eviction/reload cycle, and any other work on the box (a fine-tune, an export) is
+> squeezed or OOM-killed.
+
+Measured on a production GB10 (121 GiB), 2026-08-21: **15 of 24 entries carried `ttl: 0`, totalling
+~203 GiB of weights.** The config's history shows how it got there — 4 of 4 entries in May (when
+those were four small models and pinning was harmless), briefly 4 of 10 in June, then 8 of 15, 12 of
+18, and 15 of 24 as each new tune inherited `ttl: 0` from the entry above it. No single step was
+wrong; the aggregate was.
+
+**The policy that avoids it:**
+
+| tier | ttl | which models |
+|---|---|---|
+| always-on | `0` | only seats that must never cold-start, and only if their combined weights are a small fraction of RAM. Keep this list to two or three. |
+| hot | `1800` | the seats in daily use; 30 min idle, then unload. A 26 B Q4/Q8 reloads in ~30 s. |
+| registered | `600` | superseded tunes, probes and base variants — kept in the config for rollback, but never pinning RAM. |
+| docker-backed | leave as found | llama-swap stops the **container** on unload. If the unit is `Restart=no`, a shorter TTL takes the service down permanently. These hold no llama.cpp weights, so there is nothing to reclaim. |
+
+**Two couplings to respect when you change this:**
+
+1. `hooks.on_startup.preload` **must equal the keepalive allowlist** in
+   `llama-swap-keepalive.sh` (`MODEL_PROBE_KIND`). Editing the config alone is undone within five
+   minutes — the keepalive revives the models the preload no longer loads.
+2. If the box is *also* used for training, the always-on list is what a training window has to work
+   around. A 26 B LoRA at ~17 k sequence needs essentially the whole of a 121 GiB box, so a single
+   9 GiB always-on seat is the difference between a run completing and being killed. Prefer a short
+   preload and let seats load on demand.
+
 ### Key decisions baked into this config
 
 | Decision | Reason |

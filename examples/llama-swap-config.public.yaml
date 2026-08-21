@@ -86,6 +86,9 @@ models:
       --top-p 0.95
       -np 1
     checkEndpoint: /health
+    # ttl: 0 = NEVER idle-unload. Correct ONLY for a short, deliberate always-on list —
+    # here the three seats a serving box must answer instantly with. It is NOT a default to
+    # copy onto new entries: see "TTL policy" in RUNBOOK-llama-swap-setup.md.
     ttl: 0
     concurrencyLimit: 2
     aliases:
@@ -127,6 +130,9 @@ models:
       --top-p 0.9
       -np 1
     checkEndpoint: /health
+    # ttl: 0 = NEVER idle-unload. Correct ONLY for a short, deliberate always-on list —
+    # here the three seats a serving box must answer instantly with. It is NOT a default to
+    # copy onto new entries: see "TTL policy" in RUNBOOK-llama-swap-setup.md.
     ttl: 0
     concurrencyLimit: 2
     aliases:
@@ -178,6 +184,9 @@ models:
       --no-mmap
       -np 4
     checkEndpoint: /health
+    # ttl: 0 = NEVER idle-unload. Correct ONLY for a short, deliberate always-on list —
+    # here the three seats a serving box must answer instantly with. It is NOT a default to
+    # copy onto new entries: see "TTL policy" in RUNBOOK-llama-swap-setup.md.
     ttl: 0
     concurrencyLimit: 8
     aliases:
