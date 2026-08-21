@@ -300,6 +300,34 @@ wrong; the aggregate was.
    9 GiB always-on seat is the difference between a run completing and being killed. Prefer a short
    preload and let seats load on demand.
 
+A second box, same week, same drift: a DGX Spark (121 GiB) serving study-tutor carried **8 of 12
+entries at `ttl: 0`, the llama.cpp ones totalling ~84.5 GiB**. Two of them were in daily use, so this
+was live exposure rather than theory — that box could have filled with no recovery but a restart,
+while students were on it.
+
+**`ttl` and `preload` are not in conflict.** A seat can be in `hooks.on_startup.preload` *and* carry a
+non-zero `ttl`: it loads at startup so the first user of the day pays nothing, and it is released once
+the box has been idle for the TTL. That combination is usually what a serving box actually wants. The
+cost is explicit and worth stating to whoever owns the service: **the first request after an idle gap
+longer than the TTL pays a cold load.** Size the TTL to the session shape, not to the model.
+
+### Applying a TTL change safely
+
+Both facts below were measured on llama-swap v219 while making exactly this change, 2026-08-21.
+
+1. **There is no per-model unload.** `/unload?model=<name>` returns `200` and unloads the *entire*
+   fleet — the parameter is ignored. Assume any unload is a whole-fleet bounce, and do not reach for
+   it to "just free one seat".
+2. **Do not kill the process to restore posture.** Check first: `systemctl status llama-swap`. On a
+   box where llama-swap runs as a bare unsupervised process (`/usr/local/bin/llama-swap -config ...`
+   with no unit), killing it takes the whole fleet down with nothing to bring it back. To replay
+   `hooks.on_startup.preload` in its configured order, rewrite the config file with identical bytes
+   (`cp config.yaml /tmp/x && cp /tmp/x config.yaml`); `-watch-config` treats it as a change and
+   reloads. Measured: a five-seat posture, docker-backed audio containers included, restored in 70 s.
+3. **Classify docker-backed entries by the launch command, not by a substring.** Testing whether the
+   stanza *contains* "docker" matched a comment and left a 15.8 GiB llama.cpp seat pinned at `ttl: 0`
+   — the one seat the change existed to release. Parse the `cmd:` line.
+
 ### Key decisions baked into this config
 
 | Decision | Reason |
