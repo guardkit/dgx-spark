@@ -54,6 +54,25 @@ DISK_FLOOR_GB           15
 ```bash
 curl -s -o /dev/null -w "model repo reachable: HTTP %{http_code}\n" https://huggingface.co/api/models/ibm-granite/granite-vision-4.1-4b || echo "recon: skipped (source unreachable)"
 docker manifest inspect vllm/vllm-openai:v0.22.0-aarch64-cu129-ubuntu2404 >/dev/null 2>&1 && echo "image tag: still published" || echo "recon: image tag not confirmable (offline or auth) — proceed on the local/pinned copy"
+
+# PUBLISHED IS NOT MAINTAINED. `manifest inspect` proves a tag EXISTS, not that anyone is still
+# building it — vllm/vllm-openai:cu130-nightly stayed resolvable, and this check stayed green, for
+# the four months after it was abandoned (last built 2026-04-23; a `nightly` tag that had stopped
+# being nightly). So report when the pin was last BUILT, and compare it against the newest release
+# on the same aarch64/cu129 line — conventions §4(a), pinned vs latest, no LLM judgment.
+HUB=https://hub.docker.com/v2/repositories/vllm/vllm-openai
+PINNED_TAG=v0.22.0-aarch64-cu129-ubuntu2404; PINNED_VER=v0.22.0
+PUSHED=$(curl -s "$HUB/tags/$PINNED_TAG" | jq -r '.last_updated // empty' | cut -c1-10)
+[ -n "$PUSHED" ] && echo "image tag $PINNED_TAG: last built $PUSHED"
+LATEST_VER=$(curl -s "$HUB/tags?page_size=100&name=aarch64-cu129&ordering=last_updated" \
+  | jq -r '[.results[].name | capture("^(?<v>v[0-9]+\\.[0-9]+\\.[0-9]+)-aarch64-cu129").v] | first // empty')
+if   [ -z "$LATEST_VER" ];              then echo "recon: latest-release lookup unavailable — proceed on PINS"
+elif [ "$LATEST_VER" = "$PINNED_VER" ]; then echo "vLLM image: pinned == latest ($PINNED_VER)"
+else echo "DRIFT: vLLM image pinned $PINNED_VER, latest $LATEST_VER"; fi
+
+# A ROLLING tag (nightly/latest) is a different question from a VERSION-PINNED one: for a rolling
+# tag an old build date means ABANDONED; for a version pin it is correct by design, and the only
+# question is whether to move the pin (drift → PR editing PINS, conventions §6 — never a runtime edit).
 ```
 
 Drift → `DRIFT-granite-vision-seat-<date>.md`. Never edit steps mid-run.
