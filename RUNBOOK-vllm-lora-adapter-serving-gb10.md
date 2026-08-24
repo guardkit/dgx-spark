@@ -68,7 +68,7 @@ PUSHED=$(curl -s "$HUB/tags/$PINNED_TAG" | jq -r '.last_updated // empty' | cut 
 [ -n "$PUSHED" ] && echo "image tag $PINNED_TAG: last built $PUSHED" \
                  || echo "recon: image tag not confirmable — proceed on the local copy"
 LATEST_VER=$(curl -s "$HUB/tags?page_size=100&name=aarch64-cu129&ordering=last_updated" \
-  | jq -r '[.results[].name | capture("^(?<v>v[0-9]+\.[0-9]+\.[0-9]+)-aarch64-cu129").v] | first // empty')
+  | jq -r '[.results[].name | capture("^(?<v>v[0-9]+\\.[0-9]+\\.[0-9]+)-aarch64-cu129").v] | first // empty')
 if   [ -z "$LATEST_VER" ];              then echo "recon: latest-release lookup unavailable — proceed on PINS"
 elif [ "$LATEST_VER" = "$PINNED_VER" ]; then echo "vLLM image: pinned == latest ($PINNED_VER)"
 else echo "DRIFT: vLLM image pinned $PINNED_VER, latest $LATEST_VER"; fi
