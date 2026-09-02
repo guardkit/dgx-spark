@@ -119,8 +119,7 @@ product-owner v6 export used; it does not change the merged weights). It ran 897
 tensors checked, 0 identical to the base, 12 merged
 (`~/fine-tuning/output/coach-gemma4-26b-moe-v4/merged-16bit/merge-applied-check.json`), and the
 exhaustive check reports 265 modules checked, 265 merged, 0 identical and 0 unresolved
-(`.../vllm-control2-2026-09-02/coach-merge-exhaustive-check.json`). The result is 51,644,301,065
-bytes across two files (`s1-merge.json`).
+(`.../vllm-control2-2026-09-02/coach-merge-exhaustive-check.json`). The merged directory is ten files totalling 51,644,301,065 bytes, of which the two weight files are 51,612,009,916 (`s1-merge.json`).
 
 ---
 
