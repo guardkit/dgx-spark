@@ -149,7 +149,7 @@ Swept across whole layers rather than sampled experts (`converter-v2-verify.txt`
 difference is 4.4e-4 against a reconstruction of 1.2e-3, so the cosine of 0.278 is measuring rounding
 error. **The merge itself loses the tiniest per-expert differences**, so an expert whose trained
 change is that small cannot be verified this way at all; the check confirms the converter on every
-expert whose trained change is large enough to see. The magnitudes also agree: the reconstruction is
+expert whose trained change is large enough to see, bar two in layer 29 that have no receipt either way. The magnitudes also agree: the reconstruction is
 within about 3% of the merged difference on every expert with a meaningful change, which confirms the
 adapter's scaling factor is 1.0.
 
