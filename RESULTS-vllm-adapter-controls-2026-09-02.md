@@ -36,11 +36,11 @@ skipped them without a word — which is why fixing the arithmetic changed nothi
 why the corrected export gave byte-identical answers to the broken one. Turned to the questions the
 lane pre-registered: **the adapter path was measurably worse than the merged weights on the same
 engine, and for the coach it is no longer worse once the names are right** — the coach served from
-the renamed export scored 6 of 6 checks green, the same as its own merged weights, on every rep of
+the renamed export scored 6 of 6 runs green (15 of 15 checks), the same as its own merged weights, on every rep of
 both tasks (`s5-batchinvariant.json`), where the same numbers under the old names scored 0 of 6;
 the product-owner adapter has never been served with its expert half loaded, so its gap is still
 open. **The product owner's slip is not the adapter's fault at all**: the merged product-owner
-weights under the same vLLM image score 16 of 17, exactly as the adapter does, and the one check
+weights under the same vLLM image score 16 of 17 three times over, where the adapter's runs were 16, 11 and 17 (old export) and could-not-be-graded, 16, 16 (corrected packing), so the adapter is no worse than its merged weights on the runs that could be graded, and the one check
 they fail — a missing Integration section — appears only where today's prompt and vLLM meet
 (`s3-po-2x2.json`); the 17 of 17 it was being measured against was a single August run that does not
 reproduce — re-run today with the same prompt bytes on the switchboard seat (August used a hand-started server, see below), one of the three runs could not
@@ -137,7 +137,7 @@ The v1 converter took the "B" factor of each expert by striding through the pack
 compare each exported expert against the *merged* weights' own before-and-after difference — that is,
 against merged-minus-base, which is the ground truth for what the adapter should do. The attention
 projections calibrate the test, because they need no repacking at all and so show what a true match
-scores under the merged file's rounding: 0.8029 to 0.9385 on a cosine similarity scale
+scores under the merged file's rounding: 0.8029 to 0.9385 on a cosine similarity (a measure of how alike two sets of numbers are: 1.0 identical, 0 unrelated) scale
 (`converter-v2-verify.json`, `control_attention_q_proj_cos`). Against that, the v1 export scored
 **0.0378 and 0.0681** on the coach's layer 0 expert 0, with the best other expert at 0.002 — the
 right magnitude of noise everywhere. The v2 converter takes each expert's B factor contiguously
@@ -162,7 +162,7 @@ The v1 exports are kept untouched as evidence at `~/fine-tuning/output/<run>/lor
 
 Fixing the arithmetic changed nothing at the server. In S4, the corrected coach export produced the
 same grades, the same failing check and the same vague findings as the old one — and comparing the
-two runs' raw replies, **six of the eight bundles have exactly the same answer text in both**
+two runs' raw replies, **seven, six and seven of the eight bundles across the three reps have exactly the same answer text in both**
 (run directories `fleet-evals/runs/coach-heldout/coach-ft-v4-vllm-temp0-2026-09-02` and
 `.../coach-ft-v4-vllm-adapterv2-temp0-2026-09-02`, noted in `s5-batchinvariant.json`). State it
 plainly: **for four of the five adapters, the expert half of the adapter was never reaching the
@@ -210,8 +210,8 @@ every check in the frozen battery passes.
 
 | Configuration | Green | What its findings looked like | Files |
 |---|---|---|---|
-| Merged Q8_0 weights under llama.cpp, 25 July baseline | **6 of 6** | specific: `plan_audit.variances: tests/conftest.py injects a fake gateway…` | `fleet-evals/runs/coach-heldout/coach-ft-v4-2026-07-25/`; re-graded live on 2026-09-02 (`001: 2 passed, 2 deselected` ×3; `002: 3 passed, 3 deselected` ×3) |
-| Merged bf16 weights under vLLM, no adapter (S2) | **6 of 6** | specific, and byte-identical across all three reps | `fleet-evals/runs/coach-heldout/coach-ft-v4-merged-vllm-temp0-2026-09-02/`; `s2-merged-coach.json` |
+| Merged Q8_0 (the 8-bit quantised form the switchboard seat serves) weights under llama.cpp, 25 July baseline | **6 of 6** | specific: `plan_audit.variances: tests/conftest.py injects a fake gateway…` | `fleet-evals/runs/coach-heldout/coach-ft-v4-2026-07-25/`; re-graded live on 2026-09-02 (`001: 2 passed, 2 deselected` ×3; `002: 3 passed, 3 deselected` ×3) |
+| Merged bf16 (16-bit floating point, the precision the merged weights are stored in) weights under vLLM, no adapter (S2) | **6 of 6** | specific, and byte-identical across all three reps | `fleet-evals/runs/coach-heldout/coach-ft-v4-merged-vllm-temp0-2026-09-02/`; `s2-merged-coach.json` |
 | Old v1 adapter under vLLM, temperature 0 | 0 of 6 | bare field names: `bdd.pending[0]`, `plan_audit.variances[0].detail`, `independent_tests.stdout_tail`, `honesty.claims` | `fleet-evals/runs/coach-heldout/coach-ft-v4-vllm-temp0-2026-09-02/`; `~/fine-tuning/output/vllm-control-2026-09-02/control-B.json` |
 | Arithmetic-corrected v2 adapter under vLLM (S4) | 0 of 6 | the same bare field names | `fleet-evals/runs/coach-heldout/coach-ft-v4-vllm-adapterv2-temp0-2026-09-02/`; `s4-cache-slots.json` |
 | v2 adapter with deterministic kernels on (S5) | 0 of 6 | the same bare field names, now identical across reps | `fleet-evals/runs/coach-heldout/coach-ft-v4-vllm-batchinvariant-temp0-2026-09-02/`; `s5-batchinvariant.json` |
@@ -359,9 +359,7 @@ below) is what tells vLLM how much of the machine's memory to claim.
 | 0.70 | 4 (v2 exports) | 2 | 51.04 | 32.23 | 812,674 | 24.80× | **7** | `launch-s4ii.log`, `mem-s4ii-serve.txt` |
 | 0.70 | 5 (four v2 plus the renamed coach) | 5 | 54.89 | 18.32 | 461,984 | 14.10× | **19** | `launch-s5.log`, `mem-s5-serve.txt` |
 
-*Note on the S2 row:* the merged coach at the same 0.55 dial reported far less cache than the merged
-product-owner run at that dial. Both figures are the servers' own. No receipt explains the difference
-and it was not investigated; the S2 stage only needed the exam result.
+*Note on the S2 row, and on the cache budget itself:* the merged coach at the same 0.55 dial reported far less cache (7.22 GiB) than the merged product-owner run's 17.95 GiB, and the S3 cell A launch — the SAME merged product-owner weights, image, flags and dial as that 17.95 GiB run — reported 8.84 GiB, 223,034 tokens and 6.81 requests' worth (`launchA.log` in `vllm-control2-2026-09-02`, lines 60–63; also in `s3-po-2x2.json` under cell A). So the cache figure at a given dial is not a constant of the configuration on this box: vLLM sizes the cache from the memory it finds free when it profiles, and on unified memory that varies with what else is resident at that moment. Treat every cache figure here as one launch's reading, and read the dial's effect from launches made minutes apart under the same conditions (the 0.55-to-0.70 comparison with four adapters was).
 
 **How to read the memory column, and one correction to the S4 write-up.** Those "memory left" figures
 are the settled values, taken 70 to 90 seconds after the engine came up, not the trough during weight
