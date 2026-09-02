@@ -409,3 +409,12 @@ the model switchboard answers on port 9000 (HTTP 200, 29 model names listed);
 `forge-prod` is up and healthy; both specialist-agent containers are up; `vllm-multi` no longer
 exists; `free -g` shows 103 GB available. The forge build queue was read before and after and had
 nothing running, paused or queued (`estate-gate-s5.txt`).
+
+## Addendum 2, 2026-09-02 late evening — the adapter-path conclusions above are superseded
+
+The controls run later the same evening (`RESULTS-vllm-adapter-controls-2026-09-02.md`, beside this file) found two defects in series in the adapter path, both now fixed, and neither in vLLM's serving of the slots:
+
+1. **The export converter packed the expert adapters wrong** (one of the two adapter matrices sliced every 128th column instead of a contiguous block). Against the merged weights' own per-expert deltas the old export scored a cosine of 0.004 to 0.07; the corrected export scores 0.83 to 0.98 where the attention adapters, which need no repacking, calibrate a true match at 0.80 to 0.94.
+2. **The expert adapters were never applied.** vLLM v0.25.0 attaches per-expert adapter tensors by the expert layer's full module path, which for Gemma 4 contains a `moe` segment the exports lacked; it finds nothing and serves the attention adapters alone, without a message. That is why every adapter still "did something" (Q2 above), why the product-owner score barely moved, and why the coach could judge but not cite evidence.
+
+With both corrected, the coach adapter served over this process scored **6 of 6** on its held-out exam with the merged coach's specific evidence, matching its merged weights and the July baseline. The product-owner slip in the table above belongs to the engine path (bf16 under vLLM against the Q8 seat under llama.cpp) and to a fragile check, not to the adapter; the 17 of 17 baseline was one run on a hand-started server with an older prompt. The non-repeatability is closed by vLLM's batch-invariant mode at about a quarter of single-stream speed. The cache limit was the memory dial, not the adapters: 522,333 tokens at 0.70 against 38,847 at 0.55 with the same four adapters. Read the controls document for the receipts.
