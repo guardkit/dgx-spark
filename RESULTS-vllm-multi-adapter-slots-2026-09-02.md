@@ -17,7 +17,12 @@ Every number below names the file it was read from. Nothing here is quoted from 
 move any seat onto it.** One vLLM process loaded the Gemma 4 base once and served all four of our
 tuned adapters at the same time, with no LoRA patches, and it answered a pair of simultaneous
 requests in 1.17 times the time one request takes alone — against 2.0 times for the llama.cpp
-workhorse we run today, which handles one request at a time. That is the thing this lane set out to
+workhorse we run today, which handles one request at a time (22.7 s for two at once against 11.4 s
+for one, `ai-transition/docs/measurements/what-a-build-costs-the-models-2026-09-01.md`, line 59).
+The same measurement also gave that workhorse two slots and got 14.9 s for two at once, 1.31 times
+one — so most of this parallel win is also reachable from one configuration line on the engine
+already running; it was reverted to one slot because a second slot costs context-window memory, the
+same trade that caps this run at 1.19 requests' worth of full-length context. That is the thing this lane set out to
 find out, and it is answered yes. But the exams say do not ship it yet: the product-owner adapter
 scored 44 of 51 checks against a merged seat that scored 17 of 17 (a new failure mode appeared —
 one reply's summary file was not valid YAML, which also took three further checks out of
@@ -72,9 +77,9 @@ That was proved and recorded in
 | # | Question | Answer | Number, and the file it came from |
 |---|---|---|---|
 | **Q1** | Does an unpatched vLLM start with adapters on this mixture-of-experts model, and advertise all of them? | **PASS** | All five names advertised (`gemma4-base`, `po-v5`, `po-v6`, `coach-ft-v4`, `architect-plan-v2`) — `vllm-multi-2026-09-02/models.json`. **0** `get_expert_mapping` errors and **0** "not in the model's supported LoRA target modules" warnings — counted in `vllm-multi-2026-09-02/launch.log`. Time from container start to the model list answering: **494 s** — `vllm-multi-2026-09-02/footprint.txt` |
-| **Q2** | Are the adapters actually doing something, or silently inert? | **PASS** | Same prompt, same server, temperature 0, one call per model: **5 different answers, 5 different checksums** (`distinct_md5_count: 5`, `all_identical: false`) — `vllm-multi-2026-09-02/selection.json`. The base and the product-owner adapter overlap on only 4.7% of their wording across three samples each (`base_vs_po_v6_mean: 0.047`) — `vllm-multi-2026-09-02/selection-strength.json` |
+| **Q2** | Are the adapters actually doing something, or silently inert? | **PASS** | Same prompt, same server, temperature 0, one call per model: **5 different answers, 5 different checksums** (`distinct_md5_count: 5`, `all_identical: false`) — `vllm-multi-2026-09-02/selection.json`. The base and the product-owner adapter overlap on only 4.7% of their wording across three samples each (`base_vs_po_v6_mean: 0.047`) — `vllm-multi-2026-09-02/selection-strength.json`. That same file's own overall verdict is `separated: false`: the adapters' re-runs resemble each other only 0.58 on average while the closest pair of different models scored 0.709, which is the non-repeatability disclosed below, not a sign the adapters are inert. Q2's PASS rests on `selection.json` |
 | **Q3** | Quality parity with the merged seats? | **NOT MET** | Product owner 44 of 51 checks (16, 11, 17) against a merged baseline of 17 of 17; coach 0 of 6 reps green against 6 of 6. See the exams table below for the per-rep files |
-| **Q4** | Does one process really serve several requests side by side? | **PASS on short requests** | Single request median **11.548 s**; two simultaneous requests to the *same* adapter **13.488 s = 1.168×**; two to *different* adapters **13.641 s = 1.181×**; four at once, one per adapter, **20.295 s = 1.757×** — all from `vllm-multi-2026-09-02/slots-2026-09-02.csv`, totals in `vllm-multi-2026-09-02/summary.json`. The bar was "under 1.5× for a pair"; today's llama.cpp workhorse measured 2.0× on 2026-09-01 |
+| **Q4** | Does one process really serve several requests side by side? | **PASS on short requests** | Single request median **11.548 s**; two simultaneous requests to the *same* adapter **13.488 s = 1.168×**; two to *different* adapters **13.641 s = 1.181×**; four at once, one per adapter, **20.295 s = 1.757×** — all from `vllm-multi-2026-09-02/slots-2026-09-02.csv`, totals in `vllm-multi-2026-09-02/summary.json`. The bar was "under 1.5× for a pair"; today's llama.cpp workhorse measured 2.0× with one slot and 1.31× with two slots on 2026-09-01 (`ai-transition/docs/measurements/what-a-build-costs-the-models-2026-09-01.md`, line 59) |
 
 ### Two things that qualify Q4, and must travel with it
 
@@ -275,9 +280,13 @@ in this run regardless (see the coach section).
 2. **No LoRA patches of any kind.** None of the April spike's three patched files were mounted.
 3. **The coach exam ran at temperature 0.1, its baseline at 0.0.** Recorded above; it is one of the
    two untested candidate causes of the 0-of-6 result.
-4. **The coach run's own `config.json` files carry a wrong template string.** Corrected in writing
-   beside the run (`SERVING-CORRECTION.txt`); the rendered prompts were then shown to be identical
-   either way.
+4. **The coach run's own `config.json` files carry stale serving metadata.** Besides the wrong
+   template string, each of the six files also records a GGUF path (`coach-ft-v3 ... Q4_K_M.gguf`), a
+   v3 lineage, `ctx_size 98304`, `np 1` and `served_via llama-swap :9000` — copied through from the
+   July runner's defaults. None of it is true of this run: the coach was served as bf16 base plus
+   adapter by vLLM on port 8010 with no GGUF and no switchboard. The numbers are unaffected. All of
+   these fields are now listed in `SERVING-CORRECTION.txt` beside the run, and the rendered prompts
+   were shown to be identical either way.
 5. **An earlier launch of the same configuration was stopped by hand at 12:06:53Z** on a
    mid-load memory reading. That was a mistake, is recorded as one in
    `coordinator-stop-mem.txt`, and the run reported here is the clean relaunch.
@@ -285,6 +294,13 @@ in this run regardless (see the coach section).
    appear in `launch.log`. They concern the image tower, which we do not use (`--limit-mm-per-prompt
    '{"image":0}'`). They are not the "tensors skipped" warning that would signal an inert adapter —
    that warning appears **zero** times.
+7. **The switchboard's loaded models were unloaded before the launch.** At 12:25:30Z the lane called
+   llama-swap's own unload endpoint (`curl http://127.0.0.1:9000/unload`, runbook Phase 0.5) to free
+   memory: available memory went from 103 GB to 113 GB (`vllm-multi-2026-09-02/mem-before.txt`,
+   `footprint.txt` line 5). No configuration was edited and nothing was restarted; every seat reloads
+   on its next request, so the first call to each seat after this lane paid a cold start. The memory
+   table above says "asked to release its seats" — this is what that means. *(Added by the lane
+   coordinator on 2026-09-02 after review; the builder's text had said the switchboard was "not touched".)*
 
 ---
 
@@ -294,8 +310,10 @@ in this run regardless (see the coach section).
 - The mechanism: one resident Gemma 4 base plus four ~2.7 GB adapters in a single vLLM process, on
   this box, on this image, on this snapshot, with no LoRA patches.
 - Parallel serving of several requests at once, including requests aimed at *different* adapters,
-  **for short prompts** — 1.17× to 1.18× for a pair against 2.0× for today's one-at-a-time
-  workhorse.
+  **for short prompts** — 1.17× to 1.18× for a pair against 2.0× for today's one-slot workhorse,
+  and against 1.31× for the same workhorse given two slots (measured 2026-09-01, reverted for
+  memory). vLLM is not the only way to get slots; it is the way that also frees the memory the
+  duplicated seats hold.
 - The conversion procedure for turning our training-format adapters into vLLM-format ones, now
   reproducible byte for byte and spot-checked numerically.
 
@@ -308,9 +326,10 @@ in this run regardless (see the coach section).
   does.
 - **One adapter set, one box.** These four adapters, this snapshot, this GB10. The Spark boxes are
   untested.
-- **No switchboard integration.** The model switchboard (llama-swap, on port 9000) was not touched:
-  no seat entry points at this process, and no configuration was edited. Callers reached vLLM
-  directly on port 8010.
+- **No switchboard integration.** No seat entry in the model switchboard (llama-swap, on port 9000)
+  points at this process, and none of its configuration was edited. Callers reached vLLM directly on
+  port 8010. The switchboard WAS asked, through its own API, to unload its loaded models before the
+  launch — see Deviation 7.
 - **The planner is ungated.** Served and counted, never marked. And its long answers can come back
   with an empty `content` field because it is still thinking when the token budget runs out.
 - **The version pin is deliberately behind current, and stays there.** v0.25.0 is the newest release
