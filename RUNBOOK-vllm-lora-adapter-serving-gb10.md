@@ -1,6 +1,10 @@
 # Runbook: Runtime LoRA adapter serving on GB10 — vLLM v0.25.0, UNPATCHED (no LoRA patches; one broken file removed at container start — see PINS)
 
-**Status:** **Unproven** — first execution pending. Supersedes the ad-hoc
+**Status:** **Executed once, 2026-08-24, on this image and this snapshot** — Q1 PASS, Q2 PASS,
+Q3 **50/51** (17/17 · 17/17 · 16/17). Written up in
+[`RESULTS-vllm-lora-adapter-serving-2026-08-24.md`](./RESULTS-vllm-lora-adapter-serving-2026-08-24.md).
+That run served **one** adapter (`po-v5`); this version of the runbook extends it to four adapters
+and adds Q4 (do two requests run side by side?), both still unproven. Supersedes the ad-hoc
 `~/fine-tuning/scripts/vllm_lora_spike.sh` (which pinned an abandoned image; see §0 WHY).
 
 **Purpose:** Prove that a **stock, unpatched** vLLM serves a **runtime LoRA adapter** against a
@@ -25,7 +29,9 @@ build is TERMINAL before starting (`forge status`) — see
 vLLM image        vllm/vllm-openai:v0.25.0-aarch64-cu129   (built 2026-07-11)
                   WHY THIS OLD RELEASE, AND NOT THE CURRENT ONE: v0.25.0 is the ONLY release that
                   both (a) carries the LoRA resolver fix and (b) predates the breakage below.
-                  v0.26.x and v0.27.1 CANNOT LOAD GEMMA 4 AT ALL — they ship transformers 5.14 or
+                  v0.26 AND EVERY RELEASE AFTER IT CANNOT LOAD GEMMA 4 AT ALL (v0.27.1 proved by
+                  execution here; v0.26.x and v0.28.0, the current release, follow from the same
+                  transformers dependency) — they ship transformers 5.14 or
                   newer, whose heterogeneity guard refuses a plain `getattr` on any attribute of a
                   config with per-layer attributes, and vLLM's `get_head_size()`
                   (`transformers_utils/model_arch_config_convertor.py`) does exactly that. It fails
@@ -60,10 +66,16 @@ seat dials        --max-model-len 32768 --max-num-seqs 4 --gpu-memory-utilizatio
                   --reasoning-parser gemma4
                   --no-enable-prefix-caching --limit-mm-per-prompt '{"image":0}'
                   Arithmetic for 0.55 and the reason for the reasoning parser: Phase 1.
-eval              fleet-evals task po-held-007-feature-spec (suite po-heldout-spec, reps 3)
+eval              fleet-evals task po-held-007-feature-spec (suite po-heldout-spec, reps 1..3)
+                  RUNNER: `harness/run_po_spec_eval.py` — NOT `run_po_eval.py`, which has no
+                  assembly for this task and exits 1. It takes neither --suite nor --task.
+                  Always pass `--temperature 0` (the runner sends nothing by default and the
+                  server then samples) and `--out DIR` (PO_EVAL_OUTPUT_DIR on the command line is
+                  a no-op). See "THE RUNNER FOR THIS EXAM" before Phase 2.
                   grading: `python3 -m pytest test/ -q` = 17 test functions
 BASELINE          17/17 — the same adapter, same snapshot, under vLLM 0.19.2rc1.dev134 WITH
                   three local patches. This run must match it with ZERO patches.
+                  MOST RECENT UNPATCHED RESULT: 50/51 on 2026-08-24 (17/17 · 17/17 · 16/17).
 ```
 
 When recon flags drift on a pin, the fix is a **PR editing this block** — never a runtime edit (§6).
@@ -74,9 +86,9 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 
 | # | Question | Prior evidence | Falsified if |
 |---|---|---|---|
-| Q1 | Does an unpatched vLLM **start** with a LoRA on MoE Gemma 4? | Failed on the April build (`get_expert_mapping` AttributeError). Fixed upstream in v0.25.0 — **read from source, never executed here.** | engine exits non-zero / no `/v1/models` |
-| Q2 | Is the adapter **effective**, or silently inert? | #39815 open, its fix #39816 **unmerged**. Our inertness evidence is all April-era. | adapter arm scores == base arm |
-| Q3 | Parity with the merged seat? | 17/17 with 3 patches | adapter arm < 17/17 |
+| Q1 | Does an unpatched vLLM **start** with a LoRA on MoE Gemma 4? | Failed on the April build (`get_expert_mapping` AttributeError). **PASS on 2026-08-24** on this image and snapshot: served in 470 s, 0 expert-mapping errors, 0 LoRA warnings — but with **one** adapter mounted, not four. | engine exits non-zero / no `/v1/models` |
+| Q2 | Is the adapter **effective**, or silently inert? | #39815 open, its fix #39816 **unmerged**, yet **PASS on 2026-08-24** for `po-v5` (greedy, same prompt/server: base 879 chars vs adapter 893, different hashes). Why it worked with the fix unmerged is **not known** — do not carry the pass over to a different adapter without re-testing. | adapter arm scores == base arm |
+| Q3 | Parity with the merged seat? | 17/17 with 3 patches (merged seat: 17/17 × 3, clean). Unpatched vLLM on 2026-08-24 scored **50/51** — 17/17 · 17/17 · **16/17**, the miss a spec-content slip. | adapter arm < 17/17 |
 | Q4 | Does **one process serve several adapters at the same time** (parallel slots)? | The current workhorse runs llama.cpp with `-np 1`, which serialises: on 2026-09-01 a simultaneous pair of identical requests took **2.0×** the time of one alone. | a simultaneous pair takes ≥ 1.5× a single request (Phase 1b) |
 
 **Q2 is the one with no upstream answer.** Do not infer it from Q1 passing.
@@ -130,9 +142,15 @@ done
 
 # ESTATE GATE — absolute. If ANY row of forge status shows RUNNING, PAUSED or QUEUED, STOP
 # and report. Do not unload seats, do not start a container, do not "just check something first".
-docker exec forge-prod forge --config /var/forge/forge.yaml status 2>/dev/null \
-  | grep -qE 'RUNNING|PAUSED|QUEUED' && echo "FAIL-estate: a build is non-terminal — DO NOT PROCEED" \
-                                     || echo PASS-estate
+# It FAILS CLOSED: silence because the command could not run is not permission to proceed.
+if ! FORGE_STATUS=$(docker exec forge-prod forge --config /var/forge/forge.yaml status 2>&1); then
+  echo "FAIL-estate: cannot read forge status — DO NOT PROCEED"; echo "$FORGE_STATUS" | tail -5
+elif printf '%s\n' "$FORGE_STATUS" | grep -qE 'RUNNING|PAUSED|QUEUED'; then
+  echo "FAIL-estate: a build is non-terminal — DO NOT PROCEED"
+  printf '%s\n' "$FORGE_STATUS" | grep -E 'RUNNING|PAUSED|QUEUED'
+else
+  echo PASS-estate
+fi
 ```
 
 **▶ GATE:** all PASS, or stop. `FAIL-estate` is absolute — the factory owns the GPU.
@@ -168,7 +186,25 @@ SNAP=/hf/hub/models--unsloth--gemma-4-26b-a4b-it/snapshots/60941ad6341d0b7af9127
 ADAPTERS=$HOME/fine-tuning/output/vllm-exports        # one subdirectory per adapter export
 N=$(find "$ADAPTERS" -mindepth 1 -maxdepth 1 -type d | wc -l)
 curl -sS -m 30 http://127.0.0.1:9000/unload >/dev/null 2>&1     # free the seats (reload on demand)
-until [ "$(free -g | awk '/Mem:/{print $7}')" -ge 90 ]; do sleep 5; done
+
+# Wait for the seats to release, but NEVER forever: 60 tries x 5 s = 5 minutes, then say who is
+# still holding the memory. An unbounded `until` here stops the runbook dead with no message.
+for _ in $(seq 1 60); do
+  AVAIL_GB=$(free -g | awk '/Mem:/{print $7}')          # column 7 = "available"
+  [ "$AVAIL_GB" -ge 90 ] && break
+  sleep 5
+done
+if [ "$AVAIL_GB" -lt 90 ]; then
+  # FAIL-CLOSED, and it must not kill the operator's shell: the container start lives in the
+  # else-branch, so a memory failure cannot fall through into it.
+  echo "FAIL-memory: only ${AVAIL_GB} GB available after 5 minutes (need 90). STOP — do not start"
+  echo "the container. What still holds the memory:"
+  ps -eo rss,pid,comm --sort=-rss | head -9 \
+    | awk 'NR>1{printf "  %6.1f GB  pid %-8s %s\n",$1/1048576,$2,$3}'
+  curl -sS -m 10 http://127.0.0.1:9000/running 2>/dev/null \
+    | head -c 400 | sed 's/^/  llama-swap still running: /'; echo
+  echo "  (a seat still loaded means the /unload above did not take — check llama-swap by hand)"
+else
 docker rm -f vllm-lora >/dev/null 2>&1
 docker run -d --name vllm-lora --gpus all --ipc=host -p 8010:8000 \
   -v "$HOME/.cache/huggingface":/hf:ro \
@@ -183,6 +219,7 @@ docker run -d --name vllm-lora --gpus all --ipc=host -p 8010:8000 \
   --reasoning-parser gemma4 \
   --max-model-len 32768 --max-num-seqs 4 --no-enable-prefix-caching \
   --gpu-memory-utilization 0.55 --limit-mm-per-prompt '{"image":0}'
+fi
 ```
 
 **▶ GATE Q1** — serves, and **every** model id is advertised:
@@ -231,33 +268,91 @@ awk -F, 'NR>1{v[$1]=$3} END{r=v["pair"]/v["single"];
 `~/fine-tuning/output/vllm-concurrency/phase1b.csv` — quote the two times and the ratio from that
 file, never from memory of the terminal.
 
+## THE RUNNER FOR THIS EXAM — read before Phase 2 or 3
+
+Three things about the exam command are easy to get wrong, and each one silently produces a
+worthless answer rather than an error.
+
+- **The runner is `harness/run_po_spec_eval.py`, NOT `harness/run_po_eval.py`.** This task's answer
+  is a tree of files, not one response string, so the general runner has no assembly for it: it
+  exits 1 with `ValueError: No runner assembly registered for task 'po-held-007-feature-spec'`
+  (`run_po_eval.py:161`), which the task's own `instruction.md` (line 73, under "Harness assembly")
+  states is by design. The dedicated runner serves this one task only, so it **rejects `--suite` and
+  `--task`** (exit 2, `unrecognized arguments`). Do not add them back.
+- **`--temperature 0` must be on the command line.** The runner's `--temperature` and `--top-p`
+  default to `None`, which sends nothing and lets the server sample. Q2's whole falsification test
+  is "identical output means the adapter is inert" — under sampling the two arms differ no matter
+  what the adapter does, so Q2 would pass automatically and prove nothing. The 2026-08-24 run that
+  produced 50/51 did pin it; its receipts read
+  `"gen_params_sent": {"temperature": 0.0, "max_tokens": 16384}`. Check that line in every
+  `config.json` before believing any result below.
+- **Receipts go where `--out` says, and nowhere else.** Setting `PO_EVAL_OUTPUT_DIR` on the command
+  line does nothing: the runner sets that variable itself, per rep, when it calls the grader
+  (`run_po_spec_eval.py:312`). Use `--out`; without it results land in
+  `fleet-evals/runs/po-heldout-spec/<utc-stamp>-<model>/`.
+
+With `--out DIR`, each rep's receipts are at
+`DIR/po-held-007-feature-spec/rep<N>/` — `grade.txt` (the pytest output), `config.json` (what was
+actually sent), `response.txt`, and the generated `features/` tree. **Read `grade.txt`, never a
+summary line from the terminal.**
+
 ## Phase 2: Q2 — is the adapter actually DOING anything?
 
-Two arms, same prompt, same server, greedy. **This is the question upstream has not answered.**
+Two arms, same prompt, same server, greedy (`--temperature 0`, pinned in the command below).
+**This is the question upstream has not answered.**
 
 ```bash
 cd ~/Projects/appmilla_github/fleet-evals
 for M in gemma4-base po-v5; do
-  PO_EVAL_OUTPUT_DIR=$HOME/fine-tuning/output/vllm-q2-$M \
-  python3 harness/run_po_eval.py --model "$M" --endpoint http://127.0.0.1:8010/v1 \
-    --suite po-heldout-spec --task po-held-007-feature-spec --rep 1 --grade \
-    2>&1 | tail -5
+  python3 harness/run_po_spec_eval.py --model "$M" --endpoint http://127.0.0.1:8010/v1 \
+    --temperature 0 --rep 1 --grade \
+    --out $HOME/fine-tuning/output/vllm-q2-$M 2>&1 | tail -5
+done
+
+# the comparison, from the files — not from the terminal.
+# A MISSING FILE IS A FAILURE, never a blank line: an empty read here would look like "no difference".
+for M in gemma4-base po-v5; do
+  R=$HOME/fine-tuning/output/vllm-q2-$M/po-held-007-feature-spec/rep1
+  [ -s "$R/response.txt" ] || { echo "FAIL-Q2: no response.txt for $M at $R — the arm did not run"; continue; }
+  python3 -c "import json,sys;print('$M temp sent:', json.load(open('$R/config.json'))['gen_params_sent'])"
+  echo "$M $(wc -c < "$R/response.txt") chars  sha256 $(sha256sum "$R/response.txt" | cut -c1-16)"
 done
 ```
 
-**▶ GATE Q2:** the two arms must **differ**. Identical output = the adapter is inert (#39815
-alive) — record it and stop; Q3 is then meaningless.
+**▶ GATE Q2:** the two arms must **differ** — different byte counts and different hashes from the
+two `response.txt` files above. Identical output = the adapter is inert (#39815 alive) — record it
+and stop; Q3 is then meaningless. If either `config.json` does not show `temperature: 0.0`, the
+comparison is void: fix the command and re-run.
 
 ## Phase 3: Q3 — parity with the merged seat
 
+All three pre-registered reps, greedy, into one run directory.
+
 ```bash
-PO_EVAL_OUTPUT_DIR=$HOME/fine-tuning/output/vllm-q3 \
-python3 harness/run_po_eval.py --model po-v5 --endpoint http://127.0.0.1:8010/v1 \
-  --suite po-heldout-spec --task po-held-007-feature-spec --grade 2>&1 | tail -20
+cd ~/Projects/appmilla_github/fleet-evals
+python3 harness/run_po_spec_eval.py --model po-v5 --endpoint http://127.0.0.1:8010/v1 \
+  --temperature 0 --grade --out $HOME/fine-tuning/output/vllm-q3 2>&1 | tail -20
+
+# read the grades from the files, one line per rep.
+# A MISSING grade.txt IS A FAILURE, never a blank line.
+for N in 1 2 3; do
+  G=$HOME/fine-tuning/output/vllm-q3/po-held-007-feature-spec/rep$N/grade.txt
+  [ -s "$G" ] || { echo "rep$N: FAIL-Q3 no grade.txt at $G — the rep did not run or was not graded"; continue; }
+  LINE=$(grep -Eo '[0-9]+ (passed|failed)(, [0-9]+ (passed|failed))*' "$G" | tail -1)
+  [ -n "$LINE" ] && echo "rep$N: $LINE" \
+                 || { echo "rep$N: FAIL-Q3 grade.txt has no pytest summary line — last 5 lines:"; tail -5 "$G"; }
+done
 ```
 
-**▶ GATE Q3:** **17/17** = parity, adapter serving proven unpatched. 15/17 → check the snapshot
-pin FIRST (see PINS), not the adapter.
+Reps are frozen at **1..3**. The harness refuses `--rep 4`; adding reps until the number improves is
+exam-shopping, and it was already tried and refused on 2026-08-24.
+
+**▶ GATE Q3:** **17/17 on each of the three reps** = parity, adapter serving proven unpatched.
+15/17 → check the snapshot pin FIRST (see PINS), not the adapter. **A single 16/17 rep is a repeat,
+not a new regression:** the 2026-08-24 run scored 17/17 · 17/17 · **16/17** (50/51), the one failure
+being `test_gate_po_held_007.py:191`, a spec-content slip where the summary's Integration section
+omitted the `features/{slug}/{slug}_summary.md` path. Compare against that, not against a clean
+sheet.
 
 ## Phase 4: Restore the estate (MANDATORY — do not skip on failure)
 
