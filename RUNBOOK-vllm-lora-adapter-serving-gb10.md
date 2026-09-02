@@ -45,6 +45,16 @@ vLLM image        vllm/vllm-openai:v0.25.0-aarch64-cu129   (built 2026-07-11)
                   a per-layer attribute`; it fails identically with `--enable-lora` removed (base-model
                   support, not adapters), and `--hf-overrides` cannot help because the guard fires on
                   attribute ACCESS, not on the value.
+                  WHY NOT cu130-nightly: ABANDONED — last built 2026-04-23 while cu129 ships
+                  daily. The `cu130` name reads as newer than `cu129` and is not. Running it
+                  cost us a wrong upstream issue (vllm#53470, closed not-planned).
+                  KNOWN DEFECT IN THIS IMAGE, UNRELATED TO LoRA: it ships a broken torchcodec — a
+                  CUDA-13 build (`libnvrtc.so.13`) inside a CUDA-12.9 image — which raises at
+                  `import vllm` and kills the server before any model work. vLLM catches ImportError
+                  but not this RuntimeError, so an ABSENT torchcodec is fine and a PRESENT-BUT-BROKEN
+                  one is fatal. The container therefore deletes it at start (Phase 1). We decode no
+                  video. Say this out loud in the results: "unpatched" means no LoRA patches, and
+                  must never be allowed to hide this removal.
 base snapshot     unsloth/gemma-4-26b-a4b-it @ 60941ad6341d0b7af91277ff25c4175f08b56819
                   WHY THIS EXACT SNAPSHOT: it is the one the adapter was TRAINED on. Serving
                   d722512f instead scored 15/17; pinning the trained-on snapshot scored 17/17.
