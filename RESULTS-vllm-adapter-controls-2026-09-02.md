@@ -43,7 +43,7 @@ open. **The product owner's slip is not the adapter's fault at all**: the merged
 weights under the same vLLM image score 16 of 17, exactly as the adapter does, and the one check
 they fail — a missing Integration section — appears only where today's prompt and vLLM meet
 (`s3-po-2x2.json`); the 17 of 17 it was being measured against was a single August run that does not
-reproduce — re-run today on the same seat with the same prompt bytes, one of the three runs could not
+reproduce — re-run today with the same prompt bytes on the switchboard seat (August used a hand-started server, see below), one of the three runs could not
 be graded at all and the other two scored 16 of 17. **The coach's vague findings — bare field names like `plan_audit.variances[0].detail` instead
 of the sentence naming the actual defect — came from the broken export and nothing else**: with the
 expert weights actually loaded it writes the specific sentence every time. **The non-repeatability is
@@ -52,8 +52,10 @@ three different answers to the same question at temperature 0 now gives one, seq
 three requests are fired at once — the single exception being the renamed coach export, whose expert
 kernels are the only ones actually running, where one of three simultaneous calls still differed.
 It costs about a third more compute per token generated (0.0625 seconds per token against 0.0483 on
-the same path without it), and running the expert adapters for real costs about half again on top
-(a coach bundle went from 1.87 to 3.37 seconds). **Four resident adapters added about 5 GiB to what the server
+the same path without it), Running the expert adapters for real does not add cost per token: per completion token the renamed export is
+cheaper than the old one under the same mode (0.0626 against 0.0691 seconds); its bundles take longer in
+wall clock because its replies are longer (a mean of 53.9 completion tokens against 33.8), and the extra
+tokens are the evidence it now cites. **Four resident adapters added about 5 GiB to what the server
 loaded (48.54 GiB to 53.62 GiB) and, at the 0.55 dial, cost 16.4 GiB of the working cache (17.95 GiB
 down to 1.54 GiB) — and you buy that back with the memory dial, not by dropping adapters**: turning
 the dial to 0.70 with the same four adapters took the cache from 1.54 GiB, which is 1.19 requests'
@@ -257,8 +259,8 @@ writes the section with either prompt; vLLM writes it with August's prompt and d
 So the twelve extra lines push the section out of the answer only under vLLM. That is a prompt and
 engine matter, and it is not evidence about adapters at all.
 
-**The 17 of 17 baseline does not reproduce, and should not be quoted again.** Re-running the exact
-August cell today — same seat, same prompt bytes, same greedy settings — gave three replies, none of
+**The 17 of 17 baseline does not reproduce, and should not be quoted again.** Re-running the
+August cell today — the same prompt bytes and greedy settings, on the switchboard seat rather than August's hand-started server — gave three replies, none of
 which matches August's (md5 `8171ce00e54f37e7747b165eba70587a`), and two grades of 16 out of 17.
 Correcting the builder here, who reported the third as "10 of 17": **that run could not be graded.**
 Its digest file was not valid YAML, the production post-processor refused to run, three checks
@@ -282,10 +284,10 @@ are the same size (26,859,860,864 bytes), but they were not compared in full.
 |---|---|---|---|
 | Merged weights under vLLM, today's prompt | 16, 16, 16 | yes, three byte-identical replies (md5 `acd351b2…`) | `control-A.json` |
 | Old v1 adapter under vLLM (the lane run) | 16, 11, 17 | no | `fleet-evals/runs/po-heldout-spec/20260902T13{2752,2932,3123}Z-po-v6/` |
-| Arithmetic-corrected v2 adapter (S4) | 11, 16, 16 | no — three different replies at temperature 0 (`po-adapterv2-md5.txt`) | `.../20260902-control-po-v6-adapterv2/`; `s4-cache-slots.json` |
-| Corrected v2 adapter, deterministic kernels on (S5) | 11, 11, 11 | yes — all three md5 `1ca83a3b…` | `.../20260902-control-po-v6-adapter-batchinvariant/`; `s5-batchinvariant.json` |
+| Arithmetic-corrected v2 adapter (S4) | could not be graded, 16, 16 | no — three different replies at temperature 0 (`po-adapterv2-md5.txt`) | `.../20260902-control-po-v6-adapterv2/`; `s4-cache-slots.json` |
+| Corrected v2 adapter, deterministic kernels on (S5) | could not be graded, three times | yes — all three md5 `1ca83a3b…` | `.../20260902-control-po-v6-adapter-batchinvariant/`; `s5-batchinvariant.json` |
 
-The reps scoring 11 are the same failure mode as cell C rep 1: the reply's digest was not valid YAML,
+The reps that could not be graded are the same failure mode as cell C rep 1: the reply's digest was not valid YAML,
 production's post-processor refused it, the harness fell back to its simpler slicer, and three checks
 were left unmeasured. A skipped check measures nothing, so 11 of 17 overstates rather than understates
 the gap.
@@ -333,10 +335,11 @@ seconds with the mode on, against 112.1 / 100.8 / 114.2 on the same adapter path
 132.7 / 128.8 / 128.6 for the merged weights. Because the replies are different lengths the fairer
 number is per token generated: **0.0625 seconds with the mode, 0.0483 without, 0.0467 for merged
 weights** — so the mode costs about 1.29 times the compute per token, and the adapter path with it
-runs at about 1.34 times the merged weights' cost per token. Separately, actually running the expert
-adapters costs about 1.45 times: a coach bundle took 3.37 seconds on the renamed export against 2.33
-on the v2 export in the same launch, which itself was 1.25 times S4's 1.87 seconds without the mode
-(`s5-batchinvariant.json`).
+runs at about 1.34 times the merged weights' cost per token. Actually running the expert adapters does not cost more per token: on the renamed export a coach bundle
+took 3.37 seconds against 2.33 on the v2 export in the same launch, but per completion token the renamed export
+is the cheaper of the two (0.0626 against 0.0691 seconds, from the same `per_bundle` usage records) — its replies
+are longer (a mean of 53.9 tokens against 33.8) because they now name the evidence. The mode itself made the v2
+bundle 1.25 times S4's 1.87 seconds (`s5-batchinvariant.json`).
 
 ---
 
@@ -467,6 +470,11 @@ figures are settled values rather than troughs and 0.70 is too high a dial; the 
 fixed 256-token replies; the base model was not exercised in S4; and the adapter source paths come
 from the launch script rather than the server log.
 
+**The repeatability probe kept hashes, not replies.** The S5 determinism script hashed each of the 36 replies and
+discarded the text, although the brief asked for the replies to be saved. The distinct-answer counts stand (the
+reviewer recomputed them from the recorded hashes), but the one divergent reply — the renamed coach export's odd
+answer out of three simultaneous calls — cannot be inspected by anyone. A receipt defect, recorded as one.
+
 **Renamed exports exist for all four adapters, but only the coach's was served.** The directories
 `vllm-exports-v3/{po-gemma4-v5, po-gemma4-v6, architect-plan-v2}` each carry a `rename-v3.json`
 recording the same 23,040-key rename, and three further diagnostic exports
@@ -509,7 +517,7 @@ the limit was reading the prompts, not the adapters.
 
 ## Next steps — options, not a plan
 
-1. **Build and grade renamed exports for the product owner and the planner.** The converter already
+1. **Grade the renamed exports that already exist for the product owner and the planner.** The converter already
    does it; the exports for `po-gemma4-v5`, `po-gemma4-v6` and `architect-plan-v2` are already on
    disk. That is the single measurement that would tell us whether the product-owner gap is real.
    It needs one launch and three reps per seat.
@@ -525,3 +533,4 @@ the limit was reading the prompts, not the adapters.
 5. **Re-measure the parallel slots on the fixed path.** Every slot number here was taken with the
    expert adapters switched off, so they understate the real cost of serving adapters that work.
 
+*Coordinator's amendment, 2026-09-02 late. The S6 reviewer blocked this document on two unlicensed claims (the per-token cost of running the expert adapters, and "exactly as the adapter does") and four smaller points (the cache figure's run-to-run variation, the merged directory's byte count, two unexplained experts in layer 29, "checks" for "runs"), plus the unsaved repeatability replies and the identical-answer counts the coordinator's notes had asked for. All are corrected above, together with the wording of the August comparison and the ungradable-run notation; four terms are glossed for a non-specialist. No measurement changed. The block was resolved by correcting the document, not by overriding the reviewer.*
