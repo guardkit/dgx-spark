@@ -27,30 +27,24 @@ build is TERMINAL before starting (`forge status`) — see
 
 ```
 vLLM image        vllm/vllm-openai:v0.25.0-aarch64-cu129   (built 2026-07-11)
-                  WHY THIS OLD RELEASE, AND NOT THE CURRENT ONE: v0.25.0 is the ONLY release that
-                  both (a) carries the LoRA resolver fix and (b) predates the breakage below.
-                  v0.26 AND EVERY RELEASE AFTER IT CANNOT LOAD GEMMA 4 AT ALL (v0.27.1 proved by
-                  execution here; v0.26.x and v0.28.0, the current release, follow from the same
-                  transformers dependency) — they ship transformers 5.14 or
-                  newer, whose heterogeneity guard refuses a plain `getattr` on any attribute of a
-                  config with per-layer attributes, and vLLM's `get_head_size()`
-                  (`transformers_utils/model_arch_config_convertor.py`) does exactly that. It fails
-                  with `AmbiguousGlobalPerLayerAttributeError: 'head_dim' is a per-layer attribute`,
-                  it fails identically with `--enable-lora` removed (so it is base-model support,
-                  not adapters), `--hf-overrides` does not help (the guard fires on access, not on
-                  the value), and it is not fixed on vLLM main. transformers 5.14.0 shipped
-                  2026-07-15; the v0.25.0 image was built four days earlier with transformers 5.13.0.
-                  Being behind the current release is CORRECT HERE, not drift to be closed.
-                  WHY NOT cu130-nightly: ABANDONED — last built 2026-04-23 while cu129 ships
-                  daily. The `cu130` name reads as newer than `cu129` and is not. Running it
-                  cost us a wrong upstream issue (vllm#53470, closed not-planned).
-                  KNOWN DEFECT IN THIS IMAGE, UNRELATED TO LoRA: it ships a broken torchcodec — a
-                  CUDA-13 build (`libnvrtc.so.13`) inside a CUDA-12.9 image — which raises at
-                  `import vllm` and kills the server before any model work. vLLM catches ImportError
-                  but not this RuntimeError, so an ABSENT torchcodec is fine and a PRESENT-BUT-BROKEN
-                  one is fatal. The container therefore deletes it at start (Phase 1). We decode no
-                  video. Say this out loud in the results: "unpatched" means no LoRA patches, and
-                  must never be allowed to hide this removal.
+                  WHY THIS OLD RELEASE, AND NOT THE CURRENT ONE: v0.25.0 is the release that was
+                  PROVEN HERE (2026-08-24, 50/51) to carry the LoRA resolver fix and load Gemma 4.
+                  v0.26.x and v0.27.1 CANNOT LOAD GEMMA 4 (v0.27.1 proved by execution here): they ship
+                  transformers >= 5.14, whose per-layer attention config for Gemma 4 (transformers
+                  #47384, in 5.15.0) makes a plain `getattr` on `head_dim` raise in vLLM's
+                  `get_head_size()`.
+                  v0.28.0 (tag 2026-08-24, arm64 image 2026-08-26) CONTAINS THE vLLM-SIDE FIX — PR
+                  #49797 "Fix Gemma 4 for upcoming Transformers version" (merged 2026-08-10; not in
+                  0.27.x per the maintainer) — and its LoRA resolver, FusedMoE experts path and `gemma4`
+                  reasoning parser are unchanged. It is therefore the CANDIDATE to replace this pin.
+                  UNTESTED HERE: do not move the pin until the no-LoRA control launch, the LoRA start
+                  and the Q2 effectiveness check have been run on the v0.28.0 image (read from source,
+                  never executed — the 2026-08-24 lesson). Whether its cu129 image still ships the
+                  broken torchcodec is also unknown until run; keep the removal step.
+                  The v0.27.1 failure, for the record: `AmbiguousGlobalPerLayerAttributeError: 'head_dim' is
+                  a per-layer attribute`; it fails identically with `--enable-lora` removed (base-model
+                  support, not adapters), and `--hf-overrides` cannot help because the guard fires on
+                  attribute ACCESS, not on the value.
 base snapshot     unsloth/gemma-4-26b-a4b-it @ 60941ad6341d0b7af91277ff25c4175f08b56819
                   WHY THIS EXACT SNAPSHOT: it is the one the adapter was TRAINED on. Serving
                   d722512f instead scored 15/17; pinning the trained-on snapshot scored 17/17.
