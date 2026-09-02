@@ -61,11 +61,17 @@ base snapshot     unsloth/gemma-4-26b-a4b-it @ 60941ad6341d0b7af91277ff25c4175f0
                   WHY THIS EXACT SNAPSHOT: it is the one the adapter was TRAINED on. Serving
                   d722512f instead scored 15/17; pinning the trained-on snapshot scored 17/17.
                   A snapshot mismatch looks exactly like a bad adapter.
-adapters          one directory holding one vLLM-format export per adapter, e.g.
-                  ~/fine-tuning/output/vllm-exports/{po-v5,po-v6,coach-v4,plan-v2}
-                  (each r=16, ~1.9 GB). po-v5 is
-                  ~/fine-tuning/output/po-gemma4-v5/lora-adapter-vllm — the known-good reference
-                  export; never modify it. The rest come from the per-expert converter
+adapters          one vLLM-format export per adapter, each living beside its PEFT source as
+                  ~/fine-tuning/output/<train-run>/lora-adapter-vllm (each r=16, 2,673,219,856 B):
+                    po-v5              po-gemma4-v5/lora-adapter-vllm   (the known-good reference; never modify)
+                    po-v6              po-gemma4-v6/lora-adapter-vllm   (the live PO seat)
+                    coach-ft-v4        coach-gemma4-26b-moe-v4/lora-adapter-vllm
+                    architect-plan-v2  architect-plan-v2/lora-adapter-vllm (the live planner)
+                  MODULE NAMES ARE THE ALIASES CLIENTS SEND (llama-swap forwards the requested alias
+                  verbatim, proven 2026-08-24), so a seat entry can front this process by alias.
+                  MOUNT EACH EXPORT INDIVIDUALLY at /adapters/<name> (Phase 1): a directory of symlinks
+                  to host paths does NOT resolve inside the container (proven 2026-09-02 13:00 — every
+                  link dangled). The rest come from the per-expert converter
                   (`~/fine-tuning/scripts/convert_moe_lora_to_per_expert.py`).
 seat dials        --max-model-len 32768 --max-num-seqs 4 --gpu-memory-utilization 0.55
                   --max-loras N --max-cpu-loras 2N  (N = adapters served together)
@@ -101,7 +107,7 @@ When recon flags drift on a pin, the fix is a **PR editing this block** — neve
 
 **The planner adapter is served but NOT exam-gated here.** The planner's held-out exam
 (`po-held-008`) has no runner assembly — there is no machine grader for it in this lane. Serve
-`plan-v2` so it is loaded and counted in Q4's slot test, and record its exam result as
+`architect-plan-v2` so it is loaded and counted in Q4's slot test, and record its exam result as
 **"not gated"**. Do not invent a grader to fill the gap.
 
 **Known non-defect:** tasks 004/005 diverge on **template, not adapter** — merged (GGUF template,
@@ -140,10 +146,11 @@ notes fix `get_head_size()` for per-layer attributes.
 docker image inspect vllm/vllm-openai:v0.25.0-aarch64-cu129 >/dev/null && echo PASS-image || echo FAIL-image
 SNAP=$HOME/.cache/huggingface/hub/models--unsloth--gemma-4-26b-a4b-it/snapshots/60941ad6341d0b7af91277ff25c4175f08b56819
 [ -d "$SNAP" ] && echo PASS-snapshot || echo FAIL-snapshot
-ADAPTERS=$HOME/fine-tuning/output/vllm-exports
-for A in "$ADAPTERS"/*/; do
-  [ -f "$A/adapter_model.safetensors" ] && echo "PASS-adapter $(basename "$A")" \
-                                        || echo "FAIL-adapter $(basename "$A")"
+O=$HOME/fine-tuning/output
+for A in po-v5:po-gemma4-v5 po-v6:po-gemma4-v6 coach-ft-v4:coach-gemma4-26b-moe-v4 architect-plan-v2:architect-plan-v2; do
+  D="$O/${A#*:}/lora-adapter-vllm"
+  [ -f "$D/adapter_model.safetensors" ] && [ -f "$D/adapter_config.json" ] && echo "PASS-adapter ${A%%:*}" \
+                                                                           || echo "FAIL-adapter ${A%%:*} (missing $D)"
 done
 
 # ESTATE GATE — absolute. If ANY row of forge status shows RUNNING, PAUSED or QUEUED, STOP
@@ -181,7 +188,7 @@ Four things in the command below are not cosmetic:
   `vllm` at import (PINS). Deleting it is an image-packaging workaround, **not** a LoRA patch.
 - **`--reasoning-parser gemma4`** — the base chat template primes a `<|channel>thought` section in
   every generation prompt. Without a parser that thinking text lands in `content` and breaks the
-  file markers the graders read. Required for `plan-v2` and `qav`, harmless for the rest.
+  file markers the graders read. Required for `architect-plan-v2` and `qav`, harmless for the rest.
 - **`--max-loras N`** — the maximum number of *different* adapters vLLM will serve **in one batch**;
   it defaults to **1**, so leaving it unset serialises everything the moment two adapters are in
   flight together. Set it to the number of adapters mounted. `--max-cpu-loras` is the host-side
@@ -198,8 +205,8 @@ Phase 4, after the logs are captured.
 
 ```bash
 SNAP=/hf/hub/models--unsloth--gemma-4-26b-a4b-it/snapshots/60941ad6341d0b7af91277ff25c4175f08b56819
-ADAPTERS=$HOME/fine-tuning/output/vllm-exports        # one subdirectory per adapter export
-N=$(find "$ADAPTERS" -mindepth 1 -maxdepth 1 -type d | wc -l)
+O=$HOME/fine-tuning/output                              # each export is mounted individually below
+N=4                                                     # adapters served together = --max-loras
 curl -sS -m 30 http://127.0.0.1:9000/unload >/dev/null 2>&1     # free the seats (reload on demand)
 
 # Wait for the seats to release, but NEVER forever: 60 tries x 5 s = 5 minutes, then say who is
@@ -223,13 +230,16 @@ else
 docker rm -f vllm-lora >/dev/null 2>&1
 docker run -d --name vllm-lora --gpus all --ipc=host -p 8010:8000 \
   -v "$HOME/.cache/huggingface":/hf:ro \
-  -v "$ADAPTERS":/adapters:ro \
+  -v "$O/po-gemma4-v5/lora-adapter-vllm":/adapters/po-v5:ro \
+  -v "$O/po-gemma4-v6/lora-adapter-vllm":/adapters/po-v6:ro \
+  -v "$O/coach-gemma4-26b-moe-v4/lora-adapter-vllm":/adapters/coach-ft-v4:ro \
+  -v "$O/architect-plan-v2/lora-adapter-vllm":/adapters/architect-plan-v2:ro \
   --entrypoint bash vllm/vllm-openai:v0.25.0-aarch64-cu129 -c \
   'rm -rf /usr/local/lib/python3.12/dist-packages/torchcodec* && exec vllm serve "$@"' _ \
   --model "$SNAP" --served-model-name gemma4-base \
   --enable-lora --max-lora-rank 16 \
   --lora-modules po-v5=/adapters/po-v5 po-v6=/adapters/po-v6 \
-                 coach-v4=/adapters/coach-v4 plan-v2=/adapters/plan-v2 \
+                 coach-ft-v4=/adapters/coach-ft-v4 architect-plan-v2=/adapters/architect-plan-v2 \
   --max-loras "$N" --max-cpu-loras "$((2*N))" \
   --reasoning-parser gemma4 \
   --max-model-len 32768 --max-num-seqs 4 --no-enable-prefix-caching \
@@ -243,7 +253,7 @@ fi
 for i in $(seq 1 150); do curl -sf -m 5 http://127.0.0.1:8010/v1/models >/dev/null && break; sleep 10; done
 curl -s http://127.0.0.1:8010/v1/models | jq -r '.data[].id' | sort | tee /tmp/vllm-ids.txt
 MISSING=0
-for M in gemma4-base po-v5 po-v6 coach-v4 plan-v2; do
+for M in gemma4-base po-v5 po-v6 coach-ft-v4 architect-plan-v2; do
   grep -qx "$M" /tmp/vllm-ids.txt || { echo "missing: $M"; MISSING=1; }
 done
 [ "$MISSING" -eq 0 ] && echo "PASS-Q1 unpatched serve + all adapters registered" || echo "FAIL-Q1"
