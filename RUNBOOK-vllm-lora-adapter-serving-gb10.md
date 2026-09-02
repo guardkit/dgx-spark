@@ -32,7 +32,9 @@ vLLM image        vllm/vllm-openai:v0.25.0-aarch64-cu129   (built 2026-07-11)
                   v0.26.x and v0.27.1 CANNOT LOAD GEMMA 4 (v0.27.1 proved by execution here): they ship
                   transformers >= 5.14, whose per-layer attention config for Gemma 4 (transformers
                   #47384, in 5.15.0) makes a plain `getattr` on `head_dim` raise in vLLM's
-                  `get_head_size()`.
+                  `get_head_size()`. v0.25.0's image ships **transformers 5.13.0**, which predates
+                  that guard entirely — that, and nothing else, is why this release still loads the
+                  model.
                   v0.28.0 (tag 2026-08-24, arm64 image 2026-08-26) CONTAINS THE vLLM-SIDE FIX — PR
                   #49797 "Fix Gemma 4 for upcoming Transformers version" (merged 2026-08-10; not in
                   0.27.x per the maintainer) — and its LoRA resolver, FusedMoE experts path and `gemma4`
@@ -149,6 +151,12 @@ done
 # It FAILS CLOSED: silence because the command could not run is not permission to proceed.
 if ! FORGE_STATUS=$(docker exec forge-prod forge --config /var/forge/forge.yaml status 2>&1); then
   echo "FAIL-estate: cannot read forge status — DO NOT PROCEED"; echo "$FORGE_STATUS" | tail -5
+elif ! printf '%s\n' "$FORGE_STATUS" | grep -q 'BUILD' \
+  || ! printf '%s\n' "$FORGE_STATUS" | grep -q 'STATUS'; then
+  # An empty or header-less answer is a FAILED READ, not an idle factory. forge prints its table
+  # header even when no builds exist, so its absence means we learned nothing about the GPU.
+  echo "FAIL-estate: forge status printed no table header — DO NOT PROCEED"
+  printf '%s\n' "$FORGE_STATUS" | tail -5
 elif printf '%s\n' "$FORGE_STATUS" | grep -qE 'RUNNING|PAUSED|QUEUED'; then
   echo "FAIL-estate: a build is non-terminal — DO NOT PROCEED"
   printf '%s\n' "$FORGE_STATUS" | grep -E 'RUNNING|PAUSED|QUEUED'
@@ -157,7 +165,10 @@ else
 fi
 ```
 
-**▶ GATE:** all PASS, or stop. `FAIL-estate` is absolute — the factory owns the GPU.
+**▶ GATE:** all PASS, or stop. `FAIL-estate` is absolute — the factory owns the GPU. It **fails
+closed** in three ways: the command not running, the command answering without its table header
+(a read that told us nothing), and any row reading RUNNING, PAUSED or QUEUED. Silence is never a
+pass, and no seat is unloaded until this gate says PASS-estate.
 
 ## Phase 1: Serve UNPATCHED
 
