@@ -145,9 +145,7 @@ layer 15 expert 5, 0.8468 / 0.8777 on the product owner's layer 0 expert 0, and 
 its layer 29 expert 64 — the same band as the calibration.
 
 Swept across whole layers rather than sampled experts (`converter-v2-verify.txt`): coach layer 0,
-**126 of 128** experts score above 0.5; coach layer 29, **109 of 128**. The 19 that do not are
-explained by the instrument, not the export: 17 of them have a merged difference below 0.001, which
-is at the merged file's own rounding floor. Layer 29 expert 127 is the clearest case — its merged
+**126 of 128** experts score above 0.5; coach layer 29, **109 of 128**. Of the 19 that do not, 17 have a merged difference below 0.001, which is at the merged file's own rounding floor — too small for the instrument to see — and two (non-tiny) are unexplained by any receipt. Layer 29 expert 127 is the clearest case — its merged
 difference is 4.4e-4 against a reconstruction of 1.2e-3, so the cosine of 0.278 is measuring rounding
 error. **The merge itself loses the tiniest per-expert differences**, so an expert whose trained
 change is that small cannot be verified this way at all; the check confirms the converter on every
