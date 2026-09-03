@@ -116,8 +116,7 @@ order matters on this box.
 `:9000/v1/models` five seconds later. The starting request (24-token prompt to
 `product-owner-agent` — `start-request.json`, `usage.prompt_tokens` 24; the 32-token prompt belongs
 to S12b's starting request, `s12b-start-request.json`) was fired at 12:00:41Z; the container came up
-at 12:00:32Z and the member was ready at 12:09:13Z — **8 minutes 32 seconds**, and the request itself returned HTTP 200 after
-511.8 s having waited for the load. The switchboard's patience setting (`healthCheckTimeout`) was
+at 12:00:32Z and the member was ready at 12:09:13Z — **8 minutes 32 seconds**, and the request itself returned HTTP 200 after 511.8 s having waited for the load. The switchboard's patience setting (`healthCheckTimeout`) was
 600 s at the time, so this left 88 seconds of margin.
 
 **The three checks through LiteLLM** (`litellm-check.json`), each made from inside a container that
