@@ -22,6 +22,9 @@ Three words used throughout, in plain English:
 - **The cache** (vLLM's logs call it the KV cache) is the working memory a served model needs for
   each request in flight. Its size is quoted in tokens: 131,072 tokens is four requests at the
   32,768-token context we serve, which is what the eight-sentence campaign needs.
+- **The eight-sentence campaign** is the frozen bake-off: eight feature requests, written out in
+  advance and never changed, sent one at a time through the real factory. The sentences and the
+  rules are in `ai-transition/docs/bakeoff-tunes-vs-bases-preregistration-2026-08-25.md`.
 
 ---
 
@@ -89,7 +92,8 @@ existing `audio-parakeet.sh`) starts image `vllm/vllm-openai:v0.25.0-aarch64-cu1
 --no-enable-prefix-caching --limit-mm-per-prompt '{"image":0}'`. The start line uses
 `docker rm -f` rather than `--rm`, so a stopped container's log survives until the next start — the
 campaign needs it as proof of which adapter answered. `VLLM_BATCH_INVARIANT` is deliberately **not**
-set (deterministic kernels made the product-owner seat run away on 2026-09-03 morning).
+set: deterministic kernels are the likely cause of the product-owner seat running away on
+2026-09-03 morning (the qualification is set out under *What this does and does not license* below).
 
 **The names moved.** From `config.diff`: a new entry `gemma4-adapters` (`checkEndpoint /v1/models`,
 `ttl: 0`, `concurrencyLimit: 4`) took ten aliases — `product-owner-agent`, `product-owner-v6`,
@@ -109,9 +113,11 @@ collisions: 30 entries, zero collisions.
 order matters on this box.
 
 **Time to ready.** The config landed in one move at 12:00:28Z and the new names were visible on
-`:9000/v1/models` five seconds later. The starting request (32-token prompt to
-`product-owner-agent`) was fired at 12:00:41Z; the container came up at 12:00:32Z and the member was
-ready at 12:09:13Z — **8 minutes 32 seconds**, and the request itself returned HTTP 200 after
+`:9000/v1/models` five seconds later. The starting request (24-token prompt to
+`product-owner-agent` — `start-request.json`, `usage.prompt_tokens` 24; the 32-token prompt belongs
+to S12b's starting request, `s12b-start-request.json`) was fired at 12:00:41Z; the container came up
+at 12:00:32Z and the member was ready at 12:09:13Z — **8 minutes 32 seconds**, and the request
+itself returned HTTP 200 after
 511.8 s having waited for the load. The switchboard's patience setting (`healthCheckTimeout`) was
 600 s at the time, so this left 88 seconds of margin.
 
@@ -124,9 +130,13 @@ already held the key, so no key touched a shell:
 | `product-owner-agent` | the product-owner specialist container | 200 in 1.2 s | 24 / 21 |
 | `architect-agent` | the architect specialist container | 200 in 1.2 s | 24 / 22 |
 
-All three are in LiteLLM's own spend log at 12:14:04.848, 12:14:12.676 and 12:14:13.926, and each
-is matched in the vLLM log by a batch of 30 `Successfully loaded LoRA weights for module …
-moe.experts` lines — one per layer — showing that adapter being pulled into a graphics slot.
+All three are in LiteLLM's own spend log at 12:14:04.848, 12:14:12.676 and 12:14:13.926. Two of the
+three are matched in the vLLM log by a fresh batch of 30 `Successfully loaded LoRA weights for
+module … moe.experts` lines — one per layer — showing that adapter being pulled into a graphics
+slot: the coach at 12:14:05 and the architect at 12:14:13–12:14:14. The third, the product-owner
+call, needed no reload at all — its adapter was still in a slot from the starting request, whose own
+batch of 30 is at 12:09:10, which is why it answered in 1.2 s (all four times from
+`litellm-check.json`).
 
 **And then the coding model was asked for, and the proxy died twice.** One small completion for
 model `workhorse` was sent at 12:10:10Z from inside the product-owner specialist container. The
@@ -143,10 +153,12 @@ adapter host itself survived both kills untouched (`OOMKilled=false`).
 profiles. The switchboard preloads the member first, from a clean box — exactly the condition that
 maximises the claim — so the same 0.60 dial that gave 269,516 tokens in S11 gave **531,460 tokens**
 here, which at the measured 42.6 KB per token is **21.08 GiB** of cache. Added to 51.04 GiB of
-weights that is the **72.98 GiB** member recorded in the script's own comment block
-(`s12b-kvcap.json`, step 1); measured on the box's free-memory figure the member cost about **82
-GiB** (102 GiB before it started, 20–21 GiB settled). Either way there was nothing left for a 26 GB
-seat, and the kernel picked the proxy.
+weights that is **72.12 GiB**. The member script's own comment block writes the figure as 72.98 GiB
+(`s12b-kvcap.json`, step 1; `s12b-script.diff`), which is a different number: 72.98 GiB is what the
+0.60 dial comes to against the box's 121.63 GiB of total memory (`MemTotal` 127,535,220 kB,
+`s11-dial.json`) — the dial's target, not the sum of weights and cache. Measured on the box's
+free-memory figure the member cost about **82 GiB** (102 GiB before it started, 20–21 GiB settled).
+Either way there was nothing left for a 26 GB seat, and the kernel picked the proxy.
 
 ### S12b — a fixed cache budget, and both processes resident
 
@@ -168,13 +180,15 @@ exactly those four lines plus dated comments, and the edited file was parsed wit
 (30 entries, `gemma4-adapters` present) before it moved into place at 12:23:02Z.
 
 **Restart through the switchboard.** Unload at 12:23:46Z (HTTP 200, `OK`), confirmed gone by
-12:23:59Z, with 102.99 GiB free. Starting request fired 12:24:08Z; ready 12:32:37Z — **509 seconds**,
-against the 900 now allowed, so 391 seconds of margin instead of 88.
+12:23:59Z. The memory reading with the member gone — **102.99 GiB available** — is stamped
+12:24:08Z (`s12b-mem-before-start.txt`), not 12:23:59Z. Starting request fired 12:24:08Z; ready
+12:32:37Z — **509 seconds** against the 900 now allowed, so 391 seconds of margin instead of 88.
 
 **What the log says now.** The server's own arguments line at 12:24:17 carries
-`'kv_cache_memory_bytes': 8589934592`. Weights: 51.04 GiB in 326.5 s (`gpu_model_runner.py:5306`),
-identical to every previous run. And in place of the usual profiling lines,
-`gpu_worker.py:459` at 12:30:56:
+`'kv_cache_memory_bytes': 8589934592`. Weights: **51.04 GiB** in 326.5 s
+(`gpu_model_runner.py:5306`). The 51.04 GiB is identical to every previous run; the seconds are not
+— S12 loaded the same weights in 321.4 s (`s12-switchboard.json`). And in place of the usual
+profiling lines, `gpu_worker.py:459` at 12:30:56:
 
 > "Initial free memory 99.75 GiB, reserved 8.0 GiB memory for KV Cache as specified by
 > kv_cache_memory_bytes config and skipped memory profiling. This does not respect the
@@ -201,7 +215,12 @@ the same one it was before the stage.
 | `coach` | forge-prod | 200 in 2.8 s | 26 / 54 |
 | `workhorse` | product-owner specialist container | 200 in 3.4 s | 25 / 164 — asked 17 plus 25, answered 42 |
 
-All four are in LiteLLM's spend log (12:39:28.97, 12:41:52.862, 12:42:01.438, 12:42:14.303), and the
+All four are in LiteLLM's spend log, at **12:41:52.862** (product owner), **12:42:01.438**
+(architect), **12:42:14.303** (coach) and **12:42:40.140** (the coding model's re-check, the row
+that answered 42). The earlier 12:39:28.97 row is a different call — the separate load probe that
+pulled the coding model into memory, 13 prompt and 8 completion tokens — and is not one of these
+four. The S12b receipt's own query ran before the 12:42:40 row had been written and says so
+(`s12b-kvcap.json`); the four times above were re-read from `LiteLLM_SpendLogs` on 2026-09-03. The
 vLLM log shows the adapter swaps: the product owner was already in a slot from the starting request
 (which is why it needed no reload), the architect was pulled in at 12:42:01 and the coach at
 12:42:14, displacing one of the others — correct behaviour with only two graphics slots
@@ -222,14 +241,17 @@ adapter's 30 expert-load lines in the container log.
   weights plus 8 GiB of cache); the extra roughly 15 GiB is the graphics context, activation
   buffers, the 10 GB shared-memory segment the container holds, and four processor-side copies of
   the adapters from `--max-cpu-loras 4`. **Anyone planning from this should use 74, not 60.**
-- **The box settles at about 5.4 GiB available with 3 GB of swap free** (5.90 GiB at 12:41:26Z,
-  5.38 GiB at 12:43:53Z, `s12b-kvcap.json`; the coach recorded `MemAvailable` 5,468,280 kB). For
+- **The box settles between 5.2 and 5.9 GiB available, with about 3 GB of swap free.** Three
+  readings, each with its own value and its own file: **5.90 GiB** sixty seconds after both were
+  resident, 12:41:26Z (`s12b-kvcap.json`); **5.38 GiB** at the end of the stage, 12:43:53Z
+  (`s12b-kvcap.json`); and **5.21 GiB** when the independent coach checked a few minutes later —
+  `MemAvailable` 5,468,280 kB, which is 5.21 GiB, not 5.4 (`s12b-coach-verdict.txt`). For
   comparison, S11's two successful runs settled at 9.7 GiB and 4.2 GiB and both had swap completely
   exhausted; this one sits between them and still has swap left.
 - **At the time of writing** (this document, 2026-09-03 afternoon, read directly) the switchboard's
   `/running` lists `embed`, `gemma4-adapters` and `qwen36-workhorse` all `ready`, LiteLLM is still
   process 2643145, and `MemAvailable` reads 4,415,640 kB — about 4.2 GiB, lower than the coach's
-  5.4 GiB an hour earlier. The band is real and it is narrow.
+  5.21 GiB an hour earlier. The band is real and it is narrow.
 - **The early-warning sign.** One NVIDIA driver line exists after the S12 cascade:
   `NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned
   from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359`, at 13:39:30 local = 12:39:30Z — the exact
@@ -261,9 +283,12 @@ factory's seats are served, made for the campaign, and it is reversible in one f
   scores whether the answer is right. Any claim about plan quality on this path has to come from the
   campaign's own plan-checker scores, not from a prior exam.
 - **Repeated runs are not byte-identical.** Deterministic mode (`VLLM_BATCH_INVARIANT`) is off by
-  design, because with it on the product-owner adapter ran away on long generation (2026-09-03
-  morning). So the same sentence sent twice will not produce identical text. This was never true on
-  the llama.cpp path either.
+  design. With it on, the product-owner adapter ran away on long generation (2026-09-03 morning) —
+  but the mode is **the likely cause, not a proven one**. The plan of record records that the second
+  launch also carried three adapters rather than four, so two things differed, not one, and neither
+  was tested alone (`ai-transition/docs/software-factory-plan-of-record.md`, 2026-09-03 morning).
+  The practical decision is unaffected: the mode stays off. So the same sentence sent twice will not
+  produce identical text. This was never true on the llama.cpp path either.
 - **The keepalive will not revive the member.** `/usr/local/bin/llama-swap-keepalive.sh` was not
   changed (`s12-switchboard.json`). A switchboard restart will preload `gemma4-adapters`, but if the
   member ever stops on its own, nothing brings it back automatically — someone has to send a request
@@ -362,7 +387,11 @@ running it — both caught by checking state afterwards and both redone correctl
 - The 8 GiB cache budget was not tuned further; it cleared the campaign bar on the first attempt, so
   no second value was tried.
 - No secret was printed, saved, diffed or read from a process environment at any stage; every call
-  that needed the LiteLLM key ran inside a container that already held it. All 56 receipt files are
-  mode 600 and the secret scan returned zero.
+  that needed the LiteLLM key ran inside a container that already held it. Counted on 2026-09-03
+  with `find <folder> -type f | wc -l` and `find <folder> -type f ! -perm 600 | wc -l`: the S12/S12b
+  folder `~/fine-tuning/output/vllm-switchboard2-2026-09-03/` holds **56 files, all mode 600**, and
+  the S11 folder `~/fine-tuning/output/vllm-switchboard-2026-09-03/`, which was at 664 and 775 when
+  the coach checked it, has since been tightened and now holds **61 files, all mode 600**. The
+  secret scan returned zero.
 - The switchboard config is not in a repository; the receipts named above are its record.
 - This document was written from receipts and read-only checks. Nothing was pushed.
