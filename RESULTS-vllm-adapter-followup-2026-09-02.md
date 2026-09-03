@@ -33,9 +33,10 @@ miss all three times (`s8b-runaway.json`; `control-A.json`). That result only ap
 deterministic mode was off. With the mode on (stage S8) the very same adapter, export, engine, dial
 and prompt ran away: all three replies hit the 16,384-token ceiling, wrote one of the four required
 files, repeated the same nineteen scenarios about eleven times over, and could not be graded at all
-(`s8-followup.json`). Stage S8b changed exactly one thing — it did not set `VLLM_BATCH_INVARIANT` —
-and the runaway vanished, so **the runaway belongs to the deterministic-kernel mode meeting the expert
-adapters on long generation, not to the runtime expert path**; the price of turning the mode off is
+(`s8-followup.json`). Stage S8b did not set `VLLM_BATCH_INVARIANT` — and, incidentally, held three adapters rather than four
+(`--max-loras 3`, cache 16.50 GiB against 13.94) — and the runaway vanished, so **the runaway most likely belongs to the deterministic-kernel mode meeting the expert
+adapters on long generation, not to the runtime expert path** — the adapter count changed too, so the two
+were not separated (see Deviations); the price of turning the mode off is
 that three runs at temperature zero no longer give byte-identical replies. **Coach:** it passes at
 the dial this box can live with, six of six runs green and fifteen of fifteen checks, both with the
 mode on and with it off (`s8-followup.json`, `s8b-runaway.json`), so the mode was never what made the
@@ -109,7 +110,7 @@ Common to both: `--enable-lora --max-lora-rank 16 --reasoning-parser gemma4 --ma
 **Where the receipts live.** Everything is under
 `~/fine-tuning/output/vllm-followup-2026-09-02/`, and file names below are relative to that directory
 unless a full path is given. Exam runs are under
-`~/Projects/appmilla_github/fleet-evals/runs/`, in four run directories created for this work and
+`~/Projects/appmilla_github/fleet-evals/runs/`, in five run directories created for this work and
 never written into afterwards:
 `po-heldout-spec/20260902-followup-po-v6-v3-batchinvariant`,
 `po-heldout-spec/20260903-followup-po-v6-v3-plain`,
@@ -182,13 +183,14 @@ closed it. Counted directly from repetition 1's `response.txt`: **203 `Scenario:
 written out about eleven times over. All three `response.txt` files have md5
 `ae27836a07e01b3350ae808153bef88a`, so the deterministic mode was doing exactly what it promises —
 pinning the answer — and the answer it pinned was a loop. There is no digest file to parse, so the
-harness fell back to its simpler slicer, three checks measured nothing, and the run **could not be
+harness fell back to its simpler slicer, ten of the seventeen checks returned no verdict (three skipped, seven errored on the missing files), and the run **could not be
 graded**. That is not a score of anything, and it must not be quoted as one. Each repetition took
 about seventeen minutes (1,018.7 / 1,003.9 / 1,053.3 seconds, from each `config.json`).
 
 ### What S8b says about it: the mode, not the path
 
-S8b changed one thing and one thing only — `VLLM_BATCH_INVARIANT` was not set, confirmed by the
+S8b changed the one thing it meant to — `VLLM_BATCH_INVARIANT` was not set — and one it did not mean to,
+holding three adapters rather than S8's four (`--max-loras 3 --max-cpu-loras 6`; see Deviations); the mode change is confirmed by the
 server's own line `'VLLM_BATCH_INVARIANT': False` in `kv-lines-s8b.txt`. Same image, same base model,
 same corrected exports, same dial, same prompt bytes, same temperature, same token budget. Every one
 of the six product-owner repetitions then ended by itself, wrote all four demarcated FILE blocks, and
@@ -202,7 +204,7 @@ Two readings follow. First, on this exam the adapter path now equals or beats th
 `po-v6` at 17/16/16 and `po-v5` at 17/17/17 against the merged weights' 16/16/16, and the check
 `po-v6` misses in repetitions 2 and 3 is `test_summary_coherence` — the Integration section not naming
 the summary path — which is the identical check the merged weights fail all three times (each
-repetition's `grade.txt`; `control-A.json`). Two independent product-owner adapters clearing the exam
+repetition's `grade.txt`; `control-A.json`). Two versions of the product-owner tune clearing the exam
 on the same working expert path means the clean `po-v6` result is not a fluke of one adapter. Second,
 the cost of switching the mode off is repeat-run reproducibility: the three `po-v6` replies have three
 different md5 sums and so do the three `po-v5` ones, where S8's three were identical
@@ -236,8 +238,8 @@ were word-for-word identical across all three repetitions and quoted in full in 
 they name the file and line (`features/rsvp.feature:41`), the offending argument
 (`start_roster_sync() got an unexpected keyword argument 'retry_policy'`), and the manufactured green
 (`tests/conftest.py injects a fake gateway into sys.modules before collection`). Against S5, one
-finding is classed differently — S5 recorded the first escape-kin finding as defect class DC-14 and
-S8 records it as DC-08, naming the same defect at the same file and line — and both wordings pass the
+finding is classed differently — the controls' S5 run recorded the first escape-kin finding under one defect-class code (DC-14) and
+S8 records it under another (DC-08) — the codes are the coach's own taxonomy of defect kinds — naming the same defect at the same file and line — and both wordings pass the
 grader. Verdicts match the merged model's on every bundle: reject the four escape-kin bundles, reject
 the two dishonest catch-and-green bundles, approve the two honest ones.
 
@@ -354,8 +356,9 @@ padded once — with a 4,096-token budget, so replies could end when they were f
 | four at once | `coach-ft-v4` | 339.7 | 2,617 | 7.70 | stopped by itself |
 | four at once | `architect-plan-v2` | 283.1 | 2,099 | 7.41 | stopped by itself |
 
-Aggregate throughput: **15.0 tokens per second for one request, 22.6 across two (1.51×), 30.9 across
-four (2.06×)**. So four adapters do share one process and one copy of the base model, and adding
+Aggregate throughput, counting every token generated in the batch's window over that window's wall clock:
+**15.0 tokens per second for one request, 22.2 across two (1.49×), 27.9 across four (1.87×)** (summing each
+request's own rate instead gives 22.6 and 30.9, which flatters the batch because the shorter replies finish early)**. So four adapters do share one process and one copy of the base model, and adding
 callers buys real work: each of four requests runs at about half the speed of one alone rather than
 queuing behind it. At 7.4 to 8.3 tokens per second each, though, this is a batch machine.
 
@@ -411,7 +414,7 @@ harness normally does; it was not reconfigured or restarted.
 ## Deviations
 
 **The S8 container inspection was saved too thin.** For S8 the only saved inspection is a one-line
-text file (`inspect-s8.txt`) recording that the container was not killed and exited cleanly. It does
+text file (`inspect-s8.txt`) recording that the container was not killed (`OOMKilled=false`; the `ExitCode=0` in the same line was taken while the container was still running, so it says nothing about the exit). It does
 not record the environment or the mounts. So the evidence that `VLLM_BATCH_INVARIANT` was set for S8,
 and that the adapters were mounted read-only from `vllm-exports-v3`, rests on the launch script
 (`launch-s8.sh`) and on the server's own log (`'VLLM_BATCH_INVARIANT': True` at
@@ -440,6 +443,8 @@ the planner has never been served with the deterministic mode off.
 
 **Never more than three repetitions of anything**, and no run directory that already existed was
 written into; all five run directories used here are new.
+
+**The exam harness has no runaway guard.** Each S8 product-owner run generated to the 16,384-token ceiling for about seventeen minutes before anyone could grade it; production's degeneration guard would have cut that short. The harness should get one, so a runaway becomes a fast failure rather than a slow one.
 
 **Not done, and worth naming.** No planner exam — none exists, and none was invented. No merged-weights
 control was re-run on either of these servers; the merged numbers are quoted from the previous day's
@@ -499,3 +504,5 @@ now recommending against.
 6. **Make the export gate real.** Add the merged-difference comparison and the per-module load check
    to the converter's own verify step, so an adapter that is silently switched off cannot reach an
    exam again. Both are small scripts and both faults this lane found were invisible without them.
+
+*Coordinator's amendment, 2026-09-03. The S9 reviewer blocked this document because two sentences said Stage 8b changed only one thing while its own receipts record a second, incidental change (three adapters resident rather than four); both sentences now say so and the causal conclusion is qualified. Also corrected on the reviewer's findings: the planner failure-mode counts (both replies were cut off by the token budget), the slot aggregates (now computed over the batch window, with the flattering method named), the run-directory count, the number of unmeasured checks in the runaway, the over-read of the S8 inspect line, two unglossed shorthands, and "independent adapters" for two versions of one tune. A note on the harness's missing runaway guard was added. No measurement changed. The block was resolved by correcting the document.*
