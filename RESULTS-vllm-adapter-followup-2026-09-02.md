@@ -285,8 +285,8 @@ matters.
 
 **One correction to an earlier draft.** A draft of this write-up said the planner "adds a failure mode
 and named test case per section, which the base does not". That is false as written. Both replies do
-it: the base reply carries four `Failure Mode:` lines each paired with a `Guard/Test:` line, and the
-planner's carries six `Failure Mode:` lines each paired with a `Test Case:` line (counted directly in
+it: the base reply carries four `Failure Mode:` lines, three of them paired with a `Guard/Test:` line (the fourth is cut off mid-word where the 1,024-token budget ended), and the
+planner's carries six `Failure Mode:` lines, five paired with a `Test Case:` line (the sixth has no partner for the same reason) (counted directly in
 `planner/gemma4-base.txt` and `planner/architect-plan-v2.txt`). It is a difference of count and label,
 not of presence — and since neither reply is graded, it is not evidence of anything beyond the two
 being different.
