@@ -221,9 +221,9 @@ between them. A run is green only if every check in the frozen battery passes.
 | Configuration | Runs green | Checks green | Files |
 |---|---|---|---|
 | Merged 8-bit weights under llama.cpp, 25 July baseline | 6 of 6 | — | `fleet-evals/runs/coach-heldout/coach-ft-v4-2026-07-25/` |
-| Merged 16-bit weights under vLLM, no adapter (S2, 2026-09-02) | 6 of 6 | — | `.../coach-ft-v4-merged-vllm-temp0-2026-09-02/` |
+| Merged 16-bit weights under vLLM, no adapter (S2 (controls lane, merged coach), 2026-09-02) | 6 of 6 | — | `.../coach-ft-v4-merged-vllm-temp0-2026-09-02/` |
 | Old and wrongly-named exports under vLLM (three separate configurations, 2026-09-02) | 0 of 6 each | — | see the controls document |
-| Renamed export, deterministic mode on, dial 0.70, five adapters (S5, 2026-09-02) | 6 of 6 | 15 of 15 | `.../coach-ft-v4-moe-vllm-batchinvariant-temp0-2026-09-02/` |
+| Renamed export, deterministic mode on, dial 0.70, five adapters (S5 (controls lane, deterministic mode), 2026-09-02) | 6 of 6 | 15 of 15 | `.../coach-ft-v4-moe-vllm-batchinvariant-temp0-2026-09-02/` |
 | **S8 — corrected export, deterministic mode ON, dial 0.65, four adapters** | **6 of 6** | **15 of 15** | `.../coach-ft-v4-v3-followup-2026-09-02/`; `s8-followup.json` |
 | **S8b — corrected export, deterministic mode OFF, dial 0.65, three adapters** | **6 of 6** | **15 of 15** | `.../coach-ft-v4-v3-plain-2026-09-03/`; `s8b-runaway.json` |
 
