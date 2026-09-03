@@ -300,7 +300,7 @@ it, the more long requests can be in flight at once.
 
 | Launch | Dial | Adapters resident | Weights loaded (GiB) | Cache (GiB) | Cache (tokens) | Full-length requests' worth | Machine memory left (GB) | Source |
 |---|---|---|---|---|---|---|---|---|
-| 2026-09-02 S4 (i) | 0.55 | 4 | 53.62 | 1.54 | 38,847 | 1.19× | not recorded | controls document |
+| 2026-09-02 S4 (i) (controls lane, first cache launch) | 0.55 | 4 | 53.62 | 1.54 | 38,847 | 1.19× | not recorded | controls document |
 | **S8, this work** | **0.65** | **4** | **53.62** | **13.94** | **351,628** | **10.73×** | **19** | `kv-lines-s8.txt`, `mem-settled-s8.txt`, `mem-s8.csv` |
 | **S8b, this work** | **0.65** | **3** | **52.37** | **16.50** | **416,056** | **12.70×** | **20** | `kv-lines-s8b.txt`, `mem-settled-s8b.txt` |
 | 2026-09-02 S4 (i) | 0.70 | 4 | 53.62 | 20.71 | 522,333 | 15.94× | 14 | controls document |
