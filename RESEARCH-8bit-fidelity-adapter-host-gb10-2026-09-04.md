@@ -440,3 +440,99 @@ Unchanged. The 48 prompts are the fixed input; the host is the variable. Point t
 - [GGUF quantization levels explained](https://tinyweights.dev/posts/gguf-quantization-levels-q4-q5-q8/) — "Q8_0 is within rounding error of FP16 quality (perplexity difference of roughly 0.01 at 8B scale)". The page resolves in a browser but refused an automated fetch during independent review (HTTP 403); the study behind it is [arXiv 2601.14277](https://arxiv.org/abs/2601.14277), "Which Quantization Should I Use? A Unified Evaluation of llama.cpp Quantization on Llama-3.1-8B-Instruct"
 - [vLLM on the DGX Spark](https://vllm.ai/blog/2026-06-01-vllm-dgx-spark) — published 2026-06-01; advises using builds validated specifically for sm_121; does not discuss FP8 or INT8
 - The 2026-09-03 note in this repo, `RESEARCH-fp8-vs-nvfp4-adapter-host-gb10-2026-09-03.md`, carries the NVFP4 model cards and the DGX Spark forum threads on 4-bit, which are not repeated here
+
+## Dated note, 2026-09-04 ~21:20Z — candidate A tried, aborted at load; and vLLM's own recipe names this flag
+
+**What happened.** On Rich's word the switchboard entry was swapped to candidate A (`--quantization
+int8_per_channel_weight_only --moe-backend triton`, `--linear-backend torch` removed, nothing else changed).
+The flag took: the log read `Using TRITON Int8 MoE backend out of potential backends: ['TRITON', 'HUMMING',
+'CPU']`. Then the layer-by-layer expert load kept taking memory: available memory went 101 → 52 → 28 → 21 →
+15 → 5 → 0.2 GiB with 15 GB of swap in use, and the experts were still loading five minutes in (the FP8
+load of the same model never dips below about 35 GiB free). The coordinator stopped the lane and unloaded the
+entry at about 21:07Z, but the kernel had already killed three processes: the LiteLLM proxy (21:07:53Z;
+restarted by systemd and healthy again by 21:09Z), a Claude Code session belonging to another window
+(21:08:06Z), and the embedder (21:08:54Z; reloaded). The FP8 script was restored byte-identical and the FP8
+entry was back and answering, directly and through the proxy, by 21:19Z, with 53 GiB free. No factory build
+was running. No exam ran, so nothing here says anything about candidate A's fidelity or speed. Receipts:
+`~/fine-tuning/output/candidate-a-int8-exam-2026-09-04/c1-abort/` (the candidate's full container log, the
+script as run, the kernel kill lines, the abort time).
+
+**What it means.** Candidate A cannot be tried as a load-time (online) path on this box: whatever the loader
+holds while it quantises the experts, it exceeds the 121 GB unified pool for this model, while the FP8
+online path fits comfortably. That is a memory-at-load fact, not a verdict on the scheme. The way to test
+the scheme here is to quantise once, offline, into a compressed-tensors INT8 file, which then loads small;
+weight-only per-channel INT8 needs no calibration data, so that is a short job. Any such test belongs in a
+separate container on a quiet box with a memory watchdog that unloads below a threshold, never on the
+production entry. Two lessons for the record: online quantisation schemes differ hugely in load-time peak
+memory, and tonight's lane had no memory watchdog; both are now standing rules.
+
+**The sweep's biggest error, corrected.** The forum sweep (below) reported that no page anywhere carries
+the flag `int8_per_channel_weight_only`. That was true of a plain web search and false of the world.
+vLLM's own recipes repository, `vllm-project/recipes`, file `Google/Gemma4.md` (read 2026-09-04 via the
+GitHub API), says, verbatim: "The 26B-A4B MoE model is not included — its small expert dimensions (704)
+cause excessive quality loss with 4-bit quantization. For the MoE model, use `--quantization
+int8_per_channel_weight_only` (online, no checkpoint needed) which provides ~47% memory savings with
+negligible quality impact." Its serve command for `google/gemma-4-26B-A4B-it` is that flag with
+`--max-model-len 32768 --gpu-memory-utilization 0.90`. So the scheme this note recommends is the one vLLM
+itself recommends for this exact model. The recipe gives no numbers and was not written for a Spark, and it
+says nothing about loading on unified memory, which is where tonight's attempt failed.
+
+## Forum and issue sweep, 2026-09-04 (fifteen sources; every quote re-checked by a second reader)
+
+What the NVIDIA DGX Spark forum and the vLLM and SGLang trackers say that bears on trying an 8-bit
+weight-only scheme on this chip. Where the second reader found a source overstated, the wording here is the
+corrected one.
+
+- **Triton is the expert kernel on this chip, by default and by necessity.** vLLM issue #43507 (user report,
+  2026-05-23, open, no maintainer reply) shows the backend selection line `Using TRITON Fp8 MoE backend out of
+  potential backends: [AITER, FLASHINFER_TRTLLM, FLASHINFER_CUTLASS, DEEPGEMM, VLLM_CUTLASS, TRITON, MARLIN,
+  ...]` and gives the reason: CUTLASS 4.5 ships no grouped-expert kernel for SM_120/SM_121. A detailed user
+  report, not an upstream ruling.
+- **The one recognisable way a Triton expert kernel fails on this chip.** SGLang issue #28019 (2026-06-12,
+  a self-filed report on `RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic` on a GB10): `triton.runtime.errors.
+  OutOfResources: shared memory, Required: 147456, Hardware limit: 101376` on the first forward pass. The issue
+  was closed by a bot for inactivity; the fix pull requests (#28038, #28077) are still open and unmerged. SGLang,
+  not vLLM, but the same kernel family, model and chip. Tonight's attempt never reached a forward pass.
+- **The only GB10 expert tuning tables upstream are FP8 and not our shape.** vLLM PR #52502 (merged
+  2026-08-17) adds exactly two files, `E=256,N=512` and `E=512,N=512`, `dtype=fp8_w8a8`, tuned on a DGX Spark
+  for DeepSeek-family shapes; a GitHub code search for `NVIDIA_GB10` in the repository returns those two files
+  and nothing else. Our model is 128 experts of width 704, and the tuning-file name carries the scheme
+  (`fused_moe/config.py` on main: `elif use_int8_w8a16: return "int8_w8a16"`), so an INT8 run would use generic
+  fallback settings. vLLM-Tune (forum, serapis, 2026-04-27) tunes FP8 expert and dense kernels on the Spark and
+  warns `Using default W8A8 Block FP8 kernel config. Performance might be sub-optimal!`; it does not cover
+  INT8 weight-only.
+- **The only public INT8 attempt on a GB10 is the dense route, and it is unresolved.** Forum thread 371315
+  ("INT8 AWQ (W8A16) completely broken on DGX Spark", 2026-05-25 to 05-27, no reply since): `torch.
+  AcceleratorError: CUDA error: an illegal memory access was encountered`, with the poster's untested theory
+  about Triton kernels assuming discrete GPU memory. Nothing in it concerns the expert path.
+- **Silent wrongness is documented on this chip.** Forum thread 381433 (myron4, 2026-08-27): "The auto-
+  selected FLASHINFER_CUTLASS NvFp4 MoE backend produces degenerate output (repeated-token loops from the first
+  generated token) with zero errors", and a start-up that looks hung for an hour can be kernel autotuning into
+  an empty cache (a worker at 150 percent processor use; cache under `~/.cache/vllm`). Both are for a 4-bit
+  backend; the lesson carries: the exams, not a clean start, are the acceptance test.
+- **Memory advice from Spark owners.** The DeepSeek-V4-Flash recipe thread (alex.busse, first post
+  2026-06-27, a two-machine setup): "on GB10 (GPU + host RAM are one unified pool) that drains the UMA until
+  the host silently wedges"; practical memory dial 0.80 to 0.82. Our entry runs at 0.60.
+- **Online quantisation of Gemma 4 on a Spark is established, for the dense model.** Forum thread 365814
+  (danielkreuzhofer, 2026-04-07, Gemma 4 31B dense): `--quantization fp8 --kv-cache-dtype fp8`, Triton forced
+  because Gemma 4 has mixed head sizes, and `VLLM_DISABLE_COMPILE_CACHE=1` for a compile-cache pickling error.
+- **Public speed reference for our exact model.** Forum thread 365503 (WilliamD, 2026-04-02): the 26B
+  mixture-of-experts model at 16-bit decodes at about 23.7 tokens per second on one Spark; a reply (eugr,
+  2026-04-03) reports "~40 t/s in FP8" on a different setup.
+- **Runtime adapters on this model, on the forum, are about file formats on an unquantised base** (thread
+  366223, 2026-04-10 to 07-30). No public report combines runtime adapters with any quantisation on a Spark.
+- **8-bit weights with 16-bit arithmetic does execute on this chip**, in one hand-written case: an INT8
+  W8A16 output-layer kernel for a 122B model (forum thread 378167, styles01, 2026-07-26), with no accuracy
+  statement. Weak but real.
+- **Do not rebuild the toolchain.** A self-built PyTorch/Triton toolchain on this chip produced `sm_121a not
+  implemented from ptxas` and tensor-descriptor errors (forum thread 380704, saskia.hold, 2026-08-20).
+- **The one llm-compressor-on-Spark thread got no answer** (forum thread 370644, hela, 2026-05-19: an
+  import error, zero replies).
+- **A Mamba-2 crash class, for completeness.** vLLM issue #37431 (2026-03-18, open): `CUDA error: an illegal
+  instruction was encountered` in Mamba-2 and linear-attention Triton kernels on SM121; `CUDA_LAUNCH_BLOCKING=1`
+  helped one reporter at a 37 percent speed cost and did not help another. Not the expert path.
+
+Nothing found on: any FP8-versus-INT8 answer-quality comparison on a Spark; the Triton INT8 weight-only
+expert kernel on SM_121, positive or negative; a working llm-compressor INT8 checkpoint made or served on a
+Spark; any GB10 tuning table for 8-bit-weight experts.
+
