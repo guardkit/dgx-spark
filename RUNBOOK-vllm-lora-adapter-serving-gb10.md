@@ -29,12 +29,16 @@ build is TERMINAL before starting (`forge status`) — see
 vLLM image        vllm/vllm-openai:v0.25.0-aarch64-cu129   (built 2026-07-11)
                   WHY THIS OLD RELEASE, AND NOT THE CURRENT ONE: v0.25.0 is the release that was
                   PROVEN HERE (2026-08-24, 50/51) to carry the LoRA resolver fix and load Gemma 4.
-                  v0.26.x and v0.27.1 CANNOT LOAD GEMMA 4 (v0.27.1 proved by execution here): they ship
-                  transformers >= 5.14, whose per-layer attention config for Gemma 4 (transformers
-                  #47384, in 5.15.0) makes a plain `getattr` on `head_dim` raise in vLLM's
-                  `get_head_size()`. v0.25.0's image ships **transformers 5.13.0**, which predates
-                  that guard entirely — that, and nothing else, is why this release still loads the
-                  model.
+                  v0.27.1 CANNOT LOAD GEMMA 4 — proved by execution here, with and without adapters:
+                  `AmbiguousGlobalPerLayerAttributeError` on `head_dim`, which is what the per-layer
+                  attention config for Gemma 4 (transformers #47384, released in 5.15.0) produces when
+                  vLLM's `get_head_size()` does a plain `getattr`. That v0.26.x cannot load it either is
+                  an UNTESTED INFERENCE from that same change, not a fact: #47384 reached transformers
+                  only in 5.15.0, which is later than v0.26.x, so v0.26.x may in fact load the model — it
+                  has never been run here and no image of it is on the box (corrected 2026-09-05; see the
+                  register, REGISTER-vllm-and-version-pin-issues-gb10-2026-09-05.md, entry 9).
+                  v0.25.0's image ships **transformers 5.13.0**, which predates that guard entirely —
+                  that, and nothing else, is why this release still loads the model.
                   v0.28.0 (tag 2026-08-24, arm64 image 2026-08-26) CONTAINS THE vLLM-SIDE FIX — PR
                   #49797 "Fix Gemma 4 for upcoming Transformers version" (merged 2026-08-10; not in
                   0.27.x per the maintainer) — and its LoRA resolver, FusedMoE experts path and `gemma4`
