@@ -103,6 +103,8 @@ llama-swap :9000        ← the unified-memory model layer (all-llama.cpp; one p
 
 Flat + prefixed, matching the established house convention:
 
+The [Qwen3.8-Flash-Next runbook](./RUNBOOK-qwen38-flash-next-seat.md) serves the model on one Spark through an OpenAI-compatible API, with validation gates and fleet restoration. Its [September 8 research](./qwen38-flash-next-single-spark-research-2026-09-08.md) compares the NVIDIA forum, Tony's recipes and the shared Spark Arena result. The recipe is pinned; local execution is pending.
+
 | Prefix / dir | Contents |
 |---|---|
 | `RUNBOOK-*.md` | Executable runbooks (the deliverables an agent runs). |

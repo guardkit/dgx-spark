@@ -1,0 +1,82 @@
+{
+  "kind": "public-research-extract-not-local-execution",
+  "retrieved_date": "2026-09-08",
+  "sources": {
+    "arena": "https://spark-arena.com/benchmark/7ec7eaf7-a10c-403d-be52-c44c0fc64539",
+    "recipe": "https://github.com/lancelind/qwen3.8-Flash-DGX/blob/4e1b246aa141e04bd45c20bd1334512988c3770b/recipes/qwen38-flash-hybrid-sharp-v2-vllm.yaml"
+  },
+  "retrieval_note": "Arena rendered HTML and embedded benchmarkData retrieved over HTTPS; web renderer failed and raw endpoint returned 403. Only technical fields retained.",
+  "arena_submitted_utc": "2026-08-31T10:36:33+00:00",
+  "arena_runtime": "vLLM",
+  "arena_cluster_size": 1,
+  "arena_speculative_decoding": false,
+  "selected_tests": [
+    {
+      "testName": "ctx_pp @ d65535 (c1)",
+      "tokensPerSec": 1859.2321459373622,
+      "tokensPerSecStdDev": 8.811490824900439,
+      "ttfr": 35251.94935159137,
+      "ttfrStdDev": 167.61004534928745,
+      "estPpt": 35250.292459269986,
+      "estPptStdDev": 167.61004534928745,
+      "e2eTtft": 35252.9047819941,
+      "e2eTtftStdDev": 167.02739043812625
+    },
+    {
+      "testName": "tg128 @ d65535 (c1)",
+      "tokensPerSec": 23.3275818681893,
+      "tokensPerSecStdDev": 0.2071843550991527
+    },
+    {
+      "testName": "tg128 (c1)",
+      "tokensPerSec": 23.360656864029266,
+      "tokensPerSecStdDev": 0.01970163666665975
+    },
+    {
+      "testName": "tg128 (c5)",
+      "tokensPerSec": 75.02184648497114,
+      "tokensPerSecStdDev": 0.44439996525663494
+    },
+    {
+      "testName": "tg128 @ d100000 (c1)",
+      "tokensPerSec": 23.46795226481298,
+      "tokensPerSecStdDev": 0.31234220689660386
+    },
+    {
+      "testName": "tg128 @ d100000 (c10)",
+      "tokensPerSec": 1.7883441009262142,
+      "tokensPerSecStdDev": 0.004978246500658193
+    }
+  ],
+  "recipe_commit": "4e1b246aa141e04bd45c20bd1334512988c3770b",
+  "recipe_image": "ghcr.io/lancelind/qwen38-flash-dgx@sha256:62a77b7c2806385cd23aeb7f6c4979b29f1b0db941bdc0f4791da90aa15f5bb9",
+  "image_manifest_sha256": "62a77b7c2806385cd23aeb7f6c4979b29f1b0db941bdc0f4791da90aa15f5bb9",
+  "image_arm64_manifest": "sha256:c949df1ba87e1ecda351ef2cf8e58b9d7e7e973dda7998b476eec446fd6d0872",
+  "image_source_revision": "a35c3cc2935dff63eea8a664509a5931b4b82ea2",
+  "model_repo": "travelinlance/Qwen3.8-Flash-Next-RadixArk-NVFP4-Hybrid-Sharp",
+  "model_revision": "1f2ba8b30e34097058610938864b1991cfffa24b",
+  "control_sha256": {
+    "config.json": "e765305daba0951974308f4d32c075b52a6a45974730d273f2216718a994d624",
+    "chat_template.jinja": "d1f22a89eac3609dcfaa7b471b1f7d23bee2f084d275d26f4f8231d1d7908f4e",
+    "tokenizer_config.json": "4fe0a03ee26eff55fae0b92cc12e2d946563333eb9dce7322ba783b3dfb7e7a7",
+    "generation_config.json": "e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e",
+    "model.safetensors.index.json": "1c8b8da8ea5c789e23ca58639f18bbb2431ca340b1d62d77f45d974aa8870ecc"
+  },
+  "tony_repo_commit": "6ad1c8f15cbab1ababd2048e8e5f94094dbfc4a0",
+  "tony_nvidia_model_revision": "fc694b54fb0174e0913e6adf86691ef85a4ead47",
+  "local_context_read": {
+    "ai-transition_commit": "66900a913466e7e31f659f8791c0d983af876fef",
+    "guardkit_commit": "212ea89bff891fb036a5603818d95d997a798956"
+  },
+  "authoring_validation": {
+    "bash_blocks_parsed": 8,
+    "embedded_python_blocks_parsed": 8,
+    "python_helper_compiles": true,
+    "local_document_links_resolve": true,
+    "mock_http_checks": "PASS: auto/required/named tool choices; fragmented tool arguments; tool continuations; JSON; usage-only SSE; tokenized/served prompt-length gate; cold/warm/changed/unrelated prefix flow; decode measurement. Rejects reasoning and missing stream terminator.",
+    "simulated_memory_guard_checks": "PASS: existing inactive swap occupancy accepted; low available memory and new swap I/O stop only the named container and retain failure evidence.",
+    "hardware_execution": "NOT RUN",
+    "factory_canary": "NOT RUN",
+    "comparison_campaign": "NOT RUN"
+  }
+}
