@@ -113,7 +113,6 @@ PINS (set 2026-08-01)
                      never port. NEVER two rows named `deepseek` — LiteLLM load-balances
                      same-named rows into the down lane. Canonical rows:
                      examples/litellm-config.public.yaml (mirrored to the dashboard twin)
-  MEM_CEILING_GB     115 per node        (121 usable; freeze observed at 114)
   fabric (inherited) CX-7 FW ≥ 28.45.4028 · NCCL busbw ≥ 20 GB/s · transport NET/IB (never TCP)
   FALLBACK lane      eugr/spark-vllm-docker @ f7d6e3b5 · recipe deepseek-v4-flash · FP8 TP=2 · MTP k=2
                      · Docker, --no-ray --port 8080   (= two-spark runbook Phase 8, the escape hatch;
