@@ -21,6 +21,13 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def check_repetition(content):
+    # Ordinary Python section comments are not a generation loop. Keep this
+    # exception bounded and specific; long runs in prose/code still fail.
+    screened = re.sub(r"(?m)^[ \t]*#[ \t]*(?:={64,120}|-{64,120})[ \t]*$", "", content)
+    require(not re.search(r"(!{16,}|(.)\2{63,})", screened), "repetitive output")
+
+
 class Probe:
     def __init__(self, args):
         self.args = args
@@ -41,6 +48,13 @@ class Probe:
     def json_request(self, path, body=None):
         with urllib.request.urlopen(self.request(path, body), timeout=900) as response:
             return json.load(response)
+
+    def reset_prefix_cache(self):
+        with urllib.request.urlopen(self.request("/reset_prefix_cache", {}), timeout=30) as response:
+            require(response.status == 200, "cache reset failed")
+            body = response.read()
+            if body.strip():
+                require(json.loads(body).get("success") is True, "engine refused cache reset")
 
     def chat(self, messages, label, max_tokens=512, **extra):
         body = {
@@ -87,11 +101,23 @@ class Probe:
                             item["function"][field] += call.get("function", {}).get(field) or ""
                     finish = choice.get("finish_reason") or finish
         elapsed = time.monotonic() - start
+        # Retain the actual response before assertions, including failed streams,
+        # so a content heuristic cannot discard the evidence needed to diagnose it.
+        self.args.evidence.mkdir(parents=True, exist_ok=True)
+        raw = {"label": label, "elapsed_s": elapsed,
+               "first_delta_s": first - start if first is not None else None,
+               "last_delta_s": last - start if last is not None else None,
+               "done": done, "finish_reason": finish, "usage": usage,
+               "content": content, "reasoning": reasoning,
+               "response_models": sorted(response_models),
+               "tool_calls": [calls[k] for k in sorted(calls)]}
+        (self.args.evidence / (label + "-raw-" + str(time.time_ns()) + ".json")).write_text(
+            json.dumps(raw, indent=2) + "\n")
         require(done and first is not None and finish is not None, "incomplete/empty SSE response")
         require(not reasoning and "<think>" not in content, "thinking-off gate failed")
         require(usage.get("completion_tokens", 0) > 0, "missing native completion-token usage")
         require(not (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0), "nonzero reasoning usage")
-        require(not re.search(r"(!{16,}|(.)\2{63,})", content), "repetitive output")
+        check_repetition(content)
         record = {
             "label": label, "ttft_s": first - start, "elapsed_s": elapsed,
             "decode_tok_s": (usage["completion_tokens"] - 1) / (last - first) if last > first else None,
@@ -116,7 +142,10 @@ class Probe:
                              ("named", {"type": "function", "function": {"name": "lookup_test_key"}})):
             messages = [{"role": "user", "content": "Use lookup_test_key with key gate-alpha. After its result, answer with only the value returned by the tool."}]
             result = self.chat(messages, "tool-" + name, tools=tools, tool_choice=choice)
-            require(result["finish_reason"] == "tool_calls", "tool finish reason missing")
+            # vLLM's named-tool path deliberately returns "stop" even when it
+            # streams a structured tool call. Auto/required still use "tool_calls".
+            allowed_finish = {"stop", "tool_calls"} if name == "named" else {"tool_calls"}
+            require(result["finish_reason"] in allowed_finish, "tool finish reason missing")
             require(len(result["tool_calls"]) == 1, "expected one tool call")
             call = result["tool_calls"][0]
             require(call["id"] and call["function"]["name"] == "lookup_test_key", "wrong tool name/id")
@@ -135,21 +164,26 @@ class Probe:
         words = "ledger invoice payroll contract clause annex schedule amount date vendor total net gross tax due paid".split()
         target = self.args.prompt_tokens
         filler = " ".join(rng.choice(words) + str(rng.randrange(10000)) for _ in range(target))
-        prefix = "Test record. alpha=cobalt-731.\n" + filler + "\nTest record. beta=amber-942."
         def messages(question):
             return [{"role": "user", "content": prefix + "\n" + question}]
         question = "What is alpha in the test record? Reply only with its value."
-        for _ in range(8):
+        # Keep the full source text: destructive proportional trimming can
+        # undershoot, after which slicing cannot grow the prompt back.
+        low, high = 0, len(filler)
+        for _ in range(24):
+            size = (low + high) // 2
+            prefix = "Test record. alpha=cobalt-731.\n" + filler[:size] + "\nTest record. beta=amber-942."
             count = self.json_request("/tokenize", {"model": self.args.model, "messages": messages(question),
                                                       "add_generation_prompt": True,
                                                       "chat_template_kwargs": {"enable_thinking": False}})["count"]
-            if target <= count <= target + max(256, target * 0.02):
+            if target <= count <= target + 128:
                 break
-            filler = filler[:max(1, int(len(filler) * (target + 100) / count))]
-            prefix = "Test record. alpha=cobalt-731.\n" + filler + "\nTest record. beta=amber-942."
-        require(target <= count <= target * 1.05 + 256, "could not construct requested token length")
-        with urllib.request.urlopen(self.request("/reset_prefix_cache", {}), timeout=30) as response:
-            require(response.status == 200, "cache reset failed")
+            if count < target:
+                low = size + 1
+            else:
+                high = size - 1
+        require(target <= count <= target + 128, "could not construct requested token length")
+        self.reset_prefix_cache()
         cold = self.chat(messages(question), "cold-" + str(target), max_tokens=64)
         warm = self.chat(messages(question), "warm-" + str(target), max_tokens=64)
         for result in (cold, warm):
